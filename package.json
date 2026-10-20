@@ -1,0 +1,22 @@
+{
+  "name": "orion-os",
+  "version": "1.0.0",
+  "description": "Orion OS — système d'exploitation mobile web inspiré d'iOS et d'Android",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test",
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "icons": "node scripts/render-icons.mjs",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "eslint": ">=9",
+    "playwright": "^1.56.1"
+  }
+}

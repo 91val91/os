@@ -1,0 +1,472 @@
+/**
+ * Interface système (« SystemUI ») : construit l'écran, démarre le noyau,
+ * orchestre les états (démarrage → configuration → verrouillé → accueil →
+ * application → récentes) et les entrées (gestes, boutons, clavier).
+ */
+import { h } from '../lib/dom.js';
+import { viewport } from '../lib/gesture.js';
+import { bootKernel } from '../kernel/kernel.js';
+import { openBestBackend } from '../kernel/storage.js';
+import { MANIFESTS } from '../apps/registry.js';
+import { ThemeManager } from './theme.js';
+import { SoundManager } from './sound.js';
+import { Dialogs } from './dialogs.js';
+import { WindowManager } from './window-manager.js';
+import { StatusBar } from './statusbar.js';
+import { Navigation } from './navigation.js';
+import { HomeScreen } from './home.js';
+import { AppDrawer } from './drawer.js';
+import { NotificationShade } from './shade.js';
+import { ControlCenter } from './control-center.js';
+import { LockScreen } from './lockscreen.js';
+import { Banners } from './banners.js';
+import { CallScreen } from './call-screen.js';
+import { AlarmScreen } from './alarm-screen.js';
+import { SetupWizard } from './setup.js';
+import { PowerManager, logo } from './power.js';
+
+const LAYERS = ['wallpaper', 'home', 'drawer', 'windows', 'recents', 'navbar', 'lock', 'system', 'setup', 'shade', 'controlCenter', 'statusbar', 'banners', 'dialogs', 'hud', 'toasts', 'filters', 'boot', 'off'];
+const SCREEN_W = 393;
+const SCREEN_H = 852;
+
+export class SystemUI {
+  constructor(stage) {
+    this.stage = stage;
+    this.state = 'boot';
+    this.animScale = 1;
+    this.screenRadius = 0;
+    this.lastActivity = Date.now();
+    this.#buildDom();
+  }
+
+  dur(ms) {
+    return ms * this.animScale;
+  }
+
+  // ───────────── Construction de l'écran ─────────────
+
+  #buildDom() {
+    this.layers = {};
+    this.screen = h('div#screen');
+    for (const name of LAYERS) {
+      const el = h(`div.layer.layer-${name.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}`);
+      this.layers[name] = el;
+      this.screen.append(el);
+    }
+    const button = (cls, label, handlers) => h(`button.hw-btn.${cls}`, { type: 'button', 'aria-label': label, title: label, ...handlers });
+    this.powerButton = button('power', 'Bouton latéral (Alt+L, maintenir : menu)', {});
+    this.device = h(
+      'div#device',
+      button('silent', 'Mode silencieux', { onclick: () => this.toggleSilent() }),
+      button('vol-up', 'Volume + (Alt+↑)', { onclick: () => this.changeVolume(0.1) }),
+      button('vol-down', 'Volume − (Alt+↓)', { onclick: () => this.changeVolume(-0.1) }),
+      this.powerButton,
+      h('div.screen-wrap', this.screen, h('div.camera-cutout')),
+    );
+    this.help = h(
+      'aside.desk-help',
+      h('div.desk-brand', logo(30), h('div', h('strong', 'Orion OS'), h('span', 'Système mobile web'))),
+      h('h4', 'Gestes'),
+      h('ul', [
+        h('li', 'Glisser depuis le bas : accueil'),
+        h('li', 'Glisser et maintenir : apps récentes'),
+        h('li', 'Barre d\'état à gauche : notifications'),
+        h('li', 'Barre d\'état à droite : centre de contrôle'),
+        h('li', 'Bord gauche/droit : retour'),
+        h('li', 'Appui long / clic droit : menus'),
+      ]),
+      h('h4', 'Clavier'),
+      h('ul.keys', [
+        h('li', h('kbd', 'Échap'), ' Retour'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'H'), ' Accueil'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'R'), ' Récentes'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'N'), ' Notifications'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'C'), ' Centre de contrôle'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'L'), ' Verrouiller / réveiller'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', 'P'), ' Marche/arrêt'),
+        h('li', h('kbd', 'Alt'), '+', h('kbd', '↑'), h('kbd', '↓'), ' Volume'),
+      ]),
+    );
+    this.stage.replaceChildren(this.device, this.help);
+    this.#setupPowerButton();
+    this.#fit();
+    window.addEventListener('resize', () => this.#fit());
+    window.visualViewport?.addEventListener('resize', () => this.#fit());
+  }
+
+  /** Mode cadre (ordinateur) ou plein écran (téléphone). */
+  #fit() {
+    const vw = window.innerWidth;
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+    const fullscreen = vw <= 560 || (coarse && vw < 1000) || new URLSearchParams(location.search).has('fullscreen');
+    document.body.classList.toggle('fullscreen', fullscreen);
+    if (fullscreen) {
+      viewport.scale = 1;
+      this.device.style.transform = '';
+      this.screenRadius = 0;
+    } else {
+      const frameW = SCREEN_W + 28;
+      const frameH = SCREEN_H + 28;
+      const helpSpace = vw > 980 ? 300 : 0;
+      const scale = Math.min(1, (vh - 32) / frameH, (vw - 32 - helpSpace) / frameW);
+      viewport.scale = scale;
+      this.device.style.transform = `scale(${scale})`;
+      this.screenRadius = 48;
+    }
+    this.help.classList.toggle('hidden', fullscreen || vw <= 980);
+    const width = fullscreen ? vw : SCREEN_W;
+    this.screen.style.setProperty('--icon-size', `${Math.round(Math.min(68, Math.max(52, width * 0.152)))}px`);
+    this.screen.style.setProperty('--screen-radius', `${this.screenRadius}px`);
+  }
+
+  // ───────────── Démarrage ─────────────
+
+  async powerOn() {
+    this.power = new PowerManager(this);
+    this.power.showBoot();
+    const started = performance.now();
+    let backend;
+    try {
+      backend = await openBestBackend();
+    } catch {
+      backend = undefined;
+    }
+    this.kernel = await bootKernel({ backend, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
+    window.orion = { kernel: this.kernel, ui: this };
+
+    const k = this.kernel;
+    this.theme = new ThemeManager(this);
+    this.sound = new SoundManager(k.settings);
+    this.dialogs = new Dialogs(this);
+    this.statusbar = new StatusBar(this);
+    this.wm = new WindowManager(this);
+    this.home = new HomeScreen(this);
+    this.drawer = new AppDrawer(this);
+    this.shade = new NotificationShade(this);
+    this.controlCenter = new ControlCenter(this);
+    this.lock = new LockScreen(this);
+    this.banners = new Banners(this);
+    this.calls = new CallScreen(this);
+    this.alarmScreen = new AlarmScreen(this);
+    this.nav = new Navigation(this);
+
+    this.theme.start();
+    this.statusbar.start();
+    this.home.start();
+    this.drawer.start();
+    this.shade.start();
+    this.controlCenter.start();
+    this.lock.start();
+    this.banners.start();
+    this.calls.start();
+    this.alarmScreen.start();
+    this.nav.start();
+
+    k.am.host = {
+      launch: (appId, intent, opts) => this.wm.launch(appId, intent, opts),
+      choose: (packages, intent) => this.dialogs.choose(packages, intent),
+      focus: (pid) => this.wm.focus(pid),
+    };
+    k.permissions.prompter = (request) => this.dialogs.permission(request);
+    this.#wireKernelEvents();
+    this.#setupInput();
+    this.#startTimers();
+
+    const elapsed = performance.now() - started;
+    await new Promise((r) => setTimeout(r, Math.max(0, 1300 - elapsed)));
+    this.power.setBootProgress(1);
+    this.lock.lock();
+    this.setState('locked');
+    await this.power.hideBoot();
+
+    if (!k.settings.get('setupDone')) {
+      this.setState('setup');
+      await new SetupWizard(this).run();
+      this.lock.isLocked = false;
+      this.lock.el.classList.remove('visible');
+      this.setState('home');
+    }
+    this.#prefetchApps();
+  }
+
+  /** Précharge les modules des apps (démarrage plus rapide, cache hors ligne). */
+  #prefetchApps() {
+    const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500));
+    idle(() => {
+      for (const pkg of this.kernel.packages.list({ installed: null })) pkg.load().catch(() => {});
+    });
+  }
+
+  #wireKernelEvents() {
+    const k = this.kernel;
+    k.events.on('power:request', ({ action }) => {
+      if (action === 'lock') this.lockNow();
+      if (action === 'reboot') this.power.reboot();
+      if (action === 'shutdown') this.power.shutdown();
+    });
+    k.events.on('battery:change', (b) => {
+      if (b.previous != null && b.previous > 0.2 && b.level <= 0.2 && !b.charging) {
+        k.notifications.post({ appId: 'settings', title: 'Batterie faible', body: `${Math.round(b.level * 100)} % restants. Activez l'économiseur de batterie.`, tag: 'battery', intent: { app: 'settings', action: 'view', data: { page: 'battery' } } });
+      }
+    });
+    k.events.on('package:install', ({ id }) => {
+      const pkg = k.packages.get(id);
+      if (this.state !== 'boot') this.dialogs.toast(`${pkg.name} installée`, { icon: 'check-circle' });
+    });
+  }
+
+  #startTimers() {
+    const k = this.kernel;
+    setInterval(() => {
+      k.alarms.tick();
+      k.device.tick();
+      this.#checkAutoLock();
+    }, 1000);
+  }
+
+  #checkAutoLock() {
+    const seconds = this.kernel.settings.get('autoLock');
+    if (!seconds || ['off', 'boot', 'setup'].includes(this.state)) return;
+    if (this.kernel.telephony.call || this.alarmScreen.isVisible) return;
+    if (Date.now() - this.lastActivity > seconds * 1000) this.screenOff();
+  }
+
+  // ───────────── États ─────────────
+
+  setState(state) {
+    this.state = state;
+    this.screen.dataset.state = state;
+    this.statusbar?.refreshStyle();
+  }
+
+  /** Ferme volets, tiroir, menus et dialogues (sauf `except`). */
+  closeOverlays({ except = null } = {}) {
+    if (except !== this.shade && this.shade?.isOpen) this.shade.close();
+    if (except !== this.controlCenter && this.controlCenter?.isOpen) this.controlCenter.close();
+    if (except !== this.drawer && this.drawer?.isOpen) this.drawer.close(true);
+    this.contextMenuClose?.();
+    this.powerMenuClose?.();
+  }
+
+  async launch(appId, intent = { action: 'main' }, options = {}) {
+    if (this.lock.isLocked) {
+      await this.lock.unlock({ then: () => this.launch(appId, intent, options) });
+      return;
+    }
+    this.closeOverlays();
+    this.home.exitEditMode();
+    try {
+      return await this.wm.launch(appId, intent, options);
+    } catch (error) {
+      this.dialogs.toast(error.message);
+    }
+  }
+
+  /** Démarre un intent (explicite ou implicite) depuis l'interface système. */
+  async openIntent(intent, { appId = null } = {}) {
+    if (this.lock.isLocked) {
+      await this.lock.unlock({ then: () => this.openIntent(intent, { appId }) });
+      return;
+    }
+    this.closeOverlays();
+    try {
+      if (intent?.app || intent?.action) await this.kernel.am.start(intent);
+      else if (appId) await this.launch(appId);
+    } catch (error) {
+      this.dialogs.toast(error.message);
+    }
+  }
+
+  async goHome() {
+    if (this.dialogs.open) this.dialogs.closeAll();
+    this.closeOverlays();
+    if (this.state === 'locked' || this.state === 'setup' || this.state === 'off') return;
+    if (this.calls.isVisible && this.calls.minimize()) return;
+    if (this.state === 'recents') {
+      await this.wm.closeRecents();
+      this.setState('home');
+      return;
+    }
+    if (this.state === 'home') {
+      if (!this.home.exitEditMode()) this.home.setPage(0);
+      return;
+    }
+    this.setState('home');
+    await this.wm.minimize();
+  }
+
+  async back() {
+    if (this.dialogs.closeTop()) return;
+    if (this.contextMenuClose) return this.contextMenuClose();
+    if (this.powerMenuClose) return this.powerMenuClose();
+    if (this.shade.isOpen) return this.shade.close();
+    if (this.controlCenter.isOpen) return this.controlCenter.close();
+    if (this.calls.isVisible) return void this.calls.minimize();
+    if (this.state === 'locked') return;
+    if (this.drawer.isOpen) return void this.drawer.close();
+    if (this.state === 'recents') return this.goHome();
+    if (this.state === 'home') return void this.home.exitEditMode();
+    if (this.state === 'app') await this.wm.back();
+  }
+
+  showRecents() {
+    if (!['home', 'app'].includes(this.state)) return;
+    this.closeOverlays();
+    this.home.exitEditMode();
+    this.wm.showRecents();
+  }
+
+  toggleRecents() {
+    if (this.state === 'recents') this.goHome();
+    else this.showRecents();
+  }
+
+  onUnlocked() {
+    const fg = this.wm.currentWindow;
+    this.setState(fg ? 'app' : 'home');
+  }
+
+  lockNow() {
+    this.closeOverlays();
+    this.dialogs.closeAll();
+    if (this.state === 'recents') this.wm.closeRecents();
+    this.home.exitEditMode();
+    this.drawer.close(true);
+    this.lock.lock();
+    this.setState('locked');
+    this.sound.lock();
+  }
+
+  // ───────────── Écran et bouton latéral ─────────────
+
+  screenOff() {
+    if (this.state === 'off' || this.state === 'boot') return;
+    if (this.state !== 'setup') this.lockNow();
+    this.stateBeforeOff = this.state;
+    this.layers.off.replaceChildren();
+    this.layers.off.classList.add('visible');
+    this.setState('off');
+  }
+
+  wake() {
+    if (this.poweredOff) return;
+    this.layers.off.classList.remove('visible');
+    this.lastActivity = Date.now();
+    this.setState(this.stateBeforeOff === 'setup' ? 'setup' : 'locked');
+    if (this.lock.isLocked) this.lock.render();
+  }
+
+  wakeForNotification() {
+    this.wake();
+    clearTimeout(this.sleepAgain);
+    this.sleepAgain = setTimeout(() => {
+      if (this.state === 'locked' && Date.now() - this.lastActivity > 7000) this.screenOff();
+    }, 8000);
+  }
+
+  pressPower() {
+    if (this.poweredOff) return this.power.powerOn();
+    if (this.alarmScreen.isVisible) return this.alarmScreen.dismiss();
+    if (this.kernel?.telephony.call?.state === 'incoming') {
+      this.sound.stopLoop('ring');
+      return;
+    }
+    if (this.state === 'off') this.wake();
+    else this.screenOff();
+  }
+
+  #setupPowerButton() {
+    let timer = null;
+    let long = false;
+    const btn = this.powerButton;
+    btn.addEventListener('pointerdown', () => {
+      long = false;
+      timer = setTimeout(() => {
+        long = true;
+        if (this.kernel && !this.poweredOff) {
+          if (this.state === 'off') this.wake();
+          this.power.showMenu();
+        }
+      }, 650);
+    });
+    const up = () => {
+      clearTimeout(timer);
+      if (!long && this.kernel) this.pressPower();
+      long = true;
+    };
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointerleave', () => clearTimeout(timer));
+  }
+
+  toggleSilent() {
+    if (!this.kernel) return;
+    const silent = this.kernel.settings.toggle('silent');
+    this.dialogs.toast(silent ? 'Mode silencieux activé' : 'Sonnerie activée', { icon: silent ? 'bell-off' : 'bell' });
+  }
+
+  changeVolume(delta) {
+    if (!this.kernel) return;
+    const s = this.kernel.settings;
+    const value = Math.round(Math.min(1, Math.max(0, s.get('volume') + delta)) * 10) / 10;
+    s.set('volume', value);
+    this.power.showVolume(value);
+    this.sound.volumeTick();
+    this.lastActivity = Date.now();
+  }
+
+  emergencyCall() {
+    try {
+      this.kernel.telephony.dial('112');
+    } catch (error) {
+      this.dialogs.toast(error.message);
+    }
+  }
+
+  // ───────────── Entrées ─────────────
+
+  #setupInput() {
+    const activity = () => (this.lastActivity = Date.now());
+    this.screen.addEventListener('pointerdown', (e) => {
+      activity();
+      if (this.state === 'off' && !this.poweredOff) this.wake();
+      if (this.kernel.settings.get('showTouches')) this.#touchDot(e);
+    }, true);
+    this.screen.addEventListener('click', (e) => {
+      if (e.target.closest('button, [role="button"], .tappable')) this.sound.click();
+    });
+    window.addEventListener('keydown', (e) => {
+      activity();
+      const typing = e.target.closest?.('input, textarea, [contenteditable="true"]');
+      if (e.altKey) {
+        const actions = {
+          h: () => this.goHome(),
+          r: () => this.toggleRecents(),
+          n: () => (this.shade.isOpen ? this.shade.close() : this.shade.open()),
+          c: () => (this.controlCenter.isOpen ? this.controlCenter.close() : this.controlCenter.open()),
+          l: () => this.pressPower(),
+          p: () => this.power.showMenu(),
+          arrowup: () => this.changeVolume(0.1),
+          arrowdown: () => this.changeVolume(-0.1),
+        };
+        const action = actions[e.key.toLowerCase()];
+        if (action && this.state !== 'boot') {
+          e.preventDefault();
+          action();
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (typing) e.target.blur();
+        if (!this.lock.pinVisible) this.back();
+      }
+    });
+  }
+
+  #touchDot(e) {
+    const rect = this.screen.getBoundingClientRect();
+    const dot = h('div.touch-dot', { style: { left: `${(e.clientX - rect.left) / viewport.scale}px`, top: `${(e.clientY - rect.top) / viewport.scale}px` } });
+    this.screen.append(dot);
+    setTimeout(() => dot.remove(), 500);
+  }
+}

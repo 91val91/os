@@ -1,0 +1,99 @@
+.contacts-search {
+  margin-bottom: 14px;
+}
+
+.contacts-me {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 4px 18px;
+  margin-bottom: 14px;
+  border-bottom: .5px solid var(--sep);
+}
+
+.contacts-me strong {
+  display: block;
+  font-size: 1.2rem;
+}
+
+.contacts-me span {
+  color: var(--fg-2);
+  font-size: .85rem;
+}
+
+.contacts-list {
+  padding-right: 8px;
+}
+
+.contacts-list .list-group {
+  margin-bottom: 18px;
+  scroll-margin-top: 8px;
+}
+
+.contacts-list .li-title strong {
+  font-weight: 600;
+}
+
+.contact-fav {
+  color: var(--orange);
+}
+
+.contacts-index {
+  position: absolute;
+  right: 2px;
+  top: calc(var(--sat) + 120px);
+  display: flex;
+  flex-direction: column;
+  z-index: 3;
+}
+
+.contacts-index button {
+  font-size: .64rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 1px 4px;
+}
+
+.contact-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 20px;
+  text-align: center;
+}
+
+.contact-hero h2 {
+  margin: 10px 0 0;
+  font-size: 1.7rem;
+  font-weight: 600;
+}
+
+.contact-hero p {
+  margin: 0;
+  color: var(--fg-2);
+}
+
+.contact-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.contact-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0 8px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: .7rem;
+}
+
+.contact-link {
+  color: var(--accent);
+  text-decoration: none;
+}
