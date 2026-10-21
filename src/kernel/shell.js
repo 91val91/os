@@ -822,8 +822,12 @@ const COMMANDS = {
     desc: 'Comptes de l\'appareil',
     run({ k }) {
       if (!k.accounts) return this.env.USER;
+      // Une entrée sur deux lignes : lisible sur un écran de téléphone étroit.
       const current = k.account?.id;
-      return table([['', 'NOM', 'E-MAIL', 'RÔLE'], ...k.accounts.list().map((a) => [a.id === current ? '*' : '', a.name || '—', a.email || '—', a.owner ? 'propriétaire' : 'utilisateur'])]);
+      return k.accounts
+        .list()
+        .map((a) => `${a.id === current ? '*' : ' '} ${a.name || '—'}${a.owner ? ' (propriétaire)' : ''}${a.email ? `\n    ${a.email}` : ''}`)
+        .join('\n');
     },
   },
   hostname: { desc: 'Nom de l\'appareil', run() { return this.env.HOSTNAME; } },

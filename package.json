@@ -10,6 +10,7 @@
     "test": "node --test",
     "test:e2e": "node tests/e2e/smoke.mjs",
     "icons": "node scripts/render-icons.mjs",
+    "screenshots": "node scripts/screenshots.mjs",
     "lint": "eslint ."
   },
   "engines": {

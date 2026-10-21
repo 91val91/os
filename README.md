@@ -192,8 +192,9 @@ Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (
 ```bash
 npm test            # 50 tests unitaires du noyau (node:test, sans dépendance)
 npm install && npx playwright install chromium
-npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN
+npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
+npm run screenshots # régénère les captures du README
 ```
 
 ## Structure du projet
@@ -207,7 +208,7 @@ src/apps/                                 applications et registre
 src/lib/                                  DOM, icônes, gestes, kit d'interface, calcul, formats
 src/styles/                               jetons de design, interface système, composants
 tests/                                    tests unitaires et de bout en bout
-scripts/                                  serveur local, génération des icônes
+scripts/                                  serveur local, icônes PWA, captures du README
 ```
 
 ## Ce qui est réel, ce qui est simulé
