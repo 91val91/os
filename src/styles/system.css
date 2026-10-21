@@ -239,47 +239,42 @@ body.fullscreen .layer-statusbar {
   flex-shrink: 0;
   border-radius: var(--icon-radius);
   color: #fff;
-  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .18), 0 1px 3px rgba(0, 0, 0, .12);
-  container-type: size;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
 }
 
+/* Illustration plein cadre, découpée par la forme de l'icône */
+.app-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.app-art text {
+  font-family: var(--font-display);
+}
+
+/* Liseré commun, au-dessus de l'illustration */
+.app-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .16);
+  pointer-events: none;
+}
+
+/* Pictogramme des apps sans illustration */
 .app-icon .glyph {
   width: 56%;
   height: 56%;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .12));
 }
 
-.app-icon[data-app="calendar"] { color: #111; }
-
-.app-icon .clock-face {
-  width: 88%;
-  height: 88%;
-}
-
-.calicon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-
-.calicon-day {
-  font-size: 15cqw;
-  font-weight: 600;
-  color: #ff3b30;
-  text-transform: capitalize;
-  margin-bottom: 2cqw;
-}
-
-.calicon-num {
-  font-size: 44cqw;
-  font-weight: 300;
-  color: #111;
-  letter-spacing: -.04em;
-}
-
 .icon-badge {
   position: absolute;
+  z-index: 1;
   top: -6px;
   right: -7px;
   min-width: 22px;
@@ -293,7 +288,6 @@ body.fullscreen .layer-statusbar {
   display: grid;
   place-items: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
-  container-type: normal;
 }
 
 /* ───────────────────────── Écran d'accueil ───────────────────────── */
