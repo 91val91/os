@@ -54,6 +54,10 @@ export class LockScreen {
         if (-dy > this.el.clientHeight * 0.2 || vy < -0.5) this.unlock();
         else this.#resetContent();
       },
+      onCancel: () => {
+        this.content.style.transition = '';
+        this.#resetContent();
+      },
     });
     this.el.addEventListener('click', (e) => {
       if (this.isLocked && !this.pinVisible && e.target === this.el) this.#bounceHint();

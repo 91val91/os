@@ -4,6 +4,8 @@ import { evaluate, formatNumber, looksLikeMath, clean } from '../src/lib/expr.js
 import { slideLine, move, canMove, addRandomTile, emptyGrid, hasWon } from '../src/apps/game2048/logic.js';
 import { formatDuration, formatBytes, initials, relativeTime } from '../src/lib/format.js';
 import { landscapeSVG, hashString, mulberry32 } from '../src/lib/artwork.js';
+import { sha256Hex } from '../src/lib/sha256.js';
+import { createHash } from 'node:crypto';
 
 test('expressions : priorités, associativité, unaire', () => {
   assert.equal(evaluate('2 + 3 × 4'), 14);
@@ -82,4 +84,12 @@ test('illustrations déterministes', () => {
   assert.equal(landscapeSVG(7), landscapeSVG(7));
   assert.notEqual(landscapeSVG(7), landscapeSVG(8));
   assert.match(landscapeSVG(1), /^<svg/);
+});
+
+test('SHA-256 de secours (page HTTP sans crypto.subtle) identique à la référence', () => {
+  const encoder = new TextEncoder();
+  for (const text of ['', 'abc', '1234', 'orion:'.repeat(40), 'é€😀']) {
+    const bytes = encoder.encode(text);
+    assert.equal(sha256Hex(bytes), createHash('sha256').update(bytes).digest('hex'), text);
+  }
 });

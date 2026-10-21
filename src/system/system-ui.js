@@ -24,6 +24,7 @@ import { CallScreen } from './call-screen.js';
 import { AlarmScreen } from './alarm-screen.js';
 import { SetupWizard } from './setup.js';
 import { PowerManager, logo } from './power.js';
+import { platform } from './platform.js';
 
 const LAYERS = ['wallpaper', 'home', 'drawer', 'windows', 'recents', 'navbar', 'lock', 'system', 'setup', 'shade', 'controlCenter', 'statusbar', 'banners', 'dialogs', 'hud', 'toasts', 'filters', 'boot', 'off'];
 const SCREEN_W = 393;
@@ -36,6 +37,7 @@ export class SystemUI {
     this.animScale = 1;
     this.screenRadius = 0;
     this.lastActivity = Date.now();
+    platform.applyClasses();
     this.#buildDom();
   }
 
@@ -105,12 +107,15 @@ export class SystemUI {
       viewport.scale = 1;
       this.device.style.transform = '';
       this.screenRadius = 0;
+      // Hauteur réellement visible (le clavier virtuel d'iOS ne réduit pas 100dvh).
+      document.documentElement.style.setProperty('--app-h', `${Math.round(vh)}px`);
     } else {
       const frameW = SCREEN_W + 28;
       const frameH = SCREEN_H + 28;
       const helpSpace = vw > 980 ? 300 : 0;
       const scale = Math.min(1, (vh - 32) / frameH, (vw - 32 - helpSpace) / frameW);
       viewport.scale = scale;
+      document.documentElement.style.setProperty('--app-h', `${SCREEN_H}px`);
       this.device.style.transform = `scale(${scale})`;
       this.screenRadius = 48;
     }
@@ -132,6 +137,8 @@ export class SystemUI {
     } catch {
       backend = undefined;
     }
+    // Demande un stockage persistant pour que le téléphone n'efface pas le système de fichiers.
+    navigator.storage?.persist?.().catch(() => {});
     this.kernel = await bootKernel({ backend, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
 
@@ -194,7 +201,12 @@ export class SystemUI {
   #prefetchApps() {
     const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500));
     idle(() => {
-      for (const pkg of this.kernel.packages.list({ installed: null })) pkg.load().catch(() => {});
+      for (const pkg of this.kernel.packages.list({ installed: null })) {
+        pkg
+          .load()
+          .then((module) => module.styles?.forEach((href) => fetch(href).catch(() => {})))
+          .catch(() => {});
+      }
     });
   }
 
@@ -238,6 +250,8 @@ export class SystemUI {
     this.state = state;
     this.screen.dataset.state = state;
     this.statusbar?.refreshStyle();
+    // Une app ouverte de façon asynchrone après un toucher doit aussi intercepter Retour.
+    setTimeout(() => this.#armHistory(), 0);
   }
 
   /** Ferme volets, tiroir, menus et dialogues (sauf `except`). */
@@ -429,9 +443,22 @@ export class SystemUI {
     const activity = () => (this.lastActivity = Date.now());
     this.screen.addEventListener('pointerdown', (e) => {
       activity();
-      if (this.state === 'off' && !this.poweredOff) this.wake();
+      if (this.state === 'off') {
+        // Sur un téléphone il n'y a pas de bouton latéral : toucher l'écran rallume.
+        if (this.poweredOff) this.power.powerOn();
+        else this.wake();
+      }
       if (this.kernel.settings.get('showTouches')) this.#touchDot(e);
     }, true);
+    // Pas de menu contextuel du navigateur (appui long sur une image ou un lien).
+    this.screen.addEventListener('contextmenu', (e) => {
+      if (!e.target.closest('input, textarea, [contenteditable="true"], .selectable')) e.preventDefault();
+    });
+    // Au retour dans l'app, ne pas éteindre l'écran pour l'inactivité passée ailleurs.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') activity();
+    });
+    this.#setupHistory();
     this.screen.addEventListener('click', (e) => {
       if (e.target.closest('button, [role="button"], .tappable')) this.sound.click();
     });
@@ -461,6 +488,41 @@ export class SystemUI {
         if (!this.lock.pinVisible) this.back();
       }
     });
+  }
+
+  /** Y a-t-il quelque chose à fermer avec « Retour » ? */
+  canGoBack() {
+    if (['boot', 'off', 'locked', 'setup'].includes(this.state)) return false;
+    return (
+      this.state !== 'home' ||
+      this.dialogs.open ||
+      this.shade.isOpen ||
+      this.controlCenter.isOpen ||
+      this.drawer.isOpen ||
+      this.home.editing ||
+      Boolean(this.contextMenuClose || this.powerMenuClose)
+    );
+  }
+
+  /**
+   * Relie le bouton / geste Retour du téléphone (et du navigateur) au Retour
+   * d'Orion : une entrée d'historique « garde » est ajoutée tant qu'il y a
+   * quelque chose à fermer, et l'événement popstate déclenche back().
+   * Sans cela, Retour fermerait l'application installée.
+   */
+  #setupHistory() {
+    this.historyReady = true;
+    // Chrome ignore les entrées ajoutées sans geste de l'utilisateur : on arme après chaque toucher.
+    window.addEventListener('pointerup', () => setTimeout(() => this.#armHistory(), 0), true);
+    window.addEventListener('popstate', () => {
+      if (this.state === 'off') return;
+      this.back();
+      setTimeout(() => this.#armHistory(), 0);
+    });
+  }
+
+  #armHistory() {
+    if (this.historyReady && !history.state?.orion && this.canGoBack()) history.pushState({ orion: true }, '');
   }
 
   #touchDot(e) {

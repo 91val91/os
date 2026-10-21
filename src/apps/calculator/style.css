@@ -72,6 +72,9 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
+  /* Sur les écrans courts, le clavier rétrécit pour laisser voir l'affichage. */
+  width: min(100%, calc((var(--app-h, 100dvh) - var(--sat) - var(--sab) - 190px) * .8));
+  align-self: center;
 }
 
 .calc-sci {

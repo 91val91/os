@@ -39,14 +39,17 @@ export class AppDrawer {
       onStart: () => this.el.classList.add('dragging'),
       onMove: ({ dy }) => this.#set(1 - Math.max(0, dy) / this.travel),
       onEnd: ({ dy, vy }) => this.dragEnd(this.travel - Math.max(0, dy), -vy),
+      onCancel: () => this.#restore(),
     });
     // Glisser vers le bas depuis le haut de la liste ferme le tiroir.
+    // Au doigt, le navigateur peut reprendre le geste (défilement) : on remet alors le tiroir en place.
     drag(this.scroller, {
       axis: 'y',
       filter: () => this.isOpen && this.scroller.scrollTop <= 0,
       onStart: ({ dy }) => dy > 0 && this.el.classList.add('dragging'),
       onMove: ({ dy }) => dy > 0 && this.#set(1 - dy / this.travel),
       onEnd: ({ dy, vy }) => (dy > 0 ? this.dragEnd(this.travel - dy, -vy) : this.el.classList.remove('dragging')),
+      onCancel: () => this.#restore(),
     });
 
     for (const type of ['package:install', 'package:uninstall']) this.k.events.on(type, () => this.render());
@@ -55,6 +58,11 @@ export class AppDrawer {
 
   #set(p) {
     this.el.style.setProperty('--p', String(Math.min(1, Math.max(0, p))));
+  }
+
+  #restore() {
+    this.el.classList.remove('dragging');
+    if (this.isOpen) this.#set(1);
   }
 
   render() {

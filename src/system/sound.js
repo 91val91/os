@@ -14,11 +14,26 @@ export class SoundManager {
     this.settings = settings;
     this.ctx = null;
     this.loops = new Map();
+    this.playbackHolders = new Set();
+    // Les navigateurs mobiles n'autorisent le son qu'après un geste de l'utilisateur.
     const unlock = () => {
-      this.#context()?.resume?.();
+      const ctx = this.#context();
+      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
     };
-    window.addEventListener('pointerdown', unlock, { capture: true });
-    window.addEventListener('keydown', unlock, { capture: true });
+    for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
+      window.addEventListener(type, unlock, { capture: true });
+    }
+  }
+
+  /**
+   * Sur iPhone, Web Audio est coupé par l'interrupteur silencieux du téléphone ;
+   * la catégorie « playback » le fait sonner quand même (réveil, appel, musique).
+   * `holder` identifie qui en a besoin : la catégorie reste active tant qu'il en reste un.
+   */
+  setPlaybackSession(holder, active) {
+    if (active) this.playbackHolders.add(holder);
+    else this.playbackHolders.delete(holder);
+    if (globalThis.navigator?.audioSession) navigator.audioSession.type = this.playbackHolders.size ? 'playback' : 'auto';
   }
 
   #context() {
@@ -129,6 +144,7 @@ export class SoundManager {
   /** Boucle sonore (sonnerie, réveil) jusqu'à `stopLoop(name)`. */
   startLoop(name) {
     this.stopLoop(name);
+    this.setPlaybackSession(`loop:${name}`, true);
     const patterns = {
       ring: { every: 2600, play: () => [0, 0.2, 0.4, 0.6].forEach((t, i) => this.tone(i % 2 ? 1318.5 : 1568, { duration: 0.18, gain: 0.22, when: t, ignoreSilent: false })) },
       alarm: { every: 1100, play: () => [0, 0.18, 0.36].forEach((t) => this.tone([880, 1760], { duration: 0.12, gain: 0.22, type: 'triangle', when: t, ignoreSilent: true })) },
@@ -143,6 +159,7 @@ export class SoundManager {
   stopLoop(name) {
     clearInterval(this.loops.get(name));
     this.loops.delete(name);
+    this.setPlaybackSession(`loop:${name}`, false);
   }
 
   stopAll() {

@@ -16,10 +16,33 @@ npm start
 ```
 
 - **Sur ordinateur**, le système s'affiche dans un cadre de téléphone avec ses boutons physiques (latéral, volume, silencieux) ; la souris remplace le doigt et le clic droit l'appui long.
-- **Sur un téléphone**, lancez `HOST=0.0.0.0 npm start`, ouvrez `http://<ip-de-votre-ordinateur>:8080`, puis « Ajouter à l'écran d'accueil » : Orion OS démarre alors en plein écran, comme un système natif, et fonctionne hors ligne.
-- N'importe quel hébergement statique convient aussi (GitHub Pages, Netlify…) : tous les chemins sont relatifs.
+- **Sur un téléphone**, il doit être servi en HTTPS : voir [Démarrer sur mobile](#démarrer-sur-mobile).
+- N'importe quel hébergement statique convient (GitHub Pages, Netlify…) : tous les chemins sont relatifs.
 
 Au premier démarrage, un assistant vous accueille (nom, thème, style de navigation, code de verrouillage). Toutes les données sont persistées dans IndexedDB.
+
+## Démarrer sur mobile
+
+Les navigateurs mobiles n'autorisent l'installation en plein écran, le fonctionnement hors ligne, la caméra, le micro et la localisation que sur une page **HTTPS**. Le plus simple est donc de publier Orion OS sur GitHub Pages (gratuit pour un dépôt public) :
+
+1. Sur GitHub, ouvrez le dépôt → **Settings** → **Pages**.
+2. Dans **Build and deployment**, choisissez **Source : Deploy from a branch**, puis la branche qui contient Orion OS et le dossier **/ (root)** → **Save**.
+3. Après une à deux minutes, le système est en ligne à l'adresse `https://<utilisateur>.github.io/<dépôt>/` (par exemple `https://91val91.github.io/os/`).
+
+Ouvrez ensuite cette adresse sur le téléphone et installez-la :
+
+- **Android (Chrome)** : menu **⋮** → **Installer l'application** (ou « Ajouter à l'écran d'accueil »). L'icône Orion apparaît parmi vos applications ; elle s'ouvre en plein écran, sans barre d'adresse, et le bouton ou geste Retour d'Android agit dans Orion.
+- **iPhone / iPad (Safari)** : bouton **Partager** → **Sur l'écran d'accueil**, en laissant « Ouvrir en tant qu'app web » activé → **Ajouter**.
+
+Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la barre d'adresse reste visible et les gestes du bord de l'écran appartiennent au navigateur. Après la première ouverture, tout est en cache et le système démarre même sans réseau. Les mises à jour publiées sont téléchargées en arrière-plan et prises en compte au lancement suivant.
+
+**Sans hébergement**, depuis votre ordinateur :
+
+- `HOST=0.0.0.0 npm start` puis `http://<ip-de-l-ordinateur>:8080` sur un téléphone du même Wi‑Fi : pratique pour un essai, mais en HTTP il n'y a ni installation, ni hors ligne, ni caméra, ni localisation.
+- Un tunnel HTTPS temporaire lève ces limites : `npm start` dans un terminal, puis `cloudflared tunnel --url http://localhost:8080` dans un autre, et ouvrez l'adresse `https://….trycloudflare.com` affichée (elle change à chaque lancement).
+- Android branché en USB : dans Chrome sur l'ordinateur, `chrome://inspect` → **Port forwarding** `8080 → localhost:8080`, puis `http://localhost:8080` sur le téléphone, qui compte comme une adresse sécurisée.
+
+**Limites sur un vrai téléphone** : Orion OS reste une application web. Quand le téléphone est en veille ou qu'une autre application est au premier plan, il est suspendu : réveils et minuteurs ne sonnent qu'une fois Orion rouvert. Les appels et SMS sont simulés, et les boutons physiques (volume, marche) restent ceux du téléphone hôte ; utilisez le centre de contrôle et le menu marche-arrêt d'Orion. Sur iPhone, l'app installée ne partage pas ses données avec Safari : ce qui a été configuré dans un onglet est à refaire dans l'app.
 
 ## Prise en main
 
@@ -28,7 +51,7 @@ Au premier démarrage, un assistant vous accueille (nom, thème, style de naviga
 | Glisser vers le haut depuis le bas | Retour à l'accueil (l'app rétrécit vers son icône) |
 | Glisser vers le haut et maintenir | Applications récentes (cartes, glisser vers le haut pour fermer) |
 | Glisser latéralement sur la barre du bas | Basculer vers l'app précédente |
-| Glisser depuis le bord gauche ou droit | Retour (Android) |
+| Glisser depuis le bord gauche ou droit, ou Retour du téléphone Android | Retour |
 | Tirer la barre d'état à gauche | Volet de notifications et réglages rapides (Android) |
 | Tirer la barre d'état à droite | Centre de contrôle (iOS) |
 | Glisser vers le haut sur l'accueil | Tiroir d'applications avec recherche universelle |

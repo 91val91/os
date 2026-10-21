@@ -1,3 +1,5 @@
+import { sha256Hex } from '../lib/sha256.js';
+
 /**
  * Service de réglages : valeurs par défaut + surcharges persistées.
  */
@@ -116,9 +118,13 @@ export class Settings {
   }
 }
 
-/** Hachage d'un code de verrouillage (SHA-256 salé). */
+/**
+ * Hachage d'un code de verrouillage (SHA-256 salé). Web Crypto n'existe qu'en
+ * contexte sécurisé : en http sur le réseau local, on utilise l'implémentation JS.
+ */
 export async function hashPasscode(code, salt) {
   const data = new TextEncoder().encode(`${salt}:${code}`);
+  if (!globalThis.crypto?.subtle) return sha256Hex(data);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

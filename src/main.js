@@ -12,6 +12,14 @@ ui.powerOn().catch((error) => {
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:' && !new URLSearchParams(location.search).has('nosw')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch((error) => console.warn('Service worker indisponible', error));
+    navigator.serviceWorker
+      .register('sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then((registration) => {
+        // Les fichiers chargés avant l'activation du service worker sont mis en cache tout de suite.
+        const urls = [location.href, ...performance.getEntriesByType('resource').map((entry) => entry.name)];
+        registration.active?.postMessage({ type: 'cache', urls });
+      })
+      .catch((error) => console.warn('Service worker indisponible', error));
   });
 }

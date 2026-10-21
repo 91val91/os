@@ -118,6 +118,8 @@ export function mount(root, ctx) {
   // Session multimédia système + API Media Session du navigateur.
   function sync() {
     const t = current();
+    // iPhone : la musique continue même si l'interrupteur silencieux est activé.
+    ctx.sound.setPlaybackSession('music', playing);
     renderMini();
     fullPlayer?.render();
     renderList();
@@ -286,6 +288,7 @@ export function mount(root, ctx) {
     onDestroy: () => {
       synth?.stop();
       element.pause();
+      ctx.sound.setPlaybackSession('music', false);
       activity?.end();
       audio?.close();
       ctx.media.clear();

@@ -30,6 +30,12 @@ export class ControlCenter extends PullPanel {
     this.render();
   }
 
+  /** Le défilement natif n'est utile que si la grille dépasse l'écran ; sinon le glisser ferme. */
+  onOpen() {
+    const scroll = this.el.querySelector('.cc-scroll');
+    scroll.style.touchAction = scroll.scrollHeight > scroll.clientHeight + 1 ? 'pan-y' : 'none';
+  }
+
   #round(id) {
     const tile = this.tiles[id];
     const active = tile.active();

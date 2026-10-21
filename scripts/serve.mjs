@@ -3,7 +3,9 @@
  * Petit serveur statique sans dépendance pour lancer Orion OS en local :
  *   npm start            → http://localhost:8080
  *   PORT=3000 npm start
- * Ajoutez HOST=0.0.0.0 pour y accéder depuis un téléphone du même réseau.
+ * HOST=0.0.0.0 le rend joignable depuis un téléphone du même réseau, mais en
+ * HTTP les navigateurs mobiles bloquent l'installation, le hors-ligne, la
+ * caméra et la localisation : voir « Démarrer sur mobile » dans le README.
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';

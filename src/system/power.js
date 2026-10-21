@@ -83,7 +83,7 @@ export class PowerManager {
     await this.#blackout('Extinction…');
     const off = this.ui.layers.off;
     off.classList.remove('shutting');
-    off.replaceChildren(h('div.power-off-hint', icon('power', { size: 22 }), h('span', 'Appuyez sur le bouton latéral pour allumer')));
+    off.replaceChildren(h('div.power-off-hint', icon('power', { size: 22 }), h('span', document.body.classList.contains('fullscreen') ? 'Touchez l\'écran pour allumer' : 'Appuyez sur le bouton latéral pour allumer')));
     this.ui.state = 'off';
     this.ui.poweredOff = true;
   }

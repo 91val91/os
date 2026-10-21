@@ -16,7 +16,7 @@ export default [
         AbortController: 'readonly', Blob: 'readonly', FileReader: 'readonly', Audio: 'readonly', Node: 'readonly',
         TextEncoder: 'readonly', MediaRecorder: 'readonly', ResizeObserver: 'readonly', SpeechSynthesisUtterance: 'readonly',
         getComputedStyle: 'readonly', getSelection: 'readonly', globalThis: 'readonly', self: 'readonly', caches: 'readonly',
-        process: 'readonly',
+        history: 'readonly', Response: 'readonly', process: 'readonly',
       },
     },
     rules: {

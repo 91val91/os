@@ -28,6 +28,8 @@ export class PullPanel {
         if (dy < -this.travel * 0.2 || vy < -0.4) this.close();
         else this.open();
       },
+      // Geste repris par le navigateur (défilement au doigt) : le panneau reste ouvert.
+      onCancel: () => this.isOpen && this.open(),
     });
   }
 

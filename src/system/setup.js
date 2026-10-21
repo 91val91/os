@@ -4,6 +4,7 @@
 import { h, animate } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { createPasscode } from '../kernel/settings.js';
+import { platform } from './platform.js';
 
 const GREETINGS = ['Bonjour', 'Hello', 'Hola', 'Ciao', 'Hallo', 'Olá', 'Привет', 'こんにちは', 'مرحبا', '你好'];
 
@@ -20,7 +21,9 @@ export class SetupWizard {
       this.values = {
         userName: '',
         theme: this.k.settings.get('theme'),
-        navigation: this.k.settings.get('navigation'),
+        // App installée sur un téléphone : le bas de l'écran appartient aux gestes
+        // du système (accueil iOS/Android) ; les boutons évitent tout conflit.
+        navigation: platform.installed ? 'buttons' : this.k.settings.get('navigation'),
         passcode: null,
       };
       this.el.classList.add('visible');
@@ -191,7 +194,13 @@ export class SetupWizard {
     if (this.values.userName.trim()) s.set('userName', this.values.userName.trim());
     s.set('theme', this.values.theme);
     s.set('navigation', this.values.navigation);
-    if (this.values.passcode) s.set('passcode', await createPasscode(this.values.passcode));
+    if (this.values.passcode) {
+      try {
+        s.set('passcode', await createPasscode(this.values.passcode));
+      } catch (error) {
+        this.ui.dialogs.toast(`Code non enregistré : ${error.message}`);
+      }
+    }
     s.set('setupDone', true);
     this.k.notifications.post({
       appId: 'settings',

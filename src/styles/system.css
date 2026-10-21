@@ -24,8 +24,15 @@
   opacity: 0;
 }
 
+/* La ligne reste centrée dans la bande --sat (encoche comprise) sans déborder sur les apps. */
 body.fullscreen .layer-statusbar {
-  padding: max(6px, env(safe-area-inset-top)) 22px 0;
+  padding: 0 max(22px, env(safe-area-inset-right)) 0 max(22px, env(safe-area-inset-left));
+}
+
+/* iPhone (app installée) : iOS affiche déjà l'heure et la batterie au-dessus d'Orion. */
+html.ios-standalone .sb-left,
+html.ios-standalone .sb-right {
+  visibility: hidden;
 }
 
 .sb-left { justify-self: start; }
@@ -853,12 +860,12 @@ body.fullscreen .layer-statusbar {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
   height: 34px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px));
+  padding-bottom: 8px;
   touch-action: none;
   cursor: grab;
 }
@@ -911,6 +918,11 @@ body.fullscreen .layer-statusbar {
 
 .nav-btn:active {
   background: var(--fill-2);
+}
+
+/* Sur Android, les bords appartiennent au geste Retour du système, relié à Orion via l'historique. */
+html.android .edge-zone {
+  display: none !important;
 }
 
 .edge-zone {
@@ -1659,7 +1671,7 @@ body.fullscreen .layer-statusbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 44px 40px;
+  padding: 6px 44px calc(env(safe-area-inset-bottom, 0px) + 40px);
 }
 
 .lock-action {
@@ -1693,7 +1705,7 @@ body.fullscreen .layer-statusbar {
 
 .lock-indicator {
   position: absolute;
-  bottom: 8px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
   left: 50%;
   width: 136px;
   height: 5px;
