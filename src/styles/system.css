@@ -29,10 +29,12 @@ body.fullscreen .layer-statusbar {
   padding: 0 max(22px, env(safe-area-inset-right)) 0 max(22px, env(safe-area-inset-left));
 }
 
-/* iPhone (app installée) : iOS affiche déjà l'heure et la batterie au-dessus d'Orion. */
-html.ios-standalone .sb-left,
-html.ios-standalone .sb-right {
-  visibility: hidden;
+/* iPhone (app installée, en portrait) : iOS affiche déjà l'heure et la batterie au-dessus d'Orion. */
+@media (orientation: portrait) {
+  html.ios-standalone body.fullscreen .sb-left,
+  html.ios-standalone body.fullscreen .sb-right {
+    visibility: hidden;
+  }
 }
 
 .sb-left { justify-self: start; }
@@ -860,7 +862,7 @@ html.ios-standalone .sb-right {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: env(safe-area-inset-bottom, 0px);
+  bottom: var(--safe-b, 0px);
   height: 34px;
   display: flex;
   align-items: flex-end;
@@ -891,7 +893,7 @@ html.ios-standalone .sb-right {
 
 .nav-buttons {
   position: absolute;
-  inset: 0 0 env(safe-area-inset-bottom);
+  inset: 0 0 var(--safe-b, 0px);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -921,7 +923,7 @@ html.ios-standalone .sb-right {
 }
 
 /* Sur Android, les bords appartiennent au geste Retour du système, relié à Orion via l'historique. */
-html.android .edge-zone {
+html.android body.fullscreen .edge-zone {
   display: none !important;
 }
 
@@ -1671,7 +1673,7 @@ html.android .edge-zone {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 44px calc(env(safe-area-inset-bottom, 0px) + 40px);
+  padding: 6px 44px calc(var(--safe-b, 0px) + 40px);
 }
 
 .lock-action {
@@ -1705,7 +1707,7 @@ html.android .edge-zone {
 
 .lock-indicator {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  bottom: calc(var(--safe-b, 0px) + 8px);
   left: 50%;
   width: 136px;
   height: 5px;

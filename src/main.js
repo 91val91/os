@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:' && !new URLSea
       .then(() => navigator.serviceWorker.ready)
       .then((registration) => {
         // Les fichiers chargés avant l'activation du service worker sont mis en cache tout de suite.
-        const urls = [location.href, ...performance.getEntriesByType('resource').map((entry) => entry.name)];
+        const urls = [location.origin + location.pathname, ...performance.getEntriesByType('resource').map((entry) => entry.name)];
         registration.active?.postMessage({ type: 'cache', urls });
       })
       .catch((error) => console.warn('Service worker indisponible', error));

@@ -15,6 +15,24 @@ export function logo(size = 72) {
   return template.content.firstElementChild;
 }
 
+/**
+ * Une nouvelle version d'Orion, téléchargée par le service worker, attend
+ * que le système soit fermé : un redémarrage depuis Orion l'applique.
+ */
+async function applyPendingUpdate() {
+  try {
+    const waiting = (await navigator.serviceWorker?.getRegistration())?.waiting;
+    if (!waiting) return;
+    await new Promise((resolve) => {
+      navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+      setTimeout(resolve, 3000);
+      waiting.postMessage({ type: 'activate' });
+    });
+  } catch {
+    /* pas de service worker : simple rechargement */
+  }
+}
+
 export class PowerManager {
   constructor(ui) {
     this.ui = ui;
@@ -90,11 +108,13 @@ export class PowerManager {
 
   async reboot() {
     await this.#blackout('Redémarrage…');
+    await applyPendingUpdate();
     location.reload();
   }
 
   /** Rallume après une extinction : redémarrage complet. */
-  powerOn() {
+  async powerOn() {
+    await applyPendingUpdate();
     location.reload();
   }
 

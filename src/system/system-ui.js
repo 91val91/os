@@ -94,6 +94,7 @@ export class SystemUI {
     this.#fit();
     window.addEventListener('resize', () => this.#fit());
     window.visualViewport?.addEventListener('resize', () => this.#fit());
+    window.visualViewport?.addEventListener('scroll', () => this.#fit());
   }
 
   /** Mode cadre (ordinateur) ou plein écran (téléphone). */
@@ -107,8 +108,10 @@ export class SystemUI {
       viewport.scale = 1;
       this.device.style.transform = '';
       this.screenRadius = 0;
-      // Hauteur réellement visible (le clavier virtuel d'iOS ne réduit pas 100dvh).
+      // Hauteur réellement visible (le clavier virtuel d'iOS ne réduit pas 100dvh) ; iOS fait aussi
+      // glisser la zone visible pour montrer le champ saisi : l'écran la suit.
       document.documentElement.style.setProperty('--app-h', `${Math.round(vh)}px`);
+      document.documentElement.style.setProperty('--app-top', `${Math.round(window.visualViewport?.pageTop ?? 0)}px`);
     } else {
       const frameW = SCREEN_W + 28;
       const frameH = SCREEN_H + 28;
@@ -116,6 +119,7 @@ export class SystemUI {
       const scale = Math.min(1, (vh - 32) / frameH, (vw - 32 - helpSpace) / frameW);
       viewport.scale = scale;
       document.documentElement.style.setProperty('--app-h', `${SCREEN_H}px`);
+      document.documentElement.style.setProperty('--app-top', '0px');
       this.device.style.transform = `scale(${scale})`;
       this.screenRadius = 48;
     }
@@ -137,8 +141,11 @@ export class SystemUI {
     } catch {
       backend = undefined;
     }
-    // Demande un stockage persistant pour que le téléphone n'efface pas le système de fichiers.
-    navigator.storage?.persist?.().catch(() => {});
+    // Stockage persistant pour que le téléphone n'efface pas le système de fichiers. Seulement
+    // une fois installé : dans un onglet, Firefox afficherait une invite à chaque démarrage.
+    if (platform.installed) {
+      navigator.storage?.persisted?.().then((persisted) => persisted || navigator.storage.persist()).catch(() => {});
+    }
     this.kernel = await bootKernel({ backend, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
 
@@ -454,9 +461,14 @@ export class SystemUI {
     this.screen.addEventListener('contextmenu', (e) => {
       if (!e.target.closest('input, textarea, [contenteditable="true"], .selectable')) e.preventDefault();
     });
-    // Au retour dans l'app, ne pas éteindre l'écran pour l'inactivité passée ailleurs.
+    // Au retour dans l'app (dont les minuteurs étaient suspendus, sur iPhone notamment) :
+    // verrouille si le délai d'inactivité est dépassé, sans éteindre l'écran que l'on regarde.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') activity();
+      if (document.visibilityState !== 'visible') return;
+      const seconds = this.kernel.settings.get('autoLock');
+      const idle = seconds && Date.now() - this.lastActivity > seconds * 1000;
+      if (idle && !['off', 'boot', 'setup', 'locked'].includes(this.state) && !this.kernel.telephony.call && !this.alarmScreen.isVisible) this.lockNow();
+      activity();
     });
     this.#setupHistory();
     this.screen.addEventListener('click', (e) => {
@@ -492,16 +504,13 @@ export class SystemUI {
 
   /** Y a-t-il quelque chose à fermer avec « Retour » ? */
   canGoBack() {
-    if (['boot', 'off', 'locked', 'setup'].includes(this.state)) return false;
-    return (
-      this.state !== 'home' ||
-      this.dialogs.open ||
-      this.shade.isOpen ||
-      this.controlCenter.isOpen ||
-      this.drawer.isOpen ||
-      this.home.editing ||
-      Boolean(this.contextMenuClose || this.powerMenuClose)
+    if (['boot', 'off', 'setup'].includes(this.state)) return false;
+    // Ce que back() ferme même sur l'écran verrouillé.
+    const overlay = Boolean(
+      this.dialogs.open || this.shade.isOpen || this.controlCenter.isOpen || this.calls.isVisible || this.contextMenuClose || this.powerMenuClose,
     );
+    if (this.state === 'locked') return overlay;
+    return overlay || this.state !== 'home' || this.drawer.isOpen || this.home.editing;
   }
 
   /**
@@ -514,6 +523,8 @@ export class SystemUI {
     this.historyReady = true;
     // Chrome ignore les entrées ajoutées sans geste de l'utilisateur : on arme après chaque toucher.
     window.addEventListener('pointerup', () => setTimeout(() => this.#armHistory(), 0), true);
+    // Sur écran tactile, le clic d'un toucher arrive après ce délai : ce qu'il ouvre est armé ici.
+    window.addEventListener('click', () => setTimeout(() => this.#armHistory(), 0), true);
     window.addEventListener('popstate', () => {
       if (this.state === 'off') return;
       this.back();

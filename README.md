@@ -34,7 +34,7 @@ Ouvrez ensuite cette adresse sur le téléphone et installez-la :
 - **Android (Chrome)** : menu **⋮** → **Installer l'application** (ou « Ajouter à l'écran d'accueil »). L'icône Orion apparaît parmi vos applications ; elle s'ouvre en plein écran, sans barre d'adresse, et le bouton ou geste Retour d'Android agit dans Orion.
 - **iPhone / iPad (Safari)** : bouton **Partager** → **Sur l'écran d'accueil**, en laissant « Ouvrir en tant qu'app web » activé → **Ajouter**.
 
-Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la barre d'adresse reste visible et les gestes du bord de l'écran appartiennent au navigateur. Après la première ouverture, tout est en cache et le système démarre même sans réseau. Les mises à jour publiées sont téléchargées en arrière-plan et prises en compte au lancement suivant.
+Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la barre d'adresse reste visible et les gestes du bord de l'écran appartiennent au navigateur. Après la première ouverture, tout est en cache et le système démarre même sans réseau. Les mises à jour publiées sont téléchargées en arrière-plan et appliquées au lancement suivant, ou tout de suite en redémarrant Orion (bouton marche-arrêt du volet de notifications → Redémarrer).
 
 **Sans hébergement**, depuis votre ordinateur :
 

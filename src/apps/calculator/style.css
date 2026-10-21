@@ -72,9 +72,13 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  /* Sur les écrans courts, le clavier rétrécit pour laisser voir l'affichage. */
-  width: min(100%, calc((var(--app-h, 100dvh) - var(--sat) - var(--sab) - 190px) * .8));
+  width: 100%;
   align-self: center;
+}
+
+/* Sur les écrans assez courts, le clavier (touches rondes) rétrécit pour laisser voir l'affichage. */
+.app-root.calculator:not(.scientific) .calc-pad {
+  width: clamp(min(100%, 240px), calc((var(--app-h, 100dvh) - var(--sat) - var(--sab) - 190px) * .8), 100%);
 }
 
 .calc-sci {
@@ -147,4 +151,40 @@
 
 .app-root.scientific .calc-expr {
   font-size: 3rem !important;
+}
+
+/* Téléphone en paysage, écran partagé : touches en pilule, hauteur prise sur l'espace restant. */
+@media (max-height: 500px) {
+  body.fullscreen .app-root.calculator .calc-pad,
+  body.fullscreen .app-root.calculator .calc-sci {
+    width: 100%;
+    min-height: 0;
+    gap: 6px 12px;
+    grid-auto-rows: 1fr;
+  }
+
+  body.fullscreen .app-root.calculator .calc-pad {
+    flex: 0 1 58%;
+  }
+
+  body.fullscreen .app-root.calculator.scientific .calc-sci {
+    flex: 0 1 30%;
+    margin-bottom: 6px;
+  }
+
+  body.fullscreen .app-root.calculator .calc-key {
+    aspect-ratio: auto;
+    height: auto;
+    min-height: 0;
+    border-radius: 999px;
+    font-size: 1.4rem;
+  }
+
+  body.fullscreen .app-root.calculator .calc-sci .calc-key {
+    font-size: .9rem;
+  }
+
+  body.fullscreen .app-root.calculator .calc-expr {
+    font-size: 2.6rem !important;
+  }
 }

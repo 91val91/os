@@ -5,9 +5,14 @@
  * Au premier lancement, la page lui transmet la liste des fichiers déjà
  * chargés (noyau, interface système) pour qu'ils soient mis en cache ; les
  * modules des applications le sont lors de leur préchargement.
+ *
+ * Une nouvelle version du service worker reprend, à jour, tout ce que
+ * l'ancienne avait en cache, puis attend que plus aucune fenêtre d'Orion ne
+ * soit ouverte (ou un redémarrage depuis Orion) pour prendre la main : une
+ * session en cours ne mélange jamais deux versions du système.
  */
 const PREFIX = 'orion-os-';
-const CACHE = `${PREFIX}v2`;
+const CACHE = `${PREFIX}v3`;
 const CORE = [
   './',
   './index.html',
@@ -22,9 +27,36 @@ const CORE = [
 ];
 
 const inScope = (url) => url.origin === self.location.origin && url.href.startsWith(self.registration.scope);
+// Une seule copie de chaque page, quels que soient ses paramètres (?fullscreen…).
+const pageKey = (url) => url.origin + url.pathname;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      await cache.addAll(CORE.map((path) => new Request(path, { cache: 'reload' })));
+      // Reprend tout ce que les versions précédentes avaient en cache, en version à jour si possible.
+      for (const key of await caches.keys()) {
+        if (!key.startsWith(PREFIX) || key === CACHE) continue;
+        const old = await caches.open(key);
+        for (const request of await old.keys()) {
+          const url = new URL(request.url);
+          if (url.search || (await cache.match(request))) continue;
+          try {
+            const response = await fetch(new Request(url.href, { cache: 'reload' }));
+            if (response.ok) {
+              await cache.put(url.href, response);
+              continue;
+            }
+          } catch {
+            /* hors ligne : on garde l'ancienne copie */
+          }
+          const previous = await old.match(request);
+          if (previous) await cache.put(url.href, previous);
+        }
+      }
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -38,6 +70,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'activate') return void self.skipWaiting();
   if (event.data?.type !== 'cache' || !Array.isArray(event.data.urls)) return;
   event.waitUntil(
     caches.open(CACHE).then(async (cache) => {
@@ -61,13 +94,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || !inScope(url)) return;
   const navigation = request.mode === 'navigate';
+  const key = navigation ? pageKey(url) : request;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(request, { ignoreSearch: navigation });
+      const cached = await cache.match(key);
       // Revalidation en arrière-plan, sans repasser par le cache HTTP du navigateur.
       const network = (navigation ? fetch(request) : fetch(request, { cache: 'no-cache' }))
         .then((response) => {
-          if (response.ok) cache.put(request, response.clone());
+          if (response.ok) cache.put(key, response.clone());
           return response;
         })
         .catch(async () => cached ?? (navigation ? cache.match('./index.html') : undefined) ?? Response.error());
