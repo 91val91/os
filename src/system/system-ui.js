@@ -4,9 +4,11 @@
  * application → récentes) et les entrées (gestes, boutons, clavier).
  */
 import { h } from '../lib/dom.js';
+import { avatar } from '../lib/ui.js';
 import { viewport } from '../lib/gesture.js';
 import { bootKernel } from '../kernel/kernel.js';
-import { openBestBackend } from '../kernel/storage.js';
+import { openBestBackend, deleteBackend } from '../kernel/storage.js';
+import { openSession, eraseAllAccounts } from '../kernel/accounts.js';
 import { MANIFESTS } from '../apps/registry.js';
 import { ThemeManager } from './theme.js';
 import { SoundManager } from './sound.js';
@@ -135,19 +137,22 @@ export class SystemUI {
     this.power = new PowerManager(this);
     this.power.showBoot();
     const started = performance.now();
-    let backend;
+    // Session du compte courant : ses données vivent dans leur propre base.
+    let session = null;
     try {
-      backend = await openBestBackend();
-    } catch {
-      backend = undefined;
+      session = await openSession();
+    } catch (error) {
+      console.warn('Comptes indisponibles', error);
     }
+    const backend = session?.backend ?? (await openBestBackend().catch(() => undefined));
     // Stockage persistant pour que le téléphone n'efface pas le système de fichiers. Seulement
     // une fois installé : dans un onglet, Firefox afficherait une invite à chaque démarrage.
     if (platform.installed) {
       navigator.storage?.persisted?.().then((persisted) => persisted || navigator.storage.persist()).catch(() => {});
     }
-    this.kernel = await bootKernel({ backend, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
+    this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
+    this.#syncAccount();
 
     const k = this.kernel;
     this.theme = new ThemeManager(this);
@@ -202,6 +207,70 @@ export class SystemUI {
       this.setState('home');
     }
     this.#prefetchApps();
+  }
+
+  /** Le nom du compte et celui des réglages (utilisé par les apps) restent identiques. */
+  #syncAccount() {
+    const { accounts, settings } = this.kernel;
+    const account = this.kernel.account;
+    if (!accounts || !account) return;
+    // Appareil configuré avant les comptes : le propriétaire reprend le nom déjà choisi.
+    if (!account.name && settings.get('setupDone')) accounts.update(account.id, { name: settings.get('userName') });
+    else if (account.name && settings.get('userName') !== account.name) settings.set('userName', account.name);
+    settings.watch('userName', (name) => name && accounts.update(account.id, { name }));
+  }
+
+  // ───────────── Comptes ─────────────
+
+  /** Ouvre la session d'un autre compte (redémarrage sur ses données). */
+  async switchAccount(id) {
+    const accounts = this.kernel.accounts;
+    const target = accounts?.get(id);
+    if (!target || id === this.kernel.account?.id) return;
+    await accounts.setCurrent(id);
+    await this.power.restart(target.name ? `Ouverture de la session de ${target.name}…` : 'Nouvel utilisateur…');
+  }
+
+  /** Supprime un compte et ses données (pas celui du propriétaire). */
+  async deleteAccount(id) {
+    const accounts = this.kernel.accounts;
+    const account = accounts?.get(id);
+    if (!account || account.owner) return false;
+    const self = id === this.kernel.account?.id;
+    await accounts.remove(id);
+    // Compte en cours : sa base est ouverte, elle sera effacée au redémarrage (session du propriétaire).
+    if (self) {
+      await this.power.restart('Suppression du compte…');
+      return true;
+    }
+    await deleteBackend(globalThis, account.db).catch(() => {});
+    await accounts.forgetRemoved(account.db);
+    return true;
+  }
+
+  /** Réinitialisation d'usine : efface tous les comptes (propriétaire) ou les données du compte. */
+  async eraseDevice() {
+    const k = this.kernel;
+    await k.factoryReset();
+    if (k.accounts && k.account?.owner) await eraseAllAccounts(k.accounts);
+    location.reload();
+  }
+
+  /** Liste des comptes pour changer d'utilisateur (écran verrouillé, volet). */
+  async showAccountPicker({ manage = false } = {}) {
+    const accounts = this.kernel.accounts;
+    if (!accounts) return;
+    const current = this.kernel.account;
+    const actions = accounts.list().map((a) => ({
+      label: a.id === current?.id ? `${a.name || 'Moi'} · actuel` : a.name || 'Nouvel utilisateur',
+      value: a.id,
+      leading: avatar(a.name, { size: 30, color: a.color, photo: a.photo }),
+      disabled: a.id === current?.id,
+    }));
+    if (manage) actions.push({ label: 'Gérer les comptes', value: 'manage', icon: 'settings' });
+    const choice = await this.dialogs.actionSheet({ title: 'Changer d\'utilisateur', actions });
+    if (choice === 'manage') this.openIntent({ app: 'settings', action: 'view', data: { page: 'users' } });
+    else if (choice) await this.switchAccount(choice);
   }
 
   /** Précharge les modules des apps (démarrage plus rapide, cache hors ligne). */
@@ -346,6 +415,8 @@ export class SystemUI {
   onUnlocked() {
     const fg = this.wm.currentWindow;
     this.setState(fg ? 'app' : 'home');
+    const account = this.kernel.account;
+    if (account) this.kernel.accounts.update(account.id, { lastLogin: Date.now() });
   }
 
   lockNow() {

@@ -30,6 +30,48 @@
   color: var(--fg-2);
 }
 
+.account-photo {
+  position: relative;
+  border-radius: 50%;
+}
+
+.account-photo-edit {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.account-colors {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-colors > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.account-color {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.account-color.active {
+  outline: 2px solid var(--fg-2);
+  outline-offset: 2px;
+}
+
 .hero-icon {
   width: 72px;
   height: 72px;

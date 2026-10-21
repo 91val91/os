@@ -1,8 +1,10 @@
 /**
- * Assistant de premier démarrage : nom, apparence, navigation, code.
+ * Assistant de premier démarrage (et de chaque nouveau compte) : compte,
+ * apparence, navigation, code.
  */
 import { h, animate } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
+import { avatar } from '../lib/ui.js';
 import { createPasscode } from '../kernel/settings.js';
 import { platform } from './platform.js';
 
@@ -18,8 +20,10 @@ export class SetupWizard {
   run() {
     return new Promise((resolve) => {
       this.resolve = resolve;
+      this.account = this.k.account;
       this.values = {
-        userName: '',
+        userName: this.account?.name ?? '',
+        email: this.account?.email ?? '',
         theme: this.k.settings.get('theme'),
         // App installée sur un téléphone : le bas de l'écran appartient aux gestes
         // du système (accueil iOS/Android) ; les boutons évitent tout conflit.
@@ -85,14 +89,54 @@ export class SetupWizard {
             animate(word, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 300, fill: 'forwards' });
           });
         }, 1800);
-        this.#screen([h('div.setup-logo', icon('sparkles', { size: 40 })), word, h('p.setup-lead', `Bienvenue sur ${this.k.os.name}`)], { next: () => this.#step(1), nextLabel: 'Commencer' });
+        // Nouveau compte ajouté depuis les Réglages : on peut renoncer et revenir au propriétaire.
+        const cancel = this.account && !this.account.owner ? { label: 'Annuler et revenir à la session précédente', action: () => this.ui.deleteAccount(this.account.id) } : null;
+        this.#screen([h('div.setup-logo', icon('sparkles', { size: 40 })), word, h('p.setup-lead', `Bienvenue sur ${this.k.os.name}`)], { next: () => this.#step(1), nextLabel: 'Commencer', skip: cancel });
       },
       () => {
-        const input = h('input.setup-input', { type: 'text', placeholder: 'Votre prénom', value: this.values.userName, autocomplete: 'given-name', maxlength: 32 });
-        input.addEventListener('input', () => (this.values.userName = input.value));
-        input.addEventListener('keydown', (e) => e.key === 'Enter' && this.#step(2));
-        setTimeout(() => input.focus(), 350);
-        this.#screen([h('h1', 'Comment vous appelez-vous ?'), h('p.setup-lead', 'Votre nom apparaîtra dans les Réglages et sur votre profil.'), input], { next: () => this.#step(2), back: () => this.#step(0) });
+        const color = this.account?.color ?? this.k.settings.get('accent');
+        const preview = h('div.setup-avatar');
+        const renderPreview = () => preview.replaceChildren(avatar(this.values.userName.trim() || '?', { size: 84, color }));
+        const name = h('input.setup-input', { type: 'text', placeholder: 'Prénom et nom', value: this.values.userName, autocomplete: 'name', maxlength: 40 });
+        const email = h('input.setup-input', { type: 'email', placeholder: 'Adresse e-mail (facultatif)', value: this.values.email, autocomplete: 'email', inputmode: 'email', maxlength: 80 });
+        const error = h('p.setup-error');
+        const next = () => {
+          if (!this.values.userName.trim()) {
+            error.textContent = 'Indiquez votre nom pour créer votre compte.';
+            animate(name, [{ transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }], { duration: 260 });
+            name.focus();
+            return;
+          }
+          if (this.values.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.values.email.trim())) {
+            error.textContent = 'Cette adresse e-mail ne semble pas valide.';
+            email.focus();
+            return;
+          }
+          this.#step(2);
+        };
+        name.addEventListener('input', () => {
+          this.values.userName = name.value;
+          error.textContent = '';
+          renderPreview();
+        });
+        email.addEventListener('input', () => {
+          this.values.email = email.value;
+          error.textContent = '';
+        });
+        name.addEventListener('keydown', (e) => e.key === 'Enter' && email.focus());
+        email.addEventListener('keydown', (e) => e.key === 'Enter' && next());
+        renderPreview();
+        setTimeout(() => name.focus(), 350);
+        this.#screen(
+          [
+            h('h1', 'Votre compte'),
+            h('p.setup-lead', 'Votre compte garde vos réglages, vos apps et vos données. D\'autres personnes pourront avoir le leur sur ce téléphone.'),
+            preview,
+            h('div.setup-fields', name, email),
+            error,
+          ],
+          { next, back: () => this.#step(0) },
+        );
       },
       () => {
         this.#screen(
@@ -192,6 +236,7 @@ export class SetupWizard {
   async #finish() {
     const s = this.k.settings;
     if (this.values.userName.trim()) s.set('userName', this.values.userName.trim());
+    if (this.account) this.k.accounts.update(this.account.id, { name: this.values.userName.trim(), email: this.values.email.trim(), lastLogin: Date.now() });
     s.set('theme', this.values.theme);
     s.set('navigation', this.values.navigation);
     if (this.values.passcode) {

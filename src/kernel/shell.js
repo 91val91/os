@@ -818,6 +818,14 @@ const COMMANDS = {
     },
   },
   whoami: { desc: 'Nom de l\'utilisateur courant', run() { return this.env.USER; } },
+  users: {
+    desc: 'Comptes de l\'appareil',
+    run({ k }) {
+      if (!k.accounts) return this.env.USER;
+      const current = k.account?.id;
+      return table([['', 'NOM', 'E-MAIL', 'RÔLE'], ...k.accounts.list().map((a) => [a.id === current ? '*' : '', a.name || '—', a.email || '—', a.owner ? 'propriétaire' : 'utilisateur'])]);
+    },
+  },
   hostname: { desc: 'Nom de l\'appareil', run() { return this.env.HOSTNAME; } },
   env: {
     desc: 'Variables d\'environnement',

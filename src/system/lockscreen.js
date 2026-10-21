@@ -6,6 +6,7 @@ import { h, animate } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { drag } from '../lib/gesture.js';
 import { formatDate, formatTime } from '../lib/format.js';
+import { avatar } from '../lib/ui.js';
 import { verifyPasscode } from '../kernel/settings.js';
 
 const LETTERS = { 2: 'ABC', 3: 'DEF', 4: 'GHI', 5: 'JKL', 6: 'MNO', 7: 'PQRS', 8: 'TUV', 9: 'WXYZ' };
@@ -30,10 +31,13 @@ export class LockScreen {
     this.hint = h('div.lock-hint', 'Balayez vers le haut pour déverrouiller');
     this.flashBtn = h('button.lock-action', { type: 'button', 'aria-label': 'Lampe torche', onclick: (e) => { e.stopPropagation(); this.k.settings.toggle('flashlight'); this.k.device.vibrate(10); this.#renderActions(); } }, icon('flashlight', { size: 22 }));
     this.cameraBtn = h('button.lock-action', { type: 'button', 'aria-label': 'Appareil photo', onclick: (e) => { e.stopPropagation(); this.unlock({ then: () => this.ui.launch('camera') }); } }, icon('camera', { size: 22 }));
+    // Plusieurs comptes : on voit qui est connecté et on peut changer d'utilisateur.
+    this.userChip = h('button.lock-user', { type: 'button', 'aria-label': 'Changer d\'utilisateur', onclick: (e) => { e.stopPropagation(); this.ui.showAccountPicker(); } });
     this.content = h(
       'div.lock-content',
       h('div.lock-top', this.lockIcon, this.date, this.time),
       h('div.lock-middle', this.media, this.notifs),
+      this.userChip,
       h('div.lock-bottom', this.flashBtn, this.hint, this.cameraBtn),
       h('div.lock-indicator'),
     );
@@ -64,7 +68,7 @@ export class LockScreen {
     });
 
     const refresh = () => this.isLocked && this.render();
-    for (const type of ['notification:post', 'notification:dismiss', 'media:change', 'settings:change']) this.k.events.on(type, refresh);
+    for (const type of ['notification:post', 'notification:dismiss', 'media:change', 'settings:change', 'account:change']) this.k.events.on(type, refresh);
     setInterval(() => this.isLocked && this.#renderClock(), 1000);
   }
 
@@ -81,9 +85,31 @@ export class LockScreen {
     animate(this.content, [{ transform: 'translateY(0)' }, { transform: 'translateY(-26px)' }, { transform: 'translateY(0)' }], { duration: 420, easing: 'ease-out' });
   }
 
+  /** Comptes de l'appareil, quand il y en a plusieurs (sinon rien à choisir). */
+  get #accounts() {
+    const list = this.k.accounts?.list() ?? [];
+    return list.length > 1 ? list : null;
+  }
+
+  #renderUser() {
+    const account = this.k.account;
+    const multi = Boolean(this.#accounts && account);
+    this.userChip.hidden = !multi;
+    this.pinSwitch.hidden = !multi;
+    if (!multi) {
+      this.pinBadge.replaceChildren(icon('lock-fill', { size: 20 }));
+      this.pinBadge.classList.remove('user');
+      return;
+    }
+    this.userChip.replaceChildren(avatar(account.name, { size: 26, color: account.color, photo: account.photo }), h('span', account.name), icon('chevron-down', { size: 14, stroke: 2.4 }));
+    this.pinBadge.replaceChildren(avatar(account.name, { size: 56, color: account.color, photo: account.photo }));
+    this.pinBadge.classList.add('user');
+  }
+
   render() {
     this.#renderClock();
     this.#renderActions();
+    this.#renderUser();
     const session = this.k.media.get();
     this.media.classList.toggle('visible', Boolean(session));
     if (session) {
@@ -169,7 +195,9 @@ export class LockScreen {
       key(0),
       this.cancelBtn,
     );
-    const pin = h('div.lock-pin', h('div.pin-box', h('div.pin-lock', icon('lock-fill', { size: 20 })), this.pinTitle, this.dots, grid));
+    this.pinBadge = h('div.pin-lock', icon('lock-fill', { size: 20 }));
+    this.pinSwitch = h('button.pin-text.pin-switch', { type: 'button', hidden: true, onclick: (e) => { e.stopPropagation(); this.ui.showAccountPicker(); } }, 'Changer d\'utilisateur');
+    const pin = h('div.lock-pin', h('div.pin-box', this.pinBadge, this.pinTitle, this.dots, grid, this.pinSwitch));
     this.entered = '';
     document.addEventListener('keydown', (e) => {
       if (!this.pinVisible) return;
@@ -182,6 +210,8 @@ export class LockScreen {
 
   #showPin() {
     this.entered = '';
+    const account = this.k.account;
+    if (!this.failures) this.pinTitle.textContent = this.#accounts && account?.name ? `Code de ${account.name}` : 'Saisissez le code';
     this.#renderDots();
     this.pin.classList.add('visible');
     this.content.classList.add('blurred');

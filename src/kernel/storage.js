@@ -80,7 +80,11 @@ export class IndexedDBBackend {
     this.db = new Promise((resolve, reject) => {
       const req = this.idb.open(this.name, 1);
       req.onupgradeneeded = () => req.result.createObjectStore('kv');
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        // Base supprimée ailleurs (compte effacé) : on libère la connexion pour ne pas bloquer.
+        req.result.onversionchange = () => req.result.close();
+        resolve(req.result);
+      };
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error('IndexedDB bloqué'));
     });
@@ -119,11 +123,14 @@ export class IndexedDBBackend {
   }
 }
 
-/** Choisit le meilleur pilote disponible dans l'environnement. */
-export async function openBestBackend(env = globalThis) {
+/** Préfixe localStorage d'une base (« orion: » pour la base d'origine, d'avant les comptes). */
+const prefixFor = (name) => (name === 'orion-os' ? 'orion:' : `${name}:`);
+
+/** Choisit le meilleur pilote disponible dans l'environnement pour la base `name`. */
+export async function openBestBackend(env = globalThis, { name = 'orion-os' } = {}) {
   if (env.indexedDB) {
     try {
-      const backend = new IndexedDBBackend(env.indexedDB);
+      const backend = new IndexedDBBackend(env.indexedDB, name);
       await backend.open();
       return backend;
     } catch {
@@ -135,12 +142,29 @@ export async function openBestBackend(env = globalThis) {
       const probe = '__orion_probe__';
       env.localStorage.setItem(probe, '1');
       env.localStorage.removeItem(probe);
-      return new LocalStorageBackend(env.localStorage);
+      return new LocalStorageBackend(env.localStorage, prefixFor(name));
     }
   } catch {
     /* stockage indisponible */
   }
   return new MemoryBackend();
+}
+
+/** Efface une base, quel que soit le pilote qui l'a créée. */
+export async function deleteBackend(env = globalThis, name) {
+  try {
+    if (env.localStorage) await new LocalStorageBackend(env.localStorage, prefixFor(name)).clear();
+  } catch {
+    /* stockage indisponible */
+  }
+  if (!env.indexedDB) return;
+  await new Promise((resolve, reject) => {
+    const req = env.indexedDB.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    // Encore ouverte quelque part : elle sera effacée dès sa fermeture.
+    req.onblocked = () => resolve();
+  });
 }
 
 /** Vue préfixée d'un pilote : chaque service a son propre espace de clés. */

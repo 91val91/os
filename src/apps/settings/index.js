@@ -14,6 +14,8 @@ import { logo } from '../../system/power.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PROFILE_COLORS = ['#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f', '#ff9f0a', '#30d158', '#64d2ff', '#8e8e93'];
 const ACCENTS = ['#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f', '#ff453a', '#ff9f0a', '#30d158', '#64d2ff', '#8e8e93'];
 const NETWORKS = [
   { name: 'Orion-Maison', secure: true, signal: 3 },
@@ -30,6 +32,10 @@ export function mount(root, ctx) {
   const ui = ctx.system;
   const nav = navStack(root);
 
+  const accounts = k.accounts;
+  /** Compte de la session (profil minimal si les comptes sont indisponibles). */
+  const me = () => k.account ?? { id: null, name: s.get('userName'), email: '', color: s.get('accent'), photo: null, owner: true, createdAt: null };
+  const accountAvatar = (a, size) => avatar(a.name || '?', { size, color: a.color, photo: a.photo });
   const row = (opts) => listItem(opts);
   const toggleRow = (title, key, { icon: iconName, color, subtitle, invert = false, onChange } = {}) => {
     const sw = toggle(invert ? !s.get(key) : s.get(key), (v) => {
@@ -62,14 +68,15 @@ export function mount(root, ctx) {
         listGroup({
           items: [
             listItem({
-              leading: avatar(s.get('userName'), { size: 58, color: s.get('accent') }),
-              title: h('span.settings-name', s.get('userName')),
-              subtitle: `Compte Orion · ${s.get('deviceName')}`,
+              leading: accountAvatar(me(), 58),
+              title: h('span.settings-name', me().name),
+              subtitle: me().email || `Compte Orion · ${s.get('deviceName')}`,
               chevron: true,
-              onClick: profilePage,
+              onClick: accountPage,
               className: 'settings-profile',
             }),
-          ],
+            accounts ? row({ icon: 'users', iconColor: '#8e8e93', title: 'Utilisateurs', detail: String(accounts.list().length), chevron: true, onClick: usersPage }) : null,
+          ].filter(Boolean),
         }),
         listGroup({
           items: [
@@ -118,18 +125,154 @@ export function mount(root, ctx) {
     return p;
   }
 
-  // ───────────── Profil ─────────────
+  // ───────────── Compte et utilisateurs ─────────────
 
-  function profilePage() {
-    open('Profil', (refresh) => [
-      h('div.settings-hero', avatar(s.get('userName'), { size: 92, color: s.get('accent') }), h('h2', s.get('userName')), h('p', `${k.os.name} · ${s.get('deviceName')}`)),
-      listGroup({
-        items: [
-          row({ title: 'Nom', detail: s.get('userName'), chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: 'Votre nom', value: s.get('userName') }); if (v?.trim()) { s.set('userName', v.trim()); refresh(); } } }),
-          row({ title: "Nom de l'appareil", detail: s.get('deviceName'), chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: "Nom de l'appareil", value: s.get('deviceName') }); if (v?.trim()) { s.set('deviceName', v.trim()); refresh(); } } }),
-        ],
-      }),
-    ]);
+  /** Recadre une photo en carré de 256 px (le registre des comptes reste léger). */
+  function shrinkPhoto(dataUrl, size = 256) {
+    return new Promise((resolve) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth || size;
+          const hgt = img.naturalHeight || size;
+          const side = Math.min(w, hgt);
+          const canvas = h('canvas', { width: size, height: size });
+          canvas.getContext('2d').drawImage(img, (w - side) / 2, (hgt - side) / 2, side, side, 0, 0, size, size);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } catch {
+          resolve(dataUrl.length < 300_000 ? dataUrl : null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  async function changePhoto(refresh) {
+    const a = me();
+    const choice = await ctx.ui.actionSheet({
+      title: 'Photo du profil',
+      actions: [{ label: 'Choisir une photo', value: 'pick', icon: 'image' }, a.photo ? { label: 'Retirer la photo', value: 'remove', icon: 'trash', destructive: true } : null].filter(Boolean),
+    });
+    if (choice === 'remove') accounts.update(a.id, { photo: null });
+    if (choice === 'pick') {
+      const result = await ctx.startActivityForResult({ action: 'pick', type: 'image/*' });
+      if (!result?.path) return;
+      const photo = await shrinkPhoto(ctx.fs.readFile(result.path));
+      if (!photo) return ctx.ui.toast('Cette image ne peut pas être utilisée');
+      accounts.update(a.id, { photo });
+      ctx.ui.toast('Photo mise à jour');
+    }
+    refresh();
+  }
+
+  function accountPage() {
+    open('Compte', (refresh) => {
+      const a = me();
+      const since = a.createdAt ? new Date(a.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+      return [
+        h(
+          'div.settings-hero',
+          accounts
+            ? h('button.account-photo', { type: 'button', 'aria-label': 'Modifier la photo', onclick: () => changePhoto(refresh) }, accountAvatar(a, 92), h('span.account-photo-edit', icon('camera', { size: 14 })))
+            : accountAvatar(a, 92),
+          h('h2', a.name),
+          h('p', a.email || `${k.os.name} · ${s.get('deviceName')}`),
+        ),
+        listGroup({
+          items: [
+            row({ title: 'Nom', detail: a.name, chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: 'Votre nom', value: a.name }); if (v?.trim()) { s.set('userName', v.trim()); refresh(); } } }),
+            accounts
+              ? row({
+                  title: 'Adresse e-mail',
+                  detail: a.email || 'Ajouter',
+                  chevron: true,
+                  onClick: async () => {
+                    const v = await ctx.ui.prompt({ title: 'Adresse e-mail', value: a.email, type: 'email', placeholder: 'nom@exemple.fr' });
+                    if (v == null) return;
+                    if (v.trim() && !EMAIL.test(v.trim())) return ctx.ui.alert({ title: 'Adresse invalide', message: 'Vérifiez l\'adresse e-mail saisie.' });
+                    accounts.update(a.id, { email: v.trim() });
+                    refresh();
+                  },
+                })
+              : null,
+            accounts
+              ? h(
+                  'div.list-item.account-colors',
+                  h('span', 'Couleur'),
+                  h('div', PROFILE_COLORS.map((c) => h(`button.account-color${c === a.color ? '.active' : ''}`, { type: 'button', 'aria-label': `Couleur ${c}`, style: { background: c }, onclick: () => { accounts.update(a.id, { color: c }); refresh(); } }))),
+                )
+              : null,
+          ].filter(Boolean),
+        }),
+        listGroup({
+          items: [
+            row({ icon: 'lock', iconColor: '#ff3b30', title: 'Code de verrouillage', detail: s.get('passcode') ? 'Activé' : 'Désactivé', chevron: true, onClick: passcodePage }),
+            accounts ? row({ icon: 'users', iconColor: '#8e8e93', title: 'Utilisateurs', detail: String(accounts.list().length), chevron: true, onClick: usersPage }) : null,
+            row({ icon: 'phone-fill', iconColor: '#30d158', title: "Nom de l'appareil", detail: s.get('deviceName'), chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: "Nom de l'appareil", value: s.get('deviceName') }); if (v?.trim()) { s.set('deviceName', v.trim()); refresh(); } } }),
+          ].filter(Boolean),
+          footer: accounts ? `${a.owner ? 'Propriétaire de l\'appareil' : 'Utilisateur de l\'appareil'}${since ? ` · compte créé le ${since}` : ''}. Le compte est enregistré sur ce téléphone uniquement.` : null,
+        }),
+      ];
+    });
+  }
+
+  function usersPage() {
+    open('Utilisateurs', (refresh) => {
+      const current = me();
+      const describe = (a) => [a.id === current.id ? 'Vous' : null, a.owner ? 'Propriétaire' : null, a.email || null].filter(Boolean).join(' · ') || 'Utilisateur';
+      return [
+        listGroup({
+          header: 'Sur cet appareil',
+          items: accounts.list().map((a) =>
+            row({
+              leading: accountAvatar(a, 40),
+              title: a.name || 'Nouvel utilisateur',
+              subtitle: describe(a),
+              trailing: a.id === current.id ? h('span.check-mark', icon('check', { size: 18, stroke: 2.6 })) : null,
+              chevron: a.id !== current.id,
+              onClick: a.id === current.id ? accountPage : () => userActions(a, refresh),
+            }),
+          ),
+          footer: 'Chaque utilisateur a son propre espace : apps, fichiers, réglages, contacts, messages et code. Changez d\'utilisateur depuis l\'écran verrouillé ou le volet de notifications.',
+        }),
+        current.owner
+          ? listGroup({ items: [row({ icon: 'user-plus', iconColor: '#30d158', title: 'Ajouter un utilisateur', onClick: () => addUser(refresh) })] })
+          : listGroup({ items: [row({ title: `Supprimer ${current.name} de cet appareil`, destructive: true, onClick: () => removeUser(current) })], footer: 'Seul le propriétaire peut ajouter des utilisateurs.' }),
+      ];
+    }, { back: 'Compte' });
+  }
+
+  async function userActions(a, refresh) {
+    const choice = await ctx.ui.actionSheet({
+      title: a.name,
+      actions: [{ label: `Passer à ${a.name || 'ce compte'}`, value: 'switch', icon: 'users' }, me().owner && !a.owner ? { label: 'Supprimer l\'utilisateur', value: 'remove', icon: 'trash', destructive: true } : null].filter(Boolean),
+    });
+    if (choice === 'switch') ui.switchAccount(a.id);
+    if (choice === 'remove' && (await removeUser(a))) refresh();
+  }
+
+  async function addUser(refresh) {
+    const name = (await ctx.ui.prompt({ title: 'Nouvel utilisateur', message: 'Il disposera de son propre espace sur ce téléphone.', placeholder: 'Prénom et nom', confirmLabel: 'Ajouter' }))?.trim();
+    if (!name) return;
+    const account = accounts.create({ name });
+    refresh();
+    if (await ctx.ui.confirm({ title: `Passer à ${name} maintenant ?`, message: 'La configuration de son compte va commencer.', confirmLabel: 'Changer' })) ui.switchAccount(account.id);
+    else ctx.ui.toast(`${name} a été ajouté`);
+  }
+
+  async function removeUser(a) {
+    const self = a.id === me().id;
+    const ok = await ctx.ui.confirm({
+      title: self ? 'Supprimer votre compte ?' : `Supprimer ${a.name} ?`,
+      message: 'Ses apps, fichiers, photos, contacts, messages et réglages seront définitivement effacés de cet appareil.',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
+    if (!ok) return false;
+    await ui.deleteAccount(a.id);
+    if (!self) ctx.ui.toast(`${a.name} a été supprimé`);
+    return true;
   }
 
   // ───────────── Connectivité ─────────────
@@ -653,11 +796,16 @@ export function mount(root, ctx) {
             for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved'].includes(key)) s.reset(key);
             ctx.ui.toast('Réglages réinitialisés');
           } }),
-          row({ title: 'Effacer contenu et réglages', destructive: true, onClick: async () => {
-            if (!(await ctx.ui.confirm({ title: 'Tout effacer ?', message: 'Toutes les données (photos, notes, messages, réglages) seront supprimées et l\'appareil redémarrera.', confirmLabel: 'Tout effacer', destructive: true }))) return;
-            await k.factoryReset();
-            location.reload();
-          } }),
+          me().owner
+            ? row({ title: 'Effacer contenu et réglages', destructive: true, onClick: async () => {
+                const others = (accounts?.list().length ?? 1) > 1;
+                if (!(await ctx.ui.confirm({ title: 'Tout effacer ?', message: `Toutes les données (photos, notes, messages, réglages${others ? ' et tous les comptes' : ''}) seront supprimées et l'appareil redémarrera.`, confirmLabel: 'Tout effacer', destructive: true }))) return;
+                await ui.eraseDevice();
+              } })
+            : row({ title: 'Effacer le contenu de mon compte', destructive: true, onClick: async () => {
+                if (!(await ctx.ui.confirm({ title: 'Effacer votre contenu ?', message: 'Vos apps, fichiers, messages et réglages seront supprimés ; votre compte sera reconfiguré au redémarrage.', confirmLabel: 'Effacer', destructive: true }))) return;
+                await ui.eraseDevice();
+              } }),
         ],
       }),
     ]);
@@ -771,7 +919,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;

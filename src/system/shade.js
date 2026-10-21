@@ -6,7 +6,7 @@ import { h } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { drag } from '../lib/gesture.js';
 import { formatDate, formatTime, relativeTime } from '../lib/format.js';
-import { slider } from '../lib/ui.js';
+import { slider, avatar } from '../lib/ui.js';
 import { appIcon } from './app-icon.js';
 import { PullPanel } from './pull-panel.js';
 import { quickTiles } from './quick-settings.js';
@@ -29,12 +29,17 @@ export class NotificationShade extends PullPanel {
     this.brightness = slider({ min: 0.15, max: 1, step: 0.01, value: k.settings.get('brightness'), iconLeft: 'sun', onInput: (v) => k.settings.set('brightness', v), label: 'Luminosité' });
     this.list = h('div.shade-list');
     this.empty = h('div.shade-empty', icon('bell', { size: 30, stroke: 1.6 }), h('span', 'Aucune notification'));
+    // Compte connecté : changer d'utilisateur ou gérer les comptes.
+    this.userBtn = h('button.round-btn.shade-user', { type: 'button', 'aria-label': 'Utilisateurs', hidden: !k.accounts, onclick: () => { this.close(); this.ui.showAccountPicker({ manage: true }); } });
+    this.renderUser();
+    k.events.on('account:change', () => this.renderUser());
     this.clearBtn = h('button.shade-clear', { type: 'button', onclick: () => k.notifications.clear() }, 'Tout effacer');
     const head = h(
       'div.shade-head',
       h('div', this.clock, this.date),
       h(
         'div.shade-actions',
+        this.userBtn,
         h('button.round-btn', { type: 'button', 'aria-label': 'Éteindre', onclick: () => { this.close(); this.ui.power.showMenu(); } }, icon('power', { size: 18 })),
         h('button.round-btn', { type: 'button', 'aria-label': 'Réglages', onclick: () => { this.close(); this.ui.launch('settings'); } }, icon('settings', { size: 18 })),
       ),
@@ -55,6 +60,11 @@ export class NotificationShade extends PullPanel {
 
   get isVisible() {
     return this.el.classList.contains('visible');
+  }
+
+  renderUser() {
+    const account = this.k.account;
+    if (account) this.userBtn.replaceChildren(avatar(account.name || '?', { size: 34, color: account.color, photo: account.photo }));
   }
 
   onBeforeOpen() {

@@ -2,6 +2,7 @@
  * Noyau d'Orion OS : démarre et relie les services système.
  *
  *   events ─ log ─ storage
+ *     ├─ accounts        comptes utilisateurs (registre partagé)
  *     ├─ settings        réglages persistants
  *     ├─ fs              système de fichiers virtuel
  *     ├─ packages        gestionnaire de paquets
@@ -43,14 +44,19 @@ export const OS = Object.freeze({
 /**
  * @param {object} options
  * @param {object} [options.backend] pilote de stockage (mémoire par défaut)
+ * @param {import('./accounts.js').AccountRegistry} [options.accounts] registre des comptes
  * @param {object[]} [options.manifests] manifestes des applications
  * @param {(step: string, progress: number) => void} [options.onProgress]
  */
-export async function bootKernel({ backend = new MemoryBackend(), manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false } = {}) {
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false } = {}) {
   const log = new SystemLog({ now, echo: echoLog });
   const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
   log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
   log.info('kernel', `stockage : ${backend.kind}`);
+  if (accounts) {
+    accounts.events = events;
+    log.info('accounts', `${accounts.list().length} compte(s), session de « ${accounts.current?.name || 'nouveau compte'} »`);
+  }
 
   const snapshot = await backend.getAll();
   const ns = (name) => new Namespace(backend, name, snapshot);
@@ -108,6 +114,11 @@ export async function bootKernel({ backend = new MemoryBackend(), manifests = []
   const kernel = {
     os: OS,
     backend: backend.kind,
+    accounts,
+    /** Compte de la session en cours (null sans registre, dans les tests). */
+    get account() {
+      return accounts?.current ?? null;
+    },
     firstBoot,
     now,
     log,

@@ -117,7 +117,7 @@ export class Dialogs {
       'div.action-group',
       title || message ? h('div.action-head', title ? h('strong', title) : null, message ? h('span', message) : null) : null,
       actions.map((a) =>
-        h(`button.action-btn${a.destructive ? '.destructive' : ''}`, { type: 'button', disabled: a.disabled, onclick: () => panel.finish(a.value ?? a.label) }, a.icon ? icon(a.icon, { size: 20 }) : null, h('span', a.label)),
+        h(`button.action-btn${a.destructive ? '.destructive' : ''}`, { type: 'button', disabled: a.disabled, onclick: () => panel.finish(a.value ?? a.label) }, a.leading ?? (a.icon ? icon(a.icon, { size: 20 }) : null), h('span', a.label)),
       ),
     );
     const panel = h('div.dialog.action-sheet', group, h('button.action-btn.cancel', { type: 'button', onclick: () => panel.finish(null) }, cancelLabel));

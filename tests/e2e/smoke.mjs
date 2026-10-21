@@ -2,7 +2,7 @@
 /**
  * Test de bout en bout dans un vrai navigateur (Chromium via Playwright) :
  * démarrage, assistant de configuration, lancement de chaque application,
- * gestes système, verrouillage par code. Usage : npm run test:e2e
+ * gestes système, verrouillage par code, comptes. Usage : npm run test:e2e
  * (Playwright doit être installé : npm install && npx playwright install chromium).
  */
 import { spawn } from 'node:child_process';
@@ -32,27 +32,37 @@ try {
   });
   const wait = (ms) => page.waitForTimeout(ms);
 
+  /** Assistant : compte, thème, navigation, code (ou aucun). */
+  const runSetup = async (name, code) => {
+    await page.waitForSelector('.setup-next', { timeout: 15_000 });
+    await wait(300);
+    await page.click('.setup-next');
+    await wait(400);
+    await page.fill('.setup-input[type="text"]', name);
+    await page.click('.setup-next');
+    for (let i = 0; i < 2; i++) {
+      await wait(400);
+      await page.click('.setup-next');
+    }
+    await wait(400);
+    if (code) {
+      for (const d of code + code) {
+        await page.click(`.setup-keypad .pin-key:text-is("${d}")`);
+        await wait(80);
+      }
+    } else {
+      await page.click('text=Ne pas définir de code');
+    }
+    await wait(500);
+    await page.click('.setup-next');
+    await page.waitForFunction(() => window.orion.ui.state === 'home', null, { timeout: 5000 });
+  };
+
   await page.goto(url);
   await page.waitForSelector('.setup-next', { timeout: 10_000 });
   check(true, 'Démarrage du noyau et assistant de configuration');
-  await wait(300);
-  await page.click('.setup-next');
-  await wait(400);
-  await page.fill('.setup-input', 'Testeur');
-  await page.click('.setup-next');
-  for (let i = 0; i < 2; i++) {
-    await wait(400);
-    await page.click('.setup-next');
-  }
-  await wait(400);
-  for (const d of '24682468') {
-    await page.click(`.setup-keypad .pin-key:text-is("${d}")`);
-    await wait(80);
-  }
-  await wait(500);
-  await page.click('.setup-next');
-  await page.waitForFunction(() => window.orion.ui.state === 'home', null, { timeout: 5000 });
-  check(true, "Configuration terminée, écran d'accueil affiché");
+  await runSetup('Testeur', '2468');
+  check(await page.evaluate(() => window.orion.kernel.account?.name === 'Testeur' && window.orion.kernel.account.owner), "Configuration terminée, compte du propriétaire créé, écran d'accueil affiché");
 
   const ids = await page.evaluate(async () => {
     const k = window.orion.kernel;
@@ -114,6 +124,23 @@ try {
   }
   await wait(800);
   check(await page.evaluate(() => window.orion.ui.state === 'home'), 'Déverrouillage avec le code');
+
+  // Comptes : un second utilisateur dispose d'un espace séparé.
+  await page.evaluate(() => window.orion.kernel.accounts.create({ name: 'Invité' }));
+  await Promise.all([page.waitForEvent('load'), page.evaluate(() => window.orion.ui.switchAccount(window.orion.kernel.accounts.list().find((a) => !a.owner).id))]);
+  await runSetup('Invité', null);
+  const guest = await page.evaluate(() => ({ account: window.orion.kernel.account, apps: window.orion.kernel.packages.list().length }));
+  check(guest.account.name === 'Invité' && !guest.account.owner && guest.apps < ids.length, 'Second compte : session et données séparées');
+  await Promise.all([page.waitForEvent('load'), page.evaluate(() => window.orion.ui.switchAccount(window.orion.kernel.accounts.owner.id))]);
+  await page.waitForFunction(() => window.orion?.ui.state === 'locked', null, { timeout: 10_000 });
+  await wait(1300);
+  await drag(0.5, 0.45, 0.5, 0.1);
+  for (const d of '2468') {
+    await page.click(`.pin-key:has(.pin-digit:text-is("${d}"))`);
+    await wait(80);
+  }
+  await page.waitForFunction(() => window.orion.ui.state === 'home', null, { timeout: 5000 });
+  check(await page.evaluate((n) => window.orion.kernel.account.owner && window.orion.kernel.packages.list().length === n, ids.length), 'Retour au propriétaire avec son code, ses apps intactes');
 
   const shell = await page.evaluate(async () => {
     const { Shell } = await import('./src/kernel/shell.js');

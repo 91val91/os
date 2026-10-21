@@ -107,7 +107,12 @@ export class PowerManager {
   }
 
   async reboot() {
-    await this.#blackout('Redémarrage…');
+    await this.restart('Redémarrage…');
+  }
+
+  /** Redémarre le système (changement d'utilisateur, mise à jour). */
+  async restart(message) {
+    await this.#blackout(message);
     await applyPendingUpdate();
     location.reload();
   }

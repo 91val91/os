@@ -46,7 +46,7 @@ export function mount(root, ctx) {
     }
     const me = h(
       'div.contacts-me',
-      avatar(ctx.settings.get('userName'), { size: 54, color: ctx.settings.get('accent') }),
+      avatar(ctx.settings.get('userName'), { size: 54, color: ctx.kernel?.account?.color ?? ctx.settings.get('accent'), photo: ctx.kernel?.account?.photo }),
       h('div', h('strong', ctx.settings.get('userName')), h('span', 'Ma fiche')),
     );
     render(

@@ -67,6 +67,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 ## Fonctionnalités
 
 **Système**
+- **Comptes et utilisateurs** : l'assistant crée votre compte (nom, e-mail facultatif) ; d'autres personnes peuvent avoir le leur sur le même téléphone (**Réglages → Compte → Utilisateurs**). Chaque compte a ses apps, fichiers, photos, contacts, messages, réglages et code ; on change d'utilisateur depuis l'écran verrouillé ou le volet de notifications. Les comptes sont enregistrés sur l'appareil uniquement (pas de synchronisation en ligne).
 - Écran verrouillé avec horloge, notifications, lecture en cours, lampe et appareil photo ; code PIN haché (SHA-256 salé), blocage après 5 essais, appel d'urgence.
 - Accueil à pages avec dock, widgets (horloge, météo), badges, icônes vivantes (date du Calendrier, aiguilles de l'Horloge), mode édition par glisser-déposer.
 - Multitâche : une instance par app, apps en arrière-plan conservées, écran des récentes, arrêt automatique des plus anciennes (« low memory killer »).
@@ -111,15 +112,16 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 │ Gestionnaire de fenêtres · Écran verrouillé · Accueil · Tiroir · Volet      │
 │ Centre de contrôle · Navigation (gestes/boutons) · Appels · Alarmes · …     │
 ├────────────────────────── Noyau (src/kernel) ───────────────────────────────┤
-│ processes · intents/activités · packages · vfs · settings · notifications   │
-│ alarms · permissions · media · contacts · telephony · device (HAL) · shell  │
+│ accounts · processes · intents/activités · packages · vfs · settings        │
+│ notifications · alarms · permissions · media · contacts · telephony · shell │
 ├────────────────────────── Stockage ─────────────────────────────────────────┤
-│ IndexedDB  →  localStorage  →  mémoire                                      │
+│ une base par compte : IndexedDB  →  localStorage  →  mémoire                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - Le **noyau** est du JavaScript pur, sans accès au DOM : il est entièrement testé sous Node.js.
 - Les services communiquent par un **bus d'événements** (`process:start`, `notification:post`, `alarm:fire`, `call:state`…).
+- Les **comptes** sont listés dans un registre séparé (`orion-accounts`) ; chaque compte a sa propre base (`orion-os` pour le propriétaire, celle d'avant les comptes), ouverte au démarrage : changer d'utilisateur redémarre le système sur ses données.
 - Le **système de fichiers virtuel** est hiérarchique (`/home`, `/data/<app>`, `/system` en lecture seule, `/tmp`), lisible de façon synchrone et persisté de façon asynchrone.
 - L'**interface système** est l'« hôte » du gestionnaire d'activités : elle crée une fenêtre par processus, charge le module de l'app à la demande et l'anime.
 
@@ -177,6 +179,7 @@ $ ls -l /home/Photos | grep jpg | wc -l
 $ echo "Courses : pain, café" > ~/Documents/liste.txt && open ~/Documents/liste.txt
 $ pm list -a ; pm install snake ; open snake
 $ ps ; kill 104
+$ users                             # comptes de l'appareil
 $ sim sms 0612345678 "Coucou !"     # simule un SMS entrant
 $ settings set theme dark
 $ calc "sqrt(2) * 10"
@@ -187,7 +190,7 @@ Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (
 ## Tests
 
 ```bash
-npm test            # 45 tests unitaires du noyau (node:test, sans dépendance)
+npm test            # 50 tests unitaires du noyau (node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN
 npm run lint        # ESLint
