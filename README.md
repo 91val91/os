@@ -81,8 +81,8 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 
 | App | Points clés |
 | --- | --- |
-| Téléphone | Clavier DTMF, récents, favoris, messagerie vocale lue par synthèse vocale |
-| Messages | Conversations, photos jointes, indicateur de saisie, correspondants simulés qui répondent |
+| Téléphone | Clavier DTMF, récents, favoris, messagerie vocale |
+| Messages | Conversations, photos jointes, indicateur de saisie, correspondants simulés qui répondent (aucun contact ni conversation fictifs au départ) |
 | Contacts | Carnet d'adresses partagé, index alphabétique, sélection pour d'autres apps |
 | Appareil photo | Caméra réelle (ou scène simulée), filtres, formats photo/carré, caméra avant/arrière |
 | Photos | Photothèque par mois, albums, favoris, visionneuse avec balayage et zoom, fond d'écran |

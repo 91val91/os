@@ -6,15 +6,20 @@ export const CONTACTS_FILE = '/data/providers/contacts.json';
 
 const PALETTE = ['#ff6b6b', '#f59f00', '#37b24d', '#1c7ed6', '#7048e8', '#e64980', '#0ca678', '#f76707', '#4263eb'];
 
-const SEED = [
-  { firstName: 'Alice', lastName: 'Martin', phone: '+33 6 12 34 56 78', email: 'alice.martin@exemple.fr', favorite: true, company: 'Atelier Lumière' },
-  { firstName: 'Bruno', lastName: 'Lefèvre', phone: '+33 6 23 45 67 89', email: 'bruno@exemple.fr' },
-  { firstName: 'Camille', lastName: 'Dubois', phone: '+33 7 34 56 78 90', email: 'camille.dubois@exemple.fr', favorite: true },
-  { firstName: 'David', lastName: 'Moreau', phone: '+33 6 45 67 89 01', company: 'Boulangerie Moreau' },
-  { firstName: 'Emma', lastName: 'Laurent', phone: '+33 6 56 78 90 12', email: 'emma.l@exemple.fr' },
-  { firstName: 'Hugo', lastName: 'Girard', phone: '+33 7 67 89 01 23' },
-  { firstName: 'Léa', lastName: 'Bonnet', phone: '+33 6 78 90 12 34', email: 'lea.bonnet@exemple.fr' },
-  { firstName: 'Maman', lastName: '', phone: '+33 6 89 01 23 45', favorite: true },
+/**
+ * Contacts de démonstration des premières versions d'Orion, retirés au
+ * démarrage. Identifiés par leur id d'usine ET leur numéro : un contact créé
+ * par l'utilisateur (id horodaté) n'est jamais concerné.
+ */
+export const DEMO_CONTACTS = [
+  { id: 'c1', phone: '+33 6 12 34 56 78' },
+  { id: 'c2', phone: '+33 6 23 45 67 89' },
+  { id: 'c3', phone: '+33 7 34 56 78 90' },
+  { id: 'c4', phone: '+33 6 45 67 89 01' },
+  { id: 'c5', phone: '+33 6 56 78 90 12' },
+  { id: 'c6', phone: '+33 7 67 89 01 23' },
+  { id: 'c7', phone: '+33 6 78 90 12 34' },
+  { id: 'c8', phone: '+33 6 89 01 23 45' },
 ];
 
 /** Normalise un numéro pour comparaison (9 derniers chiffres). */
@@ -37,12 +42,9 @@ export class ContactsProvider {
   }
 
   load() {
-    if (this.fs.exists(CONTACTS_FILE)) {
-      this.#contacts = this.fs.readJSON(CONTACTS_FILE, []);
-    } else {
-      this.#contacts = SEED.map((c, i) => ({ id: `c${i + 1}`, color: PALETTE[i % PALETTE.length], notes: '', ...c }));
-      this.#persist();
-    }
+    const stored = this.fs.exists(CONTACTS_FILE) ? this.fs.readJSON(CONTACTS_FILE, []) : null;
+    this.#contacts = (stored ?? []).filter((c) => !DEMO_CONTACTS.some((demo) => demo.id === c.id && phoneKey(demo.phone) === phoneKey(c.phone)));
+    if (!stored || this.#contacts.length !== stored.length) this.#persist();
     return this;
   }
 

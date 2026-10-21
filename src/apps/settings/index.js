@@ -650,7 +650,7 @@ export function mount(root, ctx) {
         items: [
           row({ title: 'Réinitialiser tous les réglages', destructive: true, onClick: async () => {
             if (!(await ctx.ui.confirm({ title: 'Réinitialiser les réglages ?', message: 'Vos données sont conservées, seuls les réglages sont rétablis.', confirmLabel: 'Réinitialiser', destructive: true }))) return;
-            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode'].includes(key)) s.reset(key);
+            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved'].includes(key)) s.reset(key);
             ctx.ui.toast('Réglages réinitialisés');
           } }),
           row({ title: 'Effacer contenu et réglages', destructive: true, onClick: async () => {
@@ -753,12 +753,15 @@ export function mount(root, ctx) {
   }
 
   function simulate(kind) {
-    const contacts = k.contacts.list();
+    const contacts = k.contacts.list().filter((c) => c.phone);
     const contact = contacts[Math.floor(Math.random() * contacts.length)];
-    ctx.ui.toast(kind === 'call' ? `Appel de ${displayName(contact)} dans 3 s…` : `SMS de ${displayName(contact)} dans 3 s…`);
+    // Sans contact, un numéro inconnu au hasard.
+    const number = contact?.phone ?? `+33 6 ${Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 100)).padStart(2, '0')).join(' ')}`;
+    const from = contact ? displayName(contact) : number;
+    ctx.ui.toast(kind === 'call' ? `Appel de ${from} dans 3 s…` : `SMS de ${from} dans 3 s…`);
     setTimeout(() => {
-      if (kind === 'call') k.telephony.incoming(contact.phone);
-      else k.telephony.receiveSms(contact.phone, ['Tu es dispo pour un café ? ☕', 'Coucou ! Tu as vu mon message ?', 'On se retrouve à 19 h ?', 'Je viens de finir, je t\'appelle après.'][Math.floor(Math.random() * 4)]);
+      if (kind === 'call') k.telephony.incoming(number);
+      else k.telephony.receiveSms(number, ['Tu es dispo pour un café ? ☕', 'Coucou ! Tu as vu mon message ?', 'On se retrouve à 19 h ?', 'Je viens de finir, je t\'appelle après.'][Math.floor(Math.random() * 4)]);
     }, 3000);
   }
 

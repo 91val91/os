@@ -13,7 +13,6 @@ export const CALLS_FILE = '/data/providers/calls.json';
 export const EMERGENCY_NUMBERS = ['112', '15', '17', '18', '114', '911'];
 export const VOICEMAIL = '888';
 
-const MINUTE = 60_000;
 
 export class TelephonyService {
   #threads = {}; // phoneKey → { address, messages: [] }
@@ -36,43 +35,22 @@ export class TelephonyService {
   }
 
   load() {
-    const t = this.now();
-    if (this.fs.exists(SMS_FILE)) {
-      this.#threads = this.fs.readJSON(SMS_FILE, {});
-    } else {
-      this.#seedThread('+33 6 12 34 56 78', [
-        { from: 'them', text: 'Salut ! On se voit toujours ce soir ?', time: t - 2 * 60 * MINUTE, read: false },
-      ]);
-      this.#seedThread('+33 6 89 01 23 45', [
-        { from: 'them', text: "N'oublie pas d'appeler ta grand-mère 😘", time: t - 26 * 60 * MINUTE, read: true },
-        { from: 'me', text: 'Promis, je le fais demain !', time: t - 25 * 60 * MINUTE, read: true },
-      ]);
-      this.#seedThread('+33 7 34 56 78 90', [
-        { from: 'me', text: 'Tu as vu le film finalement ?', time: t - 3 * 24 * 60 * MINUTE, read: true },
-        { from: 'them', text: 'Oui ! Génial, je te raconte 🍿', time: t - 3 * 24 * 60 * MINUTE + 5 * MINUTE, read: true },
-      ]);
-      this.#saveThreads();
-    }
-    if (this.fs.exists(CALLS_FILE)) {
-      this.#calls = this.fs.readJSON(CALLS_FILE, []);
-    } else {
-      this.#calls = [
-        { number: '+33 6 89 01 23 45', direction: 'in', missed: false, time: t - 5 * 60 * MINUTE, duration: 754 },
-        { number: '+33 6 23 45 67 89', direction: 'in', missed: true, time: t - 28 * 60 * MINUTE, duration: 0 },
-        { number: '+33 6 12 34 56 78', direction: 'out', missed: false, time: t - 50 * 60 * MINUTE, duration: 132 },
-      ].map((c) => ({ id: this.#nextId++, ...c }));
-      this.#saveCalls();
-    }
+    this.#threads = this.fs.exists(SMS_FILE) ? this.fs.readJSON(SMS_FILE, {}) : {};
+    this.#calls = this.fs.exists(CALLS_FILE) ? this.fs.readJSON(CALLS_FILE, []) : [];
     const ids = Object.values(this.#threads).flatMap((th) => th.messages.map((m) => m.id ?? 0));
     this.#nextId = Math.max(this.#nextId, ...ids, ...this.#calls.map((c) => c.id)) + 1;
     return this;
   }
 
-  #seedThread(address, messages) {
-    this.#threads[phoneKey(address)] = {
-      address,
-      messages: messages.map((m) => ({ id: this.#nextId++, status: 'delivered', ...m })),
-    };
+  /** Efface conversations et appels de ces numéros (données de démonstration). */
+  forgetNumbers(numbers) {
+    const keys = new Set(numbers.map(phoneKey));
+    const threads = Object.keys(this.#threads).filter((key) => keys.has(key));
+    const calls = this.#calls.length;
+    threads.forEach((key) => delete this.#threads[key]);
+    this.#calls = this.#calls.filter((c) => !keys.has(phoneKey(c.number)));
+    if (threads.length) this.#saveThreads();
+    if (calls !== this.#calls.length) this.#saveCalls();
   }
 
   #saveThreads() {

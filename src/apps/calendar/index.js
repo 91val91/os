@@ -12,6 +12,7 @@ export const styles = [new URL('./style.css', import.meta.url).href];
 
 const COLORS = ['#ff3b30', '#ff9500', '#34c759', '#007aff', '#af52de', '#ff2d55'];
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const DEMO_EVENTS = { e1: 'Déjeuner avec Alice', e2: 'Séance de sport', e3: 'Anniversaire de Maman 🎂', e4: 'Réunion projet Orion' };
 
 const toKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const fromKey = (key) => {
@@ -20,21 +21,10 @@ const fromKey = (key) => {
 };
 
 export function mount(root, ctx) {
-  let events = ctx.storage.get('events', null);
-  if (!events) {
-    const day = (offset) => {
-      const d = new Date();
-      d.setDate(d.getDate() + offset);
-      return toKey(d);
-    };
-    events = [
-      { id: 'e1', title: 'Déjeuner avec Alice', date: day(0), start: '12:30', end: '14:00', location: 'Café du Coin', color: COLORS[3] },
-      { id: 'e2', title: 'Séance de sport', date: day(1), start: '18:00', end: '19:00', color: COLORS[2] },
-      { id: 'e3', title: 'Anniversaire de Maman 🎂', date: day(3), allDay: true, color: COLORS[5] },
-      { id: 'e4', title: 'Réunion projet Orion', date: day(6), start: '10:00', end: '11:30', location: 'Visio', color: COLORS[4] },
-    ];
-    ctx.storage.set('events', events);
-  }
+  // Les événements de démonstration des premières versions sont retirés.
+  const stored = ctx.storage.get('events', []);
+  let events = stored.filter((e) => DEMO_EVENTS[e.id] !== e.title);
+  if (events.length !== stored.length) ctx.storage.set('events', events);
 
   const today = new Date();
   let month = new Date(today.getFullYear(), today.getMonth(), 1);

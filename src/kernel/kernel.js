@@ -26,7 +26,7 @@ import { NotificationService } from './notifications.js';
 import { AlarmService } from './alarms.js';
 import { PermissionService } from './permissions.js';
 import { MediaService } from './media.js';
-import { ContactsProvider } from './contacts.js';
+import { ContactsProvider, DEMO_CONTACTS } from './contacts.js';
 import { TelephonyService } from './telephony.js';
 import { DeviceService } from './device.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
@@ -86,6 +86,11 @@ export async function bootKernel({ backend = new MemoryBackend(), manifests = []
 
   const contacts = new ContactsProvider({ fs, events }).load();
   const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers }).load();
+  // Les premières versions livraient des correspondants fictifs : leurs SMS et appels sont effacés une fois.
+  if (!settings.get('demoDataRemoved')) {
+    telephony.forgetNumbers(DEMO_CONTACTS.map((c) => c.phone));
+    settings.set('demoDataRemoved', true);
+  }
   const device = await new DeviceService({ events, settings, env, now, log }).init();
   onProgress('hal', 0.85);
 

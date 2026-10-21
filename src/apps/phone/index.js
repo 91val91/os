@@ -1,6 +1,6 @@
 /**
  * Téléphone : clavier DTMF, appels récents, favoris, contacts et
- * messagerie vocale (lue par synthèse vocale quand elle est disponible).
+ * messagerie vocale.
  */
 import { h } from '../../lib/dom.js';
 import { icon } from '../../lib/icons.js';
@@ -12,11 +12,6 @@ import { displayName } from '../../kernel/contacts.js';
 export const styles = [new URL('./style.css', import.meta.url).href];
 
 const LETTERS = { 2: 'ABC', 3: 'DEF', 4: 'GHI', 5: 'JKL', 6: 'MNO', 7: 'PQRS', 8: 'TUV', 9: 'WXYZ', 0: '+' };
-
-const VOICEMAILS = [
-  { from: '+33 6 12 34 56 78', text: "Coucou, c'est Alice ! Je voulais savoir si tu venais toujours ce soir. Rappelle-moi quand tu peux, bisous !", duration: 9, ago: 3 },
-  { from: '+33 6 45 67 89 01', text: 'Bonjour, ici la boulangerie Moreau. Votre commande de croissants est prête, vous pouvez passer la récupérer demain matin.', duration: 11, ago: 30 },
-];
 
 function formatNumber(raw) {
   const digits = raw.replace(/[^\d+*#]/g, '');
@@ -164,18 +159,6 @@ export function mount(root, ctx) {
 
   // ───────────── Messagerie ─────────────
   const vmBar = appBar({ title: 'Messagerie', large: true });
-  const speak = (text) => {
-    const synth = window.speechSynthesis;
-    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
-      ctx.ui.alert({ title: 'Transcription', message: text });
-      return;
-    }
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.volume = ctx.settings.get('volume');
-    synth.speak(utterance);
-  };
   views.voicemail = h(
     'div.phone-page',
     vmBar,
@@ -183,16 +166,7 @@ export function mount(root, ctx) {
       'div.app-scroll',
       h(
         'div.app-content',
-        h(
-          'div.list',
-          VOICEMAILS.map((vm) =>
-            h(
-              'div.list-item.vm-item',
-              h('div.li-body', h('div.li-title', tel.nameFor(vm.from)), h('div.li-sub', `${relativeTime(ctx.now() - vm.ago * 3_600_000, ctx.now())} · ${formatDuration(vm.duration * 1000)}`), h('p.vm-text', `« ${vm.text} »`)),
-              h('button.vm-play', { type: 'button', 'aria-label': 'Écouter', onclick: () => speak(vm.text) }, icon('play', { size: 18 })),
-            ),
-          ),
-        ),
+        emptyState({ icon: 'voicemail', title: 'Aucun message vocal', message: 'Les messages laissés par vos correspondants apparaîtront ici.' }),
         h('button.btn.btn-tinted.block.vm-call', { type: 'button', onclick: () => call('888') }, icon('voicemail', { size: 20 }), 'Appeler la messagerie'),
       ),
     ),
