@@ -5,7 +5,7 @@
 
 .cam-top {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 44px 44px 1fr 44px 44px;
   align-items: center;
   gap: 8px;
   padding: calc(var(--sat) + 2px) 14px 8px;
@@ -22,6 +22,14 @@
 
 .cam-top-btn.on {
   color: #ffd60a;
+}
+
+.cam-timer-btn {
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+  font-size: .62rem;
+  font-weight: 700;
 }
 
 .cam-notice {
@@ -43,6 +51,39 @@
 .cam-viewfinder.square {
   aspect-ratio: 1;
   margin: auto 0;
+}
+
+/* 9:16 : le viseur occupe toute la hauteur disponible (recadrage à la prise de vue). */
+.camera.wide .cam-viewfinder {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.camera.wide .cam-bottom {
+  flex: 0 0 auto;
+  gap: 16px;
+  padding-top: 14px;
+}
+
+.cam-viewfinder.no-grid .cam-grid {
+  display: none;
+}
+
+.cam-countdown {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  font-size: 7rem;
+  font-weight: 200;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, .45);
+  pointer-events: none;
+}
+
+.cam-countdown.visible {
+  display: grid;
 }
 
 .cam-video,

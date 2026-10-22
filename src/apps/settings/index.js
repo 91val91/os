@@ -113,6 +113,7 @@ export function mount(root, ctx) {
         listGroup({
           items: [
             row({ icon: 'apps', iconColor: '#5856d6', title: 'Applications', detail: String(visibleApps().length), chevron: true, onClick: appsPage }),
+            row({ icon: 'camera', iconColor: '#8e8e93', title: 'Appareil photo', chevron: true, onClick: cameraPage }),
             row({ icon: 'settings', iconColor: '#8e8e93', title: 'Général', chevron: true, onClick: generalPage }),
             s.get('developer') ? row({ icon: 'code', iconColor: '#636366', title: 'Options pour les développeurs', detail: ui.developerUnlocked ? null : icon('lock', { size: 15 }), chevron: true, onClick: openDeveloper }) : null,
             row({ icon: 'info', iconColor: '#8e8e93', title: `À propos de ${k.os.name}`, chevron: true, onClick: aboutPage }),
@@ -641,6 +642,42 @@ export function mount(root, ctx) {
     return false;
   }
 
+  // ───────────── Appareil photo ─────────────
+
+  function cameraPage() {
+    const choice = (key, options) => h('div.list-item', segmented(options, s.get(key), (v) => s.set(key, v)));
+    open('Appareil photo', () => [
+      listGroup({
+        header: 'Format par défaut',
+        items: [choice('camera.format', [{ value: 'wide', label: '9:16' }, { value: 'photo', label: 'Photo 3:4' }, { value: 'square', label: 'Carré 1:1' }])],
+      }),
+      listGroup({
+        header: 'Qualité des photos',
+        items: [choice('camera.quality', [{ value: 'high', label: 'Haute' }, { value: 'standard', label: 'Standard' }, { value: 'compact', label: 'Économie' }])],
+        footer: 'Haute : jusqu\'à 2560 pixels, fichiers plus lourds. Standard : 1440 pixels. Économie : 1080 pixels, idéal pour partager et gagner de la place.',
+      }),
+      listGroup({
+        header: 'Retardateur',
+        items: [choice('camera.timer', [{ value: 0, label: 'Désactivé' }, { value: 3, label: '3 s' }, { value: 10, label: '10 s' }])],
+        footer: 'Également réglable depuis le bouton en haut de l\'appareil photo.',
+      }),
+      listGroup({
+        items: [
+          toggleRow('Grille', 'camera.grid', { icon: 'grid', color: '#8e8e93', subtitle: 'Règle des tiers pour cadrer' }),
+          toggleRow('Selfies en miroir', 'camera.mirror', { icon: 'user', color: '#0a84ff', subtitle: 'Enregistrer les photos de la caméra avant comme dans le viseur' }),
+          toggleRow('Son de l\'obturateur', 'camera.shutterSound', { icon: 'volume', color: '#ff2d55' }),
+          toggleRow('Conserver les réglages', 'camera.preserve', { icon: 'history', color: '#ff9500', subtitle: 'Garder le format, le filtre et la caméra de la dernière utilisation' }),
+        ],
+      }),
+      listGroup({
+        items: [
+          row({ icon: 'hand', iconColor: '#0a84ff', title: 'Autorisations de l\'appareil photo', chevron: true, onClick: () => appPage('camera') }),
+          row({ icon: 'camera', iconColor: '#8e8e93', title: 'Ouvrir l\'appareil photo', onClick: () => ctx.startActivity({ app: 'camera', action: 'main' }) }),
+        ],
+      }),
+    ]);
+  }
+
   // ───────────── Mode développeur (mot de passe) ─────────────
 
   let developerFailures = 0;
@@ -1027,7 +1064,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: () => s.get('developer') && openDeveloper() };
+  const PAGES = { camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: () => s.get('developer') && openDeveloper() };
 
   function handleIntent(intent) {
     const data = intent?.data;

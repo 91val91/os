@@ -86,7 +86,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 | Téléphone | Clavier DTMF, récents, favoris, messagerie vocale |
 | Messages | Conversations, photos jointes, indicateur de saisie, correspondants simulés qui répondent (aucun contact ni conversation fictifs au départ) |
 | Contacts | Carnet d'adresses partagé, index alphabétique, sélection pour d'autres apps |
-| Appareil photo | Caméra réelle (ou scène simulée), filtres, formats photo/carré, caméra avant/arrière |
+| Appareil photo | Caméra réelle (ou scène simulée), filtres, formats 9:16/photo/carré, caméra avant/arrière, retardateur. **Réglages → Appareil photo** : format par défaut, qualité (Haute, Standard, Économie), retardateur, grille, selfies en miroir, son de l'obturateur, conserver les réglages |
 | Photos | Photothèque par mois, albums, favoris, visionneuse avec balayage et zoom, fond d'écran |
 | Horloge | Horloge mondiale, réveils avec jours de répétition, chronomètre à tours, minuteur |
 | Calculatrice | Saisie d'expressions avec aperçu, mode scientifique, historique |

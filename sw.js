@@ -12,7 +12,7 @@
  * session en cours ne mélange jamais deux versions du système.
  */
 const PREFIX = 'orion-os-';
-const CACHE = `${PREFIX}v4`;
+const CACHE = `${PREFIX}v5`;
 // Tout ce qu'il faut pour démarrer sans réseau : un module importé au démarrage qui
 // manquerait ici laisserait un écran noir hors ligne (vérifié par tests/sw.test.js).
 const CORE = [
@@ -57,6 +57,7 @@ const CORE = [
   './src/lib/ui.js',
   './src/lib/weather-codes.js',
   './src/system/alarm-screen.js',
+  './src/system/app-art.js',
   './src/system/app-context.js',
   './src/system/app-icon.js',
   './src/system/banners.js',
