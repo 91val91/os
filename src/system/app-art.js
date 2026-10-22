@@ -183,6 +183,28 @@ const ART = {
     `<circle cx="61" cy="38" r="14.5" fill="${p.rad([['#fff8c9', 0], ['#ffd84d', 0.55], ['#ffa424', 1]], [56, 33, 19])}"/>` +
     lift(`<path d="${CLOUD}"/>`, { fill: p.lin(['#ffffff', '#d8e8fb'], [0, 38, 0, 73]) }, { shadow: '#0a3a8c', o: 0.3 }),
 
+  maps: (p) => {
+    const land = bg(p, ['#e9f5df', '#d6ecc6', '#bfe0aa']);
+    const park = `<path d="M0 64C14 58 26 60 34 70L40 100H0Z" fill="${p.lin(['#9fdc85', '#6cc35a'], [0, 58, 0, 100])}"/>`;
+    const water = `<path d="M62 0C58 18 70 30 86 34C94 36 100 42 100 42V0Z" fill="${p.lin(['#8fd3ff', '#4aa8f0'], [70, 0, 100, 40])}"/>`;
+    const roads =
+      '<g fill="none" stroke-linecap="round">' +
+      '<path d="M-4 40C22 44 40 34 58 46S88 80 104 74" stroke="#fff" stroke-width="10"/>' +
+      '<path d="M-4 40C22 44 40 34 58 46S88 80 104 74" stroke="#ffd25e" stroke-width="5.5"/>' +
+      '<path d="M30 -4L44 104" stroke="#fff" stroke-width="7"/>' +
+      '<path d="M66 104L80 54" stroke="#fff" stroke-width="5"/>' +
+      '</g>';
+    const pin = 'M50 14C38.4 14 29 23.2 29 34.6C29 50 50 72 50 72S71 50 71 34.6C71 23.2 61.6 14 50 14Z';
+    return (
+      land +
+      park +
+      water +
+      roads +
+      lift(`<path d="${pin}"/>`, { fill: p.lin(['#ff7a6e', '#e5243b'], [0, 14, 0, 72]) }, { shadow: '#5a0a12', o: 0.32 }) +
+      '<circle cx="50" cy="34.5" r="7.5" fill="#fff"/>'
+    );
+  },
+
   music: (p) => {
     const note =
       '<ellipse cx="35.5" cy="68" rx="10" ry="7.8" transform="rotate(-20 35.5 68)"/><ellipse cx="64.5" cy="62" rx="10" ry="7.8" transform="rotate(-20 64.5 62)"/>' +
@@ -310,7 +332,7 @@ const ART = {
 };
 
 // Fonds clairs : l'icône reçoit un liseré sombre pour ne pas se fondre dans un fond blanc
-const LIGHT = new Set(['camera', 'photos', 'calendar', 'files']);
+const LIGHT = new Set(['camera', 'photos', 'calendar', 'files', 'maps']);
 
 /** Illustration d'une app (élément <svg>), ou null si elle n'en a pas. */
 export function appArt(id) {

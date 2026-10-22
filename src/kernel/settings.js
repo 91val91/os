@@ -19,12 +19,12 @@ export const DEFAULT_SETTINGS = {
   showBatteryPercent: true,
   // Navigation
   navigation: 'gestures', // gestures | buttons
-  // Connectivité
-  wifi: true,
-  wifiNetwork: 'Orion-Maison',
-  bluetooth: false,
+  // Connectivité (le Wi‑Fi réel est piloté par orion-server ou par le système du téléphone)
+  bluetooth: false, // Bluetooth d'Orion (Web Bluetooth) ; avec orion-server, l'adaptateur fait foi
+  'bluetooth.devices': [], // appareils Web Bluetooth autorisés : [{ id, name }]
   airplane: false,
-  cellular: true,
+  cellular: true, // réseau mobile simulé (mode démonstration)
+  'telephony.mode': 'auto', // auto | handoff (apps du téléphone) | simulated
   location: true,
   // Sons
   volume: 0.6,

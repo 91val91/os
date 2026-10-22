@@ -336,6 +336,8 @@ body.fullscreen .camera-cutout {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* clip : l'écran ne peut jamais défiler (un champ qui prend le focus le décalait pour de bon). */
+  overflow: clip;
   background: #000;
   color: var(--fg);
   user-select: none;

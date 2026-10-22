@@ -42,7 +42,7 @@ Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la bar
 - Un tunnel HTTPS temporaire lève ces limites : `npm start` dans un terminal, puis `cloudflared tunnel --url http://localhost:8080` dans un autre, et ouvrez l'adresse `https://….trycloudflare.com` affichée (elle change à chaque lancement).
 - Android branché en USB : dans Chrome sur l'ordinateur, `chrome://inspect` → **Port forwarding** `8080 → localhost:8080`, puis `http://localhost:8080` sur le téléphone, qui compte comme une adresse sécurisée.
 
-**Limites sur un vrai téléphone** : Orion OS reste une application web. Quand le téléphone est en veille ou qu'une autre application est au premier plan, il est suspendu : réveils et minuteurs ne sonnent qu'une fois Orion rouvert. Les appels et SMS sont simulés, et les boutons physiques (volume, marche) restent ceux du téléphone hôte ; utilisez le centre de contrôle et le menu marche-arrêt d'Orion. Sur iPhone, l'app installée ne partage pas ses données avec Safari : ce qui a été configuré dans un onglet est à refaire dans l'app.
+**Limites sur un vrai téléphone** : Orion OS reste une application web. Quand le téléphone est en veille ou qu'une autre application est au premier plan, il est suspendu : réveils et minuteurs ne sonnent qu'une fois Orion rouvert. Les appels et SMS passent par les apps Téléphone et Messages du téléphone (voir [Réseau, Bluetooth, téléphonie et GPS](#réseau-bluetooth-téléphonie-et-gps)), et les boutons physiques (volume, marche) restent ceux du téléphone hôte ; utilisez le centre de contrôle et le menu marche-arrêt d'Orion. Sur iPhone, l'app installée ne partage pas ses données avec Safari : ce qui a été configuré dans un onglet est à refaire dans l'app.
 
 ## Prise en main
 
@@ -77,6 +77,8 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Intents à la Android : « Ouvrir avec », « Partager avec », sélection d'une photo ou d'un contact depuis une autre app (`startActivityForResult`).
 - Alarmes système : réveils, minuteurs et rappels sonnent même si l'app est fermée.
 - Thèmes clair/sombre/automatique, Night Shift, luminosité, économiseur de batterie.
+- **Connectivité réelle** : Wi‑Fi, Bluetooth, réseau mobile et mode avion reflètent l'état réel de l'appareil ; installé sur un PC, une tablette ou une machine virtuelle, Orion pilote lui-même le Wi‑Fi, le Bluetooth et un modem 4G. Voir [Réseau, Bluetooth, téléphonie et GPS](#réseau-bluetooth-téléphonie-et-gps).
+- **Service de localisation** (GPS du téléphone ou récepteur GPS branché sur Orion installé), partagé par les apps qui en ont l'autorisation ; icône dans la barre d'état pendant le suivi.
 - **Mises à jour du système** (**Réglages → Général → Mise à jour logicielle**) : voir [Mises à jour](#mises-à-jour).
 - **Mode développeur protégé par un mot de passe d'appareil** (**Réglages → Mode développeur**) : le propriétaire le choisit une fois (6 caractères minimum, lettres et chiffres) ; il vaut pour tous les comptes, seul le propriétaire peut le changer ou le supprimer, et « Réinitialiser les réglages » ne l'efface pas. Il est redemandé après chaque verrouillage de l'appareil. Après 5 erreurs, attente de 30 s, doublée à chaque nouvelle erreur (15 min au plus), même si l'on ferme les Réglages ou redémarre. Mot de passe oublié : le propriétaire le remplace avec son code de verrouillage.
 
@@ -84,8 +86,9 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 
 | App | Points clés |
 | --- | --- |
-| Téléphone | Clavier DTMF, récents, favoris, messagerie vocale |
-| Messages | Conversations, photos jointes, indicateur de saisie, correspondants simulés qui répondent (aucun contact ni conversation fictifs au départ) |
+| Téléphone | Clavier DTMF, récents, favoris, messagerie vocale. Vrais appels : par le modem d'Orion installé, ou confiés à l'app Téléphone du téléphone |
+| Messages | Conversations, photos jointes. Vrais SMS (modem ou app Messages du téléphone) ; en mode démonstration, correspondants simulés qui répondent |
+| Plans | Carte OpenStreetMap (plan ou relief), position en direct avec précision et cap, recherche de lieux, itinéraires voiture/vélo/à pied, trajets enregistrés en GPX dans `Documents/Trajets` |
 | Contacts | Carnet d'adresses partagé, index alphabétique, sélection pour d'autres apps |
 | Appareil photo | Caméra réelle (ou scène simulée), filtres, formats 9:16/photo/carré, caméra avant/arrière, retardateur. **Réglages → Appareil photo** : format par défaut, qualité (Haute, Standard, Économie), retardateur, grille, selfies en miroir, son de l'obturateur, conserver les réglages |
 | Photos | Photothèque par mois, albums, favoris, visionneuse avec balayage et zoom, fond d'écran |
@@ -93,11 +96,11 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 | Calculatrice | Saisie d'expressions avec aperçu, mode scientifique, historique |
 | Notes | Fichiers texte dans `/home/Documents/Notes`, recherche, épinglage, partage |
 | Calendrier | Vue mensuelle, événements, rappels |
-| Météo | Prévisions réelles via Open-Meteo, géolocalisation, recherche de villes ; données simulées hors ligne |
+| Météo | Prévisions réelles via Open-Meteo, position par le service de localisation, recherche de villes ; données simulées hors ligne |
 | Musique | Morceaux génératifs synthétisés en temps réel, import de fichiers audio, contrôle système |
 | Navigateur | Barre d'adresse, favoris, historique, partage |
 | Fichiers | Explorateur de votre espace personnel (Documents, Photos, Musique…), import/export, renommage, déplacement. Les fichiers système n'y sont pas accessibles |
-| Réglages | Réseau, notifications, sons, affichage, fonds d'écran, confidentialité, code, batterie, stockage, apps |
+| Réglages | Wi‑Fi (réseaux, mot de passe, test de débit), Bluetooth, réseau mobile, localisation, notifications, sons, affichage, fonds d'écran, confidentialité, code, batterie, stockage, apps |
 | Terminal | Shell `osh` avec tubes, redirections, complétion et plus de 60 commandes. Caché : il s'ouvre depuis les options pour les développeurs et se ferme au verrouillage |
 | Store | Catalogue, installation et désinstallation d'applications |
 | 2048, Snake, Dessin, Dictaphone | À installer depuis le Store |
@@ -116,6 +119,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 ├────────────────────────── Noyau (src/kernel) ───────────────────────────────┤
 │ accounts · processes · intents/activités · packages · vfs · settings        │
 │ notifications · alarms · permissions · media · contacts · telephony · shell │
+│ network · bluetooth · location · bridge (pont matériel orion-server)        │
 ├────────────────────────── Stockage ─────────────────────────────────────────┤
 │ une base par compte : IndexedDB  →  localStorage  →  mémoire                │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -127,6 +131,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Le **système de fichiers virtuel** est hiérarchique (`/home`, `/data/<app>`, `/system` en lecture seule, `/tmp`), lisible de façon synchrone et persisté de façon asynchrone.
 - Chaque application travaille dans un **bac à sable** : `ctx.fs` ne donne accès qu'à l'espace de l'utilisateur (`/home`, `/tmp`) et à ses propres données (`/data/<app>`) ; les fichiers système et ceux des autres apps lui sont refusés (`EACCES`), et aucun intent ne peut lui en confier un. Seul le Terminal, en mode développeur, voit tout le système.
 - L'**interface système** est l'« hôte » du gestionnaire d'activités : elle crée une fenêtre par processus, charge le module de l'app à la demande et l'anime.
+- Le **pont matériel** (`src/kernel/bridge.js`) parle à `orion-server`, le service natif d'Orion installé, servi sur la même origine (`/api/…`, voir `server/API.md`). Il n'est cherché que lorsqu'Orion est servi en local (`127.0.0.1`) ; ailleurs, les services `network`, `bluetooth`, `location` et `telephony` utilisent les API du navigateur.
 
 ## Écrire une application
 
@@ -188,11 +193,28 @@ $ pm list -a ; pm install snake ; open snake
 $ ps ; kill 104
 $ users                             # comptes de l'appareil
 $ sim sms 0612345678 "Coucou !"     # simule un SMS entrant
+$ net                               # état du réseau (connexion, Wi‑Fi, modem, pont matériel)
+$ wifi scan ; wifi connect Maison   # Wi‑Fi (Orion installé)
+$ bt ; gps                          # appareils Bluetooth, position actuelle
 $ settings set theme dark
 $ calc "sqrt(2) * 10"
 ```
 
 Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (`*.txt`), historique (↑/↓) et complétion (Tab). `help` liste toutes les commandes.
+
+## Réseau, Bluetooth, téléphonie et GPS
+
+Une page web n'a pas le droit de piloter les radios d'un téléphone : c'est Android ou iOS qui les gère. Orion affiche donc l'état réel et utilise ce que le navigateur permet vraiment ; installé sur une machine (voir [Installer Orion](#installer-orion-sur-un-pc-ou-une-machine-virtuelle)), il pilote le matériel lui-même grâce à `orion-server`.
+
+| | Sur un téléphone (navigateur) | Orion installé (PC, tablette, VM) |
+| --- | --- | --- |
+| Wi‑Fi | État réel : en ligne ou non, type de connexion, qualité et débit estimés (Chrome sur Android), test de débit. Le choix du réseau se fait dans les réglages du téléphone | Recherche des réseaux, connexion avec mot de passe, réseaux masqués, déconnexion, oubli, activation (NetworkManager) |
+| Bluetooth | Chrome sur Android et ordinateur : appareils basse consommation (montres, capteurs…) choisis dans la fenêtre du navigateur, connexion réelle et batterie. Indisponible sur Safari (iPhone, iPad) et Firefox | Tous les appareils : recherche, appairage, connexion, batterie, oubli (BlueZ) |
+| Appels et SMS | Vrais appels et SMS confiés aux apps Téléphone et Messages du téléphone (liens `tel:` et `sms:`) ; Orion garde l'historique et les conversations | Modem 4G/5G USB ou M.2 : appels entrants et sortants, SMS envoyés et reçus, données mobiles, opérateur et signal (ModemManager) |
+| Localisation | GPS du téléphone (API Geolocation, en https), avec votre accord et celui du navigateur | Récepteur GPS USB (gpsd) : position, altitude, vitesse, satellites |
+| Mode avion | Coupe les services d'Orion (appels, SMS, Bluetooth) | Coupe réellement le Wi‑Fi, le Bluetooth et le modem, puis les rallume comme avant |
+
+Sur un ordinateur sans modem, **Réglages → Réseau mobile** permet de choisir le mode démonstration (appels et SMS simulés, correspondants qui répondent).
 
 ## Mises à jour
 
@@ -201,14 +223,15 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 - **Vérification** : au démarrage puis toutes les 6 heures, et à l'ouverture de **Réglages → Général → Mise à jour logicielle**. Une nouvelle version est annoncée par une notification et en tête des Réglages, avec ses nouveautés et la taille réellement à télécharger.
 - **Téléchargement** : la nouvelle version est préparée à côté de l'actuelle. Seuls les fichiers modifiés transitent par le réseau ; chacun est vérifié avec son empreinte SHA-256 (un fichier altéré ou une publication en cours fait échouer la mise à jour, sans rien casser).
 - **Installation** : « Installer maintenant » redémarre Orion sur la nouvelle version ; l'ancienne est effacée. Vos données, comptes et réglages sont conservés.
-- **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil se verrouille).
+- **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil est verrouillé et que rien n'est en cours : appel, réveil, musique).
+- **Version retirée** : si l'éditeur retire une version déjà téléchargée, elle est abandonnée et n'est jamais installée.
 
-**Publier une version** : changez le numéro et les nouveautés dans `src/kernel/version.js`, lancez `npm run release` (qui régénère `version.json` : version, notes, empreinte et taille de chaque fichier), puis poussez. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
+**Publier une version** : changez le numéro et les nouveautés dans `src/kernel/version.js`, ajoutez vos fichiers à git (`git add`), lancez `npm run release` (qui régénère `version.json` à partir de l'index git : version, notes, empreinte et taille de chaque fichier tel que GitHub Pages le servira ; il refuse de tourner s'il reste des changements non ajoutés), puis `git add version.json`, commitez et poussez. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
 
 ## Tests
 
 ```bash
-npm test            # 62 tests unitaires du noyau (node:test, sans dépendance)
+npm test            # 88 tests unitaires (noyau, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
@@ -233,12 +256,12 @@ scripts/                                  serveur local, publication (version.js
 
 ## Ce qui est réel, ce qui est simulé
 
-Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, mais il s'appuie sur le navigateur (et donc sur Android ou iOS) pour le matériel. Concrètement :
+Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, et s'appuie sur le navigateur (donc sur Android ou iOS) ou sur `orion-server` (Orion installé) pour le matériel. Concrètement :
 
-- **réels** quand le navigateur les fournit : appareil photo, micro, géolocalisation, niveau de batterie, vibreur, son, réseau (état en ligne, API météo), plein écran et hors ligne ;
-- **simulés** : le modem (appels et SMS avec correspondants automatiques), les réseaux Wi‑Fi/Bluetooth listés, la lampe torche, la batterie sur un ordinateur sans batterie.
+- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi (Orion installé), plein écran et hors ligne ;
+- **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie.
 
-Pour en faire le système principal d'un appareil, il faudrait le placer au-dessus d'un noyau Linux et d'une couche matérielle native, à la manière de Firefox OS (B2G) ou KaiOS : un navigateur en mode kiosque lancé au démarrage, avec des API natives pour la téléphonie.
+Installé avec l'image prévue pour cela, Orion devient le système principal de la machine, à la manière de Firefox OS (B2G) ou KaiOS : un noyau Linux, un navigateur en mode kiosque lancé au démarrage et `orion-server` pour le matériel.
 
 ## Licence
 

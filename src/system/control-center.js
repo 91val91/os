@@ -22,7 +22,7 @@ export class ControlCenter extends PullPanel {
       if (e.target === this.el || e.target.classList.contains('cc-scroll')) this.close();
     });
     this.enableSwipeToClose(this.el, { filter: (e) => !e.target.closest('.cc-slider') });
-    this.k.events.on('settings:change', () => this.isOpen && this.render());
+    for (const type of ['settings:change', 'network:change', 'bluetooth:change']) this.k.events.on(type, () => this.isOpen && this.render());
     this.k.events.on('media:change', () => this.isOpen && this.renderMedia());
   }
 

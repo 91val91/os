@@ -87,24 +87,41 @@ async function download(manifest, onProgress = () => {}) {
 function prepareLatest() {
   downloading ??= (async () => {
     const manifest = await fetchManifest();
-    const current = await readState();
-    if (current.current?.version === manifest.version) return { upToDate: true };
+    const before = await readState();
+    if (before.current?.version === manifest.version) return { upToDate: true };
     await download(manifest, (progress) => broadcast({ type: 'update-progress', ...progress }));
-    await writeState({ ...(await readState()), staged: manifest });
+    const now = await readState();
+    await writeState({ ...now, staged: manifest });
+    // Une version prête plus ancienne (remplacée par celle-ci) n'a plus lieu d'être gardée.
+    const old = now.staged?.version;
+    if (old && old !== manifest.version && old !== now.current?.version) await caches.delete(releaseCache(old));
     return { staged: summary(manifest) };
   })().finally(() => (downloading = null));
   return downloading;
 }
 
+/** Une version installée ou prête n'est utilisable que si son cache est complet. */
+async function complete(manifest) {
+  if (!manifest || !(await caches.has(releaseCache(manifest.version)))) return false;
+  const cache = await caches.open(releaseCache(manifest.version));
+  const keys = new Set((await cache.keys()).map((request) => request.url));
+  return Object.keys(manifest.files).every((path) => keys.has(at(path)));
+}
+
 self.addEventListener('install', (event) => {
   // Premier service worker de cet appareil : la version publiée est installée en entier.
-  // Pour une nouvelle version du service worker lui-même, la version installée est conservée.
+  // Pour une nouvelle version du service worker lui-même, la version installée est conservée
+  // (et réparée si son cache a disparu).
   event.waitUntil(
-    readState().then(async (current) => {
-      if (current.current) return;
+    (async () => {
+      const { current } = await readState();
+      if (await complete(current)) return;
       const manifest = await fetchManifest();
       await download(manifest);
-      await writeState({ current: manifest, staged: null });
+      await writeState({ ...(await readState()), current: manifest, staged: null });
+    })().finally(() => {
+      // Ce service worker peut attendre longtemps : l'actif peut installer une version entre-temps.
+      state = null;
     }),
   );
 });
@@ -112,6 +129,8 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      // Relu ici : le service worker précédent a pu télécharger ou installer une version depuis.
+      state = null;
       const { current, staged } = await readState();
       const keep = new Set([META, current && releaseCache(current.version), staged && releaseCache(staged.version)]);
       // Seuls les anciens caches d'Orion sont supprimés : l'origine github.io est partagée avec d'autres sites.
@@ -140,15 +159,36 @@ self.addEventListener('message', (event) => {
       prepareLatest()
         .then((result) => {
           reply({ ok: true, ...result });
-          if (result.staged) broadcast({ type: 'update-ready', version: result.staged.version });
+          // Les autres pages (fenêtre redémarrée, deuxième fenêtre) suivent aussi la fin du téléchargement.
+          if (result.staged) broadcast({ type: 'update-ready', version: result.staged.version, staged: result.staged });
         })
-        .catch((error) => reply({ ok: false, error: error.message })),
+        .catch((error) => {
+          reply({ ok: false, error: error.message });
+          broadcast({ type: 'update-failed', error: error.message });
+        }),
+    );
+  } else if (type === 'discard') {
+    // Version prête retirée par l'éditeur (ou remplacée) : elle ne sera pas installée.
+    event.waitUntil(
+      (async () => {
+        await downloading?.catch(() => {});
+        const s = await readState();
+        if (s.staged && s.staged.version !== event.data.keep) {
+          await writeState({ ...s, staged: null });
+          if (s.staged.version !== s.current?.version) await caches.delete(releaseCache(s.staged.version));
+        }
+        reply({ ok: true });
+      })(),
     );
   } else if (type === 'install') {
     event.waitUntil(
       (async () => {
         const { current, staged } = await readState();
         if (!staged) return reply({ ok: false, error: 'Aucune mise à jour téléchargée' });
+        if (!(await complete(staged))) {
+          await writeState({ current, staged: null });
+          return reply({ ok: false, error: 'La mise à jour téléchargée est incomplète : téléchargez-la à nouveau.' });
+        }
         await writeState({ current: staged, staged: null });
         if (current && current.version !== staged.version) await caches.delete(releaseCache(current.version));
         reply({ ok: true, version: staged.version });
@@ -169,7 +209,9 @@ self.addEventListener('fetch', (event) => {
 
 async function respond(request, url) {
   const { current } = await readState();
-  const cache = current ? await caches.open(releaseCache(current.version)) : null;
+  // caches.has : ne pas recréer (vide) le cache d'une version disparue.
+  const name = current && releaseCache(current.version);
+  const cache = name && (await caches.has(name)) ? await caches.open(name) : null;
   const page = request.mode === 'navigate' && (url.origin + url.pathname === at('./') || url.pathname.endsWith('/index.html'));
   // La version installée est servie telle quelle (les paramètres comme ?fullscreen sont ignorés).
   const cached = await cache?.match(page ? at('./') : url.origin + url.pathname);

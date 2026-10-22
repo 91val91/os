@@ -1,27 +1,19 @@
 {
- "version": "1.1.0",
- "build": "OR1A.261022.001",
- "codename": "Andromède",
+ "version": "1.2.0",
+ "build": "OR1B.261022.001",
+ "codename": "Bételgeuse",
  "date": "2026-10-22",
  "notes": [
-  "Mises à jour du système : vérification, téléchargement des seuls fichiers modifiés et installation au redémarrage, automatiques si vous le souhaitez.",
-  "Comptes utilisateurs : chacun ses apps, fichiers, réglages et code, changement d'utilisateur depuis l'écran verrouillé.",
-  "Nouvelles icônes des applications, dessinées pour Orion.",
-  "Réglages de l'appareil photo : format, qualité, retardateur, grille, miroir.",
-  "Mode développeur protégé par un mot de passe d'appareil ; le Terminal n'est plus visible ailleurs.",
-  "Les applications n'ont plus accès aux fichiers système.",
-  "Plus de contacts, d'événements ni de conversations de démonstration."
+  "Wi‑Fi, Bluetooth et réseau mobile refaits : Orion affiche l'état réel de la connexion. Installé sur un PC, une tablette ou une machine virtuelle, il pilote le vrai Wi‑Fi, le Bluetooth et un modem 4G (appels, SMS, données).",
+  "Sur un téléphone, appels et SMS sont de vrais appels et de vrais SMS : Orion les confie aux apps Téléphone et Messages du système.",
+  "Bluetooth sur Android (Chrome) : connexion aux montres, capteurs et autres appareils basse consommation, avec leur niveau de batterie.",
+  "Nouveau : service de localisation (GPS) et app Plans — carte, position en direct, recherche de lieux, itinéraires et trajets enregistrés (GPX).",
+  "Barre d'état et réglages rapides fidèles à la réalité : force du Wi‑Fi, signal, localisation en cours.",
+  "Mises à jour plus sûres : une version retirée n'est plus installée, un téléchargement interrompu ne bloque plus, la copie hors ligne est protégée.",
+  "Les applications n'ont plus accès aux données internes du système."
  ],
- "size": 1040422,
+ "size": 1163313,
  "files": {
-  "./index.html": {
-   "hash": "f9d4f229927b0cc1d774193c2f76d1aece0576d17c916bc3a500fd5cd1781a06",
-   "size": 1214
-  },
-  "./manifest.webmanifest": {
-   "hash": "8d7eaf176613a24701164d37926c833abc4a214e4d1fee36f2ec2dbbc7f4c71c",
-   "size": 819
-  },
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
    "size": 23327
@@ -37,6 +29,14 @@
   "./assets/icon.svg": {
    "hash": "ebb1edb49d4628e2aaf6b2037a0b86d9562342130cfab8b15e5d6f1aab2bd603",
    "size": 824
+  },
+  "./index.html": {
+   "hash": "f9d4f229927b0cc1d774193c2f76d1aece0576d17c916bc3a500fd5cd1781a06",
+   "size": 1214
+  },
+  "./manifest.webmanifest": {
+   "hash": "8d7eaf176613a24701164d37926c833abc4a214e4d1fee36f2ec2dbbc7f4c71c",
+   "size": 819
   },
   "./src/apps/browser/index.js": {
    "hash": "335d4cee1869441c51a73c291db78af62574bb58adec6462202a9101f258e424",
@@ -106,9 +106,17 @@
    "hash": "122584d269ea2131c4c19829d906ee8311fd5ba0cb8d1e975b060645a37c0a89",
    "size": 2773
   },
+  "./src/apps/maps/index.js": {
+   "hash": "5b31462d80dc22251ccbd50674dc946970f7a34735df7a5a9173376a61c9ab42",
+   "size": 33850
+  },
+  "./src/apps/maps/style.css": {
+   "hash": "3057ecbfb515d1a9304a6a1a73be9464afc02518859c5635023046e682cad479",
+   "size": 7943
+  },
   "./src/apps/messages/index.js": {
-   "hash": "9a4ad04612abfc545406fd10c3aa02626c28f2c0d27dfbd986b513de311c0784",
-   "size": 11169
+   "hash": "1a4187d5f666b2a2af25ccc2ea3e6ae7cba794e24fce52dfefc4cf0d832cdb5c",
+   "size": 11567
   },
   "./src/apps/messages/style.css": {
    "hash": "8bc2239b35761be47f0d2560c365404a064db588412cb7b42e2b560c32d0be6b",
@@ -143,8 +151,8 @@
    "size": 1233
   },
   "./src/apps/phone/index.js": {
-   "hash": "b438d7cdfb00da127c36c0e57e639fbd149b422cb5709788c0612e12e4144fb3",
-   "size": 10402
+   "hash": "06da1d44c56595be4b03ec856d3dced42064e2f37f30dd9bd0b00e8a1f45a050",
+   "size": 10441
   },
   "./src/apps/phone/style.css": {
    "hash": "7196ffcd12234d97cb32cd3dcec062a069eb0829bb20396f639e94aff3212d19",
@@ -167,16 +175,16 @@
    "size": 1078
   },
   "./src/apps/registry.js": {
-   "hash": "c7fcf6d61e34bd9ed9fbc535fb4995ffbe846c50bd9ddf9fc015aa05fa6f69ce",
-   "size": 8379
+   "hash": "403ac11284431c29266c968be451db993fec1716ddd9c59cf02d0a17a5e34a17",
+   "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "a6d822855b3527a7395ba6261111428de0408f6ab15b868320d64439ffffbd34",
-   "size": 60596
+   "hash": "4ef9ebb5953a4c78facac4c344076c272c070b620d854cf33506abf140a2698a",
+   "size": 77292
   },
   "./src/apps/settings/style.css": {
-   "hash": "9f80a24afadfb131d10f1ed72788ed55f3b7ac208881e73276291a21326f5977",
-   "size": 8607
+   "hash": "0cbbe7fb12c0e84d7b39e62e70201d8bf2fffe43a45e598ae163b0be0ca6573a",
+   "size": 8836
   },
   "./src/apps/snake/index.js": {
    "hash": "b3fb224253a05a9a97646c80f7a2e3f925dd83953fa78cf2ea3a52022edde337",
@@ -203,8 +211,8 @@
    "size": 1159
   },
   "./src/apps/weather/index.js": {
-   "hash": "407b2c5e967ebdb1da53e896e8b1bb20c7e00060781a655dbacd9a079a4ca557",
-   "size": 14293
+   "hash": "b65b1752d54713590e5b1049c57e891dff1cdc762fed50db2a19fceeb7be7587",
+   "size": 14180
   },
   "./src/apps/weather/style.css": {
    "hash": "a6f0d05135897c36f854e615418b797e320abd9889fec214928afe90d9bb6fad",
@@ -218,6 +226,14 @@
    "hash": "9113361c3521b2db198fca328e87b70d86ef2d1be93f33cf46376ab829a440ec",
    "size": 5628
   },
+  "./src/kernel/bluetooth.js": {
+   "hash": "f7e9dc5ee2acc23d6681253dc73c30af855c06b50946c1c9fdd2edc93114f0fe",
+   "size": 11108
+  },
+  "./src/kernel/bridge.js": {
+   "hash": "9c9df7a7506fadd759f658910dc58a1381cdfcbef5bfdaea56dbf460b665e9d6",
+   "size": 4714
+  },
   "./src/kernel/chatbot.js": {
    "hash": "4cbefe1f50a940bc5f4c91e9c7f5a22bd38fa28e2bd54057730555b95e17bc43",
    "size": 2150
@@ -227,8 +243,8 @@
    "size": 3611
   },
   "./src/kernel/device.js": {
-   "hash": "cc5fd2b641d7c18c7df0b6f6666bf7140ff9d24c3cdb70d2146a2e26525f2f71",
-   "size": 4245
+   "hash": "afdaa552913a49af915f2d9fe815892c9b96d7f066708bdd1e6ff2433adc5740",
+   "size": 3966
   },
   "./src/kernel/events.js": {
    "hash": "692c2025fa12d666167744a53a6b1d28f7af061bb0fabcadf97db8fa01a7188c",
@@ -239,8 +255,12 @@
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "bc6085220fb0654298ee8f2a67d3ce921ef2cff133b3c23361fcf949ba050a5c",
-   "size": 6562
+   "hash": "7caebe13372aba01b17941e35aeeb4546dc98e9ebe2665a8da82fe404663d21f",
+   "size": 8063
+  },
+  "./src/kernel/location.js": {
+   "hash": "be1a8d06cfb39dd10633f384969531c2e565a96b01e347fe47761196b90c63ba",
+   "size": 8051
   },
   "./src/kernel/log.js": {
    "hash": "e4944db860b8fd5be6a1c7eb729f6894d2f825d42c1ec6bd6e7b6a1fb20dd4c9",
@@ -249,6 +269,10 @@
   "./src/kernel/media.js": {
    "hash": "f50db07a450900ffc7f16241797bbfae88139da388ffcfaf6060975304dfa20c",
    "size": 1381
+  },
+  "./src/kernel/network.js": {
+   "hash": "12c7d14aea507e2a520abbfd5b6fdcb84ae7c058bca5b8f14c3238f4ac5913aa",
+   "size": 9117
   },
   "./src/kernel/notifications.js": {
    "hash": "b5e2a6ef3556a360b07ca347164413c5af32de02b3a8763ab93a118ae2ee8a92",
@@ -271,28 +295,28 @@
    "size": 3209
   },
   "./src/kernel/settings.js": {
-   "hash": "d001b18c37091781e37031143bea8c0a8899bb0b57020b2b36f7b1571f4a4cfd",
-   "size": 4386
+   "hash": "3e39af154cc94e88cd8369d5317236db0dd2837510c89aabef737d2933dc5a7a",
+   "size": 4713
   },
   "./src/kernel/shell.js": {
-   "hash": "7e4c83f579240058e8b9e61b28dc61202d6933fc24bca9f979014ca0e39aee0f",
-   "size": 42706
+   "hash": "8a2f3f56d9e566c8edfda9dbada1cdcb510adcd6e36a14f9cc735a32f2046cb4",
+   "size": 46955
   },
   "./src/kernel/storage.js": {
    "hash": "7c7e48a64f97c3e9edd03c6e492377316e3ef24e840fabe47ce5d6730c969f87",
    "size": 5861
   },
   "./src/kernel/telephony.js": {
-   "hash": "5a2c7cf83d425cba9202aa50be0d380e9396b77a782a02eaac2555a5d0c6f60c",
-   "size": 10870
+   "hash": "03f02c9a76a9f6c15da1bdc00fcbdf6127d4f73c94be92b24276c93b8db711e4",
+   "size": 21690
   },
   "./src/kernel/version.js": {
-   "hash": "cb68f6fd2cf66baba7075466768806b3757bad98cb6d7907d44f236ae89352ff",
-   "size": 1114
+   "hash": "38b982be5059f657c334653cb7cad41389fe40ee4563258526198ea6f34cda08",
+   "size": 1449
   },
   "./src/kernel/vfs.js": {
-   "hash": "19df090249b8104446ec5a18a2540d5f99b123dd77a96d1db779918202ff54b5",
-   "size": 12371
+   "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
+   "size": 13097
   },
   "./src/lib/artwork.js": {
    "hash": "58821c67ff142f202de09af6dc6d7f3775e75e2c3a937a7a22cdbab69ceecd61",
@@ -315,8 +339,8 @@
    "size": 5648
   },
   "./src/lib/icons.js": {
-   "hash": "7f001f992feca2af402e813e7b31b0e37381c1026974129e01dc34c8534cd09c",
-   "size": 20584
+   "hash": "11b4037e157c586d241d4a21967eb1f0f182039598c0a083ae6d8bc9f665913b",
+   "size": 21485
   },
   "./src/lib/sha256.js": {
    "hash": "f55e6423475871b2907969a623126156fd8b30dc1788dcd2049cd5e29e9ab51e",
@@ -335,28 +359,28 @@
    "size": 773
   },
   "./src/styles/base.css": {
-   "hash": "c080dca3381d68d0c026791170d3987175edd6ecf63dbd5bc207853e04337155",
-   "size": 8648
+   "hash": "b6b911b7a9f7491a6742c2e4626a2cebf880d8297dbbec3e3a5a94581735bb89",
+   "size": 8770
   },
   "./src/styles/kit.css": {
    "hash": "f7156f8fdacdcefcaed8ef0905420f55deb63873f867598579b411c7ef2e6da1",
    "size": 13635
   },
   "./src/styles/system.css": {
-   "hash": "8462bb7f1e4510c48926e4a6f60fc8b04ceef21d05dcf1d91c767e122847f83e",
-   "size": 51518
+   "hash": "17d6467541933b8b89658bca0c105e84e75d0f19851fae56791504f28a1d1671",
+   "size": 51809
   },
   "./src/system/alarm-screen.js": {
    "hash": "59255c094d3012ef1fc95cfb41231f6d67fbb7c8cd1715dd66fadc85fe6b3133",
    "size": 3642
   },
   "./src/system/app-art.js": {
-   "hash": "e217f5aeab4dc352d6b8fea3ecc52bd8f5f2652126d676a2e10777b2ff96daa3",
-   "size": 18641
+   "hash": "6e5a97679b6285c320758dcfaa4cd2b3cf4b91ef4b142e3975eff503808102aa",
+   "size": 19754
   },
   "./src/system/app-context.js": {
-   "hash": "e1bf014a978c2a658e6364646aed24fac748e12e41871991f703b22dc5f4fe86",
-   "size": 6034
+   "hash": "fcbb6470532824ab0a55054eb58f06932ce6a2ac8452fae9089ad71613dfa9c8",
+   "size": 8127
   },
   "./src/system/app-icon.js": {
    "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
@@ -367,28 +391,28 @@
    "size": 2962
   },
   "./src/system/call-screen.js": {
-   "hash": "0565dd492610ed94e1068ea9375845e7ad29a5085beaa75619b786da1340b1e8",
-   "size": 6355
+   "hash": "fb75c9d9d84ae0b346109bdeac44f9270fcb9805cd72816ad13a0b03eb57a68d",
+   "size": 6540
   },
   "./src/system/control-center.js": {
-   "hash": "4c2791a5a0a63a1f5058c583741dce0d7047b8250ec85fdc7a582e81ec6ac430",
-   "size": 5998
+   "hash": "2fe9624fde21f2797eb5e2d12494c8aa474ebd9d25aee1bb86d2dfd72f0f8ae1",
+   "size": 6063
   },
   "./src/system/developer.js": {
-   "hash": "c60a6e4c768a3a9980f4b45521e6c364f42bc1dc909024bd5dd786309bb73d8b",
-   "size": 4810
+   "hash": "9bc9cb5a46e396993b2bddb6fdd461307fa58dbe04e8ed5850c9889d60e02c65",
+   "size": 5419
   },
   "./src/system/dialogs.js": {
-   "hash": "5df18a5229c183c8f9defcf3fa6c1ffd7e9f069d7d8a98a097de82f83c009e06",
-   "size": 7793
+   "hash": "5c25443529b71be80fa4da01eb1166fccc971e69124647060f61888a2fc5d66e",
+   "size": 7839
   },
   "./src/system/drawer.js": {
    "hash": "abe1af9237983eb22c0d0fc4dcdec7fff37e8c1989c60b74638a635fe482f433",
    "size": 9014
   },
   "./src/system/home.js": {
-   "hash": "54d79199a49ab5755a2d3e9c47f1ab20703066eb1a5f2a18b6cf0ae6c8f4640b",
-   "size": 20575
+   "hash": "0b737964a3870d96ccd1364f37e03b2ec3cefcc187eb957dd10ce2488329f4de",
+   "size": 20583
   },
   "./src/system/lockscreen.js": {
    "hash": "86a3d55bc07ac0a15afa6bfbc4f74f2de19c630ab56840e043b71d2b6ddbb8b3",
@@ -403,44 +427,44 @@
    "size": 1269
   },
   "./src/system/power.js": {
-   "hash": "3595dea1a9279bd3861d92d8dcc0e471c34dca6a896e94d7bf281bcf6874bf56",
-   "size": 5441
+   "hash": "aa0d760b768f8b3335803454ed3ba5d00b2e0f252fe7e42b1d12395b5eb9e829",
+   "size": 5465
   },
   "./src/system/pull-panel.js": {
    "hash": "ca2c38c61accdf51702820f2dea5aa767723cb7958ac69bf634b49ba32e3b424",
    "size": 2427
   },
   "./src/system/quick-settings.js": {
-   "hash": "40921fb2b8bafc7b299555d7c37f9f35ddbf0223547e26a84ab8de1740428cdf",
-   "size": 2397
+   "hash": "07d063cacb1b9d2744fc960b3b8b9b2d455ad9c9a1775e65106c9a9af4271f99",
+   "size": 4677
   },
   "./src/system/setup.js": {
    "hash": "95929a85679e4099bdd4a0a2f6a6e18b1e8d1a42703f0bef46ad572648fd0b31",
    "size": 11905
   },
   "./src/system/shade.js": {
-   "hash": "fff8f97c24bb72c685e93c0446b26b2678a29525c6d41f989b5aad88adbd56a3",
-   "size": 6616
+   "hash": "3e453d88252d7eccf7d18edb9bca1d2993336116b6550dca155f215e46f2832d",
+   "size": 6681
   },
   "./src/system/sound.js": {
    "hash": "970b21eeb27687997ba44c2d283b52a21b6e92fc08ea78ce1b471ada0ac50ed8",
    "size": 5956
   },
   "./src/system/statusbar.js": {
-   "hash": "cac95f3c2501825aeb9891ee180a2645e799129e979c5b6c0081f742fa7d4d21",
-   "size": 4681
+   "hash": "6a7ae62d12c3aa77fb3c58082542b7a5aedbcdf690624525da45001fee1a4278",
+   "size": 6076
   },
   "./src/system/system-ui.js": {
-   "hash": "859c6177c6c5a7d8d9c23d28280fb54d593db6baef89bbc26cc04514b6eced79",
-   "size": 26710
+   "hash": "98d712ec3dfc52294bf9132e0b2616695c2203dc1e9abe3ad4300ac3d6cb0971",
+   "size": 26959
   },
   "./src/system/theme.js": {
    "hash": "99c6e8f2aebd4204d53844df1bc0b4d30a6574766e529b237d5238742d01a618",
    "size": 2235
   },
   "./src/system/updates.js": {
-   "hash": "87f67926ce1c23e236a07574b65f1d4fdbf4fb773c14efa100bcdd7d8281a230",
-   "size": 7309
+   "hash": "16dc8c1f15a985e7148854b2bbfab1926ec73948b7e61a8395279292f8ad13b5",
+   "size": 10502
   },
   "./src/system/wallpapers.js": {
    "hash": "dffd49888bdd864365f125ecf38eaba8d4e8d75fa45382a0972822c2ca9bf6f9",

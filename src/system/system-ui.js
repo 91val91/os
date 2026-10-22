@@ -60,6 +60,10 @@ export class SystemUI {
   #buildDom() {
     this.layers = {};
     this.screen = h('div#screen');
+    // Navigateurs sans overflow: clip : un focus peut faire défiler l'écran ; on le remet en place.
+    this.screen.addEventListener('scroll', () => {
+      if (this.screen.scrollTop || this.screen.scrollLeft) this.screen.scrollTo(0, 0);
+    });
     for (const name of LAYERS) {
       const el = h(`div.layer.layer-${name.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}`);
       this.layers[name] = el;

@@ -47,26 +47,32 @@ export const inUserSpace = (path) => within(path, USER_SPACE);
 
 /** Méthodes dont les deux premiers arguments sont des chemins (les autres n'en ont qu'un). */
 const TWO_PATHS = new Set(['rename', 'copy']);
+/** Ce que les applications peuvent appeler (rien d'autre : ni store, ni constructor, ni readonly…). */
+const APP_METHODS = ['exists', 'isDir', 'stat', 'readdir', 'mkdir', 'writeFile', 'appendFile', 'readFile', 'readJSON', 'writeJSON', 'rm', 'rename', 'copy', 'walk', 'du', 'uniquePath', 'watch'];
+/** Position de l'argument d'options des méthodes qui écrivent. */
+const OPTIONS_AT = { mkdir: 1, rm: 1, writeFile: 2, appendFile: 2, writeJSON: 2, rename: 2, copy: 2 };
 
 /**
  * Vue du système de fichiers limitée à `roots` : c'est celle que reçoivent les
  * applications (espace de l'utilisateur et leurs propres données). Les
- * fichiers système (/system, /data des autres apps…) leur sont refusés.
+ * fichiers système (/system, /data des autres apps…) leur sont refusés, et
+ * seules les méthodes publiques sont exposées.
  */
 export function sandbox(fs, roots) {
-  return new Proxy(fs, {
-    get(target, key) {
-      const value = Reflect.get(target, key, target);
-      if (typeof value !== 'function' || key === 'constructor') return value;
-      return (...args) => {
-        for (let i = 0; i < (TWO_PATHS.has(key) ? 2 : 1); i++) {
-          const path = typeof args[i] === 'string' ? args[i] : '/';
-          if (!within(path, roots)) throw new FsError('EACCES', normalize(path));
-        }
-        return value.apply(target, args);
-      };
-    },
-  });
+  const api = {};
+  for (const name of APP_METHODS) {
+    api[name] = (...args) => {
+      for (let i = 0; i < (TWO_PATHS.has(name) ? 2 : 1); i++) {
+        const path = typeof args[i] === 'string' ? args[i] : '/';
+        if (!within(path, roots)) throw new FsError('EACCES', normalize(path));
+      }
+      // L'option « system » (écriture des fichiers protégés) est réservée au noyau.
+      const at = OPTIONS_AT[name];
+      if (at !== undefined && args[at] && typeof args[at] === 'object') args[at] = { ...args[at], system: false };
+      return fs[name](...args);
+    };
+  }
+  return Object.freeze(api);
 }
 
 export function resolve(cwd, path) {
@@ -95,6 +101,7 @@ const MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
   svg: 'image/svg+xml', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4',
   weba: 'audio/webm', webm: 'video/webm', mp4: 'video/mp4', pdf: 'application/pdf',
+  gpx: 'application/gpx+xml', xml: 'application/xml',
 };
 
 export function mimeFromName(name) {
@@ -102,7 +109,7 @@ export function mimeFromName(name) {
 }
 
 export function isTextMime(mime) {
-  return /^text\/|json|javascript|x-sh/.test(mime ?? '');
+  return /^text\/|json|javascript|x-sh|^application\/(gpx\+)?xml$/.test(mime ?? '');
 }
 
 /** Taille approximative en octets d'un contenu (décode les URL data:base64). */

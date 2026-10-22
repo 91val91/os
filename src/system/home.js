@@ -10,7 +10,7 @@ import { appIcon, clockFace, refreshCalendarIcons } from './app-icon.js';
 
 const DEFAULT_LAYOUT = {
   dock: ['phone', 'messages', 'browser', 'camera'],
-  pages: [['photos', 'clock', 'calendar', 'weather', 'notes', 'calculator', 'music', 'contacts', 'files', 'store', 'settings']],
+  pages: [['photos', 'clock', 'calendar', 'weather', 'maps', 'notes', 'calculator', 'music', 'contacts', 'files', 'store', 'settings']],
   hidden: [],
 };
 const DOCK_MAX = 4;

@@ -12,8 +12,12 @@
  *     ├─ permissions     autorisations d'exécution
  *     ├─ media           session multimédia globale
  *     ├─ contacts        fournisseur de contacts
- *     ├─ telephony       modem simulé (appels, SMS)
- *     └─ device          HAL : batterie, réseau, vibreur
+ *     ├─ bridge          pont matériel (orion-server sur Orion installé)
+ *     ├─ network         connexion réelle, Wi‑Fi (NetworkManager), mode avion
+ *     ├─ bluetooth       BlueZ ou Web Bluetooth
+ *     ├─ location        GPS (gpsd) ou géolocalisation du navigateur
+ *     ├─ telephony       appels et SMS : modem, apps du téléphone ou simulation
+ *     └─ device          HAL : batterie, vibreur, informations
  */
 import { EventBus } from './events.js';
 import { SystemLog } from './log.js';
@@ -30,6 +34,10 @@ import { MediaService } from './media.js';
 import { ContactsProvider, DEMO_CONTACTS } from './contacts.js';
 import { TelephonyService } from './telephony.js';
 import { DeviceService } from './device.js';
+import { HardwareBridge } from './bridge.js';
+import { NetworkService } from './network.js';
+import { BluetoothService } from './bluetooth.js';
+import { LocationService } from './location.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
 import { RELEASE } from './version.js';
@@ -50,7 +58,7 @@ export const OS = Object.freeze({
  * @param {object[]} [options.manifests] manifestes des applications
  * @param {(step: string, progress: number) => void} [options.onProgress]
  */
-export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false } = {}) {
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null } = {}) {
   const log = new SystemLog({ now, echo: echoLog });
   const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
   log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
@@ -92,14 +100,23 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const media = new MediaService({ events });
   onProgress('services', 0.7);
 
+  // Matériel réel : pont orion-server (Orion installé) ou API du navigateur.
+  bridge ??= await new HardwareBridge({ env, log }).detect();
+  const network = new NetworkService({ events, settings, env, bridge, log, timers }).init();
+  const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
+  const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
+
   const contacts = new ContactsProvider({ fs, events }).load();
-  const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers }).load();
+  const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers, env, bridge }).load().start();
+  // Le mode avion coupe aussi les radios pilotées par le pont.
+  if (bluetooth.mode === 'bridge') network.radios.push({ name: 'bluetooth', get: () => bluetooth.enabled, set: (on) => bluetooth.setPowered(on) });
+  if (bridge.has('modem')) network.radios.push({ name: 'modem', get: () => telephony.modem?.enabled !== false, set: (on) => telephony.setModemEnabled(on) });
   // Les premières versions livraient des correspondants fictifs : leurs SMS et appels sont effacés une fois.
   if (!settings.get('demoDataRemoved')) {
     telephony.forgetNumbers(DEMO_CONTACTS.map((c) => c.phone));
     settings.set('demoDataRemoved', true);
   }
-  const device = await new DeviceService({ events, settings, env, now, log }).init();
+  const device = await new DeviceService({ events, settings, env, now, log, network }).init();
   onProgress('hal', 0.85);
 
   // Désinstallation : arrêt du processus et nettoyage des données de l'app.
@@ -139,16 +156,23 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     permissions,
     media,
     contacts,
+    bridge,
+    network,
+    bluetooth,
+    location,
     telephony,
     device,
     /** Efface toutes les données (réinitialisation d'usine). */
     async factoryReset() {
       log.warn('kernel', 'réinitialisation d\'usine');
-      telephony.shutdown();
+      this.shutdown();
       await backend.clear();
     },
     shutdown() {
       telephony.shutdown();
+      network.shutdown();
+      bluetooth.shutdown();
+      location.shutdown();
       processes.killAll('shutdown');
     },
   };

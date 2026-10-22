@@ -71,6 +71,14 @@ body.fullscreen .layer-statusbar {
   font-weight: 700;
 }
 
+/* Force du Wi‑Fi : les arcs au-delà du niveau sont estompés. */
+.sb-wifi { display: flex; }
+.sb-wifi[data-level="2"] svg path:nth-child(1),
+.sb-wifi[data-level="1"] svg path:nth-child(-n+2) { opacity: .3; }
+
+.sb-location { display: flex; }
+.sb-offline { display: flex; opacity: .55; }
+
 .sb-pct {
   font-size: 12px;
   font-weight: 600;

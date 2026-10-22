@@ -10,6 +10,9 @@ import { displayName, phoneKey } from '../../kernel/contacts.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
+/** État du dernier SMS envoyé (modem : envoi puis envoyé ; téléphone : confié à l'app Messages). */
+const STATUS_LABELS = { delivered: 'Distribué', sending: 'Envoi…', sent: 'Envoyé', handoff: 'Ouvert dans l\'app Messages du téléphone' };
+
 export function mount(root, ctx) {
   const tel = ctx.telephony;
   const nav = navStack(root);
@@ -96,7 +99,7 @@ export function mount(root, ctx) {
       try {
         const message = tel.sendSms(address, { text, image: attachment });
         if (message.status === 'failed') ctx.ui.toast("Échec de l'envoi : aucun réseau");
-        else ctx.sound.sent();
+        else if (message.status !== 'handoff') ctx.sound.sent();
       } catch (error) {
         ctx.ui.toast(error.message);
         return;
@@ -137,7 +140,7 @@ export function mount(root, ctx) {
         previous = m;
       });
       const lastMine = [...messages].reverse().find((m) => m.from === 'me');
-      if (lastMine && lastMine === messages.at(-1) && lastMine.status !== 'failed') nodes.push(h('div.bubble-status', 'Distribué'));
+      if (lastMine && lastMine === messages.at(-1) && lastMine.status !== 'failed') nodes.push(h('div.bubble-status', STATUS_LABELS[lastMine.status] ?? 'Distribué'));
       if (openThread?.typing) nodes.push(h('div.bubble.them.tail.typing', h('i'), h('i'), h('i')));
       bubbles.replaceChildren(...nodes);
       requestAnimationFrame(() => (scroll.scrollTop = scroll.scrollHeight));
@@ -219,11 +222,12 @@ export function mount(root, ctx) {
 
   // ───────────── Événements ─────────────
   const refresh = (address) => {
-    if (openThread && phoneKey(openThread.address) === phoneKey(address)) openThread.render();
+    if (openThread && address && phoneKey(openThread.address) === phoneKey(address)) openThread.render();
     if (nav.depth === 1) renderList();
   };
   ctx.subscribe('sms:received', ({ address }) => refresh(address));
   ctx.subscribe('sms:sent', ({ address }) => refresh(address));
+  ctx.subscribe('sms:status', ({ address }) => refresh(address));
   ctx.subscribe('sms:read', () => nav.depth === 1 && renderList());
   ctx.subscribe('sms:typing', ({ address, typing }) => {
     if (openThread && phoneKey(openThread.address) === phoneKey(address)) {

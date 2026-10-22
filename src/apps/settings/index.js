@@ -12,20 +12,15 @@ import { WALLPAPERS, wallpaperCss } from '../../system/wallpapers.js';
 import { appIcon } from '../../system/app-icon.js';
 import { passwordProblem, MIN_PASSWORD_LENGTH } from '../../system/developer.js';
 import { logo } from '../../system/power.js';
+import { quickTiles } from '../../system/quick-settings.js';
+import { unsupportedReason } from '../../kernel/bluetooth.js';
+import { formatCoordinates } from '../../kernel/location.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROFILE_COLORS = ['#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f', '#ff9f0a', '#30d158', '#64d2ff', '#8e8e93'];
 const ACCENTS = ['#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f', '#ff453a', '#ff9f0a', '#30d158', '#64d2ff', '#8e8e93'];
-const NETWORKS = [
-  { name: 'Orion-Maison', secure: true, signal: 3 },
-  { name: 'Livebox-4A2F', secure: true, signal: 3 },
-  { name: 'Freebox-9B1C', secure: true, signal: 2 },
-  { name: 'Café du Coin', secure: false, signal: 2 },
-  { name: 'Bbox-77E0', secure: true, signal: 1 },
-  { name: 'iPhone de Léa', secure: true, signal: 1 },
-];
 
 export function mount(root, ctx) {
   const k = ctx.kernel;
@@ -37,16 +32,38 @@ export function mount(root, ctx) {
   /** Compte de la session (profil minimal si les comptes sont indisponibles). */
   const me = () => k.account ?? { id: null, name: s.get('userName'), email: '', color: s.get('accent'), photo: null, owner: !accounts, createdAt: null };
   const accountAvatar = (a, size) => avatar(a.name || '?', { size, color: a.color, photo: a.photo });
+  const tiles = quickTiles(ui);
   const row = (opts) => listItem(opts);
   /** Apps listées dans les Réglages : les apps cachées (Terminal) seulement en mode développeur. */
   const visibleApps = () => k.packages.list().filter((p) => !p.hidden || ui.developerUnlocked);
+  /** Observateurs créés pendant le rendu d'une page : libérés au rendu suivant ou à sa fermeture. */
+  let scope = null;
+  const keep = (off) => (scope ? scope.push(off) : ctx.on('destroy', off));
+  /** Rendu d'une page avec ses propres observateurs ; renvoie la fonction qui les libère. */
+  function scoped(render) {
+    let offs = [];
+    const release = () => offs.splice(0).forEach((off) => off());
+    ctx.on('destroy', release);
+    return {
+      release,
+      run() {
+        release();
+        const outer = scope;
+        scope = offs = [];
+        try {
+          render();
+        } finally {
+          scope = outer;
+        }
+      },
+    };
+  }
   const toggleRow = (title, key, { icon: iconName, color, subtitle, invert = false, onChange } = {}) => {
     const sw = toggle(invert ? !s.get(key) : s.get(key), (v) => {
       s.set(key, invert ? !v : v);
       onChange?.(v);
     }, { label: title });
-    const off = s.watch(key, (v) => sw.set(invert ? !v : v));
-    ctx.on('destroy', off);
+    keep(s.watch(key, (v) => sw.set(invert ? !v : v)));
     return listItem({ icon: iconName, iconColor: color, title, subtitle, trailing: sw });
   };
 
@@ -54,8 +71,10 @@ export function mount(root, ctx) {
   function open(title, build, { back = 'Réglages', large = true } = {}) {
     const content = h('div');
     const p = page({ title, large, back: { label: back, onClick: () => nav.pop() }, content });
-    const refresh = () => content.replaceChildren(...[build(refresh)].flat().filter(Boolean));
+    const view = scoped(() => content.replaceChildren(...[build(refresh)].flat().filter(Boolean)));
+    const refresh = () => view.run();
     p.onShow = refresh;
+    p.onPop = view.release;
     refresh();
     nav.push(p);
     return p;
@@ -66,7 +85,6 @@ export function mount(root, ctx) {
   function mainPage() {
     const content = h('div');
     const render = () => {
-      const net = k.device.connectivity;
       const groups = [
         listGroup({
           items: [
@@ -87,10 +105,10 @@ export function mount(root, ctx) {
           : null,
         listGroup({
           items: [
-            toggleRow('Mode avion', 'airplane', { icon: 'airplane', color: '#ff9500', onChange: render }),
-            row({ icon: 'wifi', iconColor: '#0a84ff', title: 'Wi‑Fi', detail: net.wifi ? s.get('wifiNetwork') : 'Désactivé', chevron: true, onClick: wifiPage }),
-            row({ icon: 'bluetooth', iconColor: '#0a84ff', title: 'Bluetooth', detail: s.get('bluetooth') ? 'Activé' : 'Désactivé', chevron: true, onClick: bluetoothPage }),
-            row({ icon: 'antenna', iconColor: '#30d158', title: 'Réseau mobile', detail: k.telephony.network.operator, chevron: true, onClick: cellularPage }),
+            toggleRow('Mode avion', 'airplane', { icon: 'airplane', color: '#ff9500', onChange: () => p.onShow() }),
+            row({ icon: 'wifi', iconColor: '#0a84ff', title: 'Wi‑Fi', detail: tiles.wifi.detail(), chevron: true, onClick: wifiPage }),
+            row({ icon: 'bluetooth', iconColor: '#0a84ff', title: 'Bluetooth', detail: tiles.bluetooth.detail(), chevron: true, onClick: bluetoothPage }),
+            row({ icon: 'antenna', iconColor: '#30d158', title: 'Réseau mobile', detail: k.telephony.mode === 'handoff' ? 'Apps du téléphone' : k.telephony.network.operator, chevron: true, onClick: cellularPage }),
           ],
         }),
         listGroup({
@@ -128,8 +146,9 @@ export function mount(root, ctx) {
       content.replaceChildren(...groups);
     };
     const p = page({ title: 'Réglages', content });
-    p.onShow = render;
-    render();
+    const view = scoped(render);
+    p.onShow = () => view.run();
+    view.run();
     return p;
   }
 
@@ -288,87 +307,350 @@ export function mount(root, ctx) {
 
   // ───────────── Connectivité ─────────────
 
-  function wifiPage() {
-    open('Wi‑Fi', (refresh) => {
-      const on = s.get('wifi') && !s.get('airplane');
-      const items = [
-        listGroup({
-          items: [toggleRow('Wi‑Fi', 'wifi', { onChange: refresh })],
-          footer: s.get('airplane') ? 'Le mode avion est activé.' : null,
-        }),
-      ];
-      if (on) {
-        items.push(
-          listGroup({
-            items: [row({ leading: h('span.check-mark', icon('check', { size: 18, stroke: 2.6 })), title: s.get('wifiNetwork'), subtitle: 'Connecté', trailing: h('span.wifi-meta', icon('lock', { size: 14 }), icon('wifi', { size: 18 })) })],
-          }),
-          listGroup({
-            header: 'Réseaux',
-            items: NETWORKS.filter((n) => n.name !== s.get('wifiNetwork')).map((n) =>
-              row({
-                title: n.name,
-                trailing: h('span.wifi-meta', n.secure ? icon('lock', { size: 14 }) : null, icon('wifi', { size: 18, stroke: n.signal >= 2 ? 2 : 1.4 })),
-                onClick: async () => {
-                  if (n.secure) {
-                    const pass = await ctx.ui.prompt({ title: `Mot de passe pour « ${n.name} »`, type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
-                    if (pass == null) return;
-                    if (pass.length < 8) {
-                      ctx.ui.alert({ title: 'Connexion impossible', message: 'Mot de passe incorrect (8 caractères minimum).' });
-                      return;
-                    }
-                  }
-                  s.set('wifiNetwork', n.name);
-                  ctx.ui.toast(`Connecté à ${n.name}`);
-                  refresh();
-                },
-              }),
-            ),
-          }),
-        );
-      }
-      return items;
+  /** Rafraîchit la page à chaque événement tant qu'elle est affichée ; `stop` à sa fermeture. */
+  function live(p, types, stop = null) {
+    const offs = types.map((type) => k.events.on(type, () => nav.top === p && p.onShow()));
+    const end = () => {
+      offs.splice(0).forEach((off) => off());
+      stop?.();
+      stop = null;
+    };
+    const release = p.onPop;
+    p.onPop = () => {
+      end();
+      release?.();
+    };
+    ctx.on('destroy', end);
+    return p;
+  }
+
+  const failed = (title) => (error) => ctx.ui.alert({ title, message: error.message });
+  const strength = (signal) => h('span.wifi-strength', { dataset: { level: String(signal == null ? 3 : signal >= 60 ? 3 : signal >= 35 ? 2 : 1) } }, icon('wifi', { size: 18 }));
+  const wifiMeta = (n) => h('span.wifi-meta', n.security ? icon('lock', { size: 14 }) : null, strength(n.signal));
+  const TYPE_LABELS = { wifi: 'Wi‑Fi', cellular: 'Réseau mobile', ethernet: 'Ethernet (câble)', other: 'Autre', none: 'Aucune', unknown: 'Non indiquée' };
+  const QUALITY_LABELS = { '4g': 'Rapide (équivalent 4G)', '3g': 'Moyenne (équivalent 3G)', '2g': 'Lente (équivalent 2G)', 'slow-2g': 'Très lente' };
+
+  /** Ce que le navigateur sait vraiment de la connexion (Network Information API). */
+  function connectionRows(st) {
+    return [
+      row({ title: 'État', detail: st.airplane && !st.online ? 'Mode avion' : st.online ? 'En ligne' : 'Hors ligne' }),
+      row({ title: 'Connexion', detail: TYPE_LABELS[st.type] ?? st.type }),
+      st.quality ? row({ title: 'Qualité', detail: QUALITY_LABELS[st.quality] ?? st.quality }) : null,
+      st.downlink ? row({ title: 'Débit estimé', detail: `${String(st.downlink).replace('.', ',')} Mb/s` }) : null,
+      st.rtt ? row({ title: 'Latence estimée', detail: `${st.rtt} ms` }) : null,
+      st.saveData ? row({ title: 'Économiseur de données', detail: 'Activé' }) : null,
+      st.ip ? row({ title: 'Adresse IP', detail: st.ip }) : null,
+    ].filter(Boolean);
+  }
+
+  /** Test de connexion : latence vers le serveur d'Orion et débit descendant. */
+  function speedTestGroup(refresh) {
+    const result = speedTestGroup.result;
+    return listGroup({
+      header: 'Test de connexion',
+      items: [
+        result?.running
+          ? row({ title: 'Mesure en cours…', trailing: spinner(18) })
+          : row({
+              icon: 'bolt',
+              iconColor: '#30d158',
+              title: 'Tester la connexion',
+              onClick: async () => {
+                speedTestGroup.result = { running: true };
+                refresh();
+                try {
+                  speedTestGroup.result = await k.network.speedTest();
+                } catch (error) {
+                  speedTestGroup.result = { error: error.message };
+                }
+                refresh();
+              },
+            }),
+        result?.error ? row({ title: 'Résultat', detail: result.error }) : null,
+        result?.latency != null ? row({ title: 'Latence', detail: `${result.latency} ms` }) : null,
+        result?.latency != null ? row({ title: 'Débit descendant', detail: result.download != null ? `${String(result.download).replace('.', ',')} Mb/s` : 'Non mesurable ici' }) : null,
+      ].filter(Boolean),
+      footer: 'Le débit est mesuré en téléchargeant 5 Mo depuis speed.cloudflare.com.',
     });
   }
 
-  function bluetoothPage() {
-    const devices = () => s.get('btDevices') ?? { 'Écouteurs Orion Buds': false, 'Enceinte JBL Flip': false, 'Montre Orion Watch': true };
-    open('Bluetooth', (refresh) => {
-      const on = s.get('bluetooth') && !s.get('airplane');
-      const list = devices();
-      return [
-        listGroup({ items: [toggleRow('Bluetooth', 'bluetooth', { onChange: refresh })], footer: `Visible sous le nom « ${s.get('deviceName')} ».` }),
-        on
-          ? listGroup({
-              header: 'Mes appareils',
-              items: Object.entries(list).map(([name, connected]) =>
-                row({
-                  title: name,
-                  detail: connected ? 'Connecté' : 'Non connecté',
-                  onClick: () => {
-                    s.set('btDevices', { ...list, [name]: !connected });
-                    ctx.ui.toast(connected ? `${name} déconnecté` : `${name} connecté`);
-                    refresh();
-                  },
-                }),
-              ),
-            })
-          : null,
-        on ? listGroup({ header: h('span.scanning', 'Autres appareils', spinner(14)), items: [row({ title: 'TV Salon', subtitle: 'Recherche…' })] }) : null,
-      ];
+  function wifiPage() {
+    const net = k.network;
+    if (!net.controllable) {
+      const p = open('Wi‑Fi', (refresh) => {
+        const st = net.state;
+        return [
+          listGroup({
+            header: 'Connexion actuelle',
+            items: connectionRows(st),
+            footer: 'Sur un téléphone, la radio Wi‑Fi est gérée par Android ou iOS : choisissez votre réseau dans les réglages du téléphone. Orion indique ici ce que le navigateur sait réellement de la connexion. Installé sur un ordinateur, une tablette ou une machine virtuelle, Orion pilote lui-même le Wi‑Fi.',
+          }),
+          speedTestGroup(refresh),
+        ];
+      });
+      return live(p, ['network:change']);
+    }
+
+    let joining = null;
+    let scanning = false;
+    const p = open('Wi‑Fi', (refresh) => {
+      const st = net.state;
+      const wifi = st.wifi;
+      const power = toggle(wifi.enabled, (on) => net.setWifiEnabled(on).catch(failed('Wi‑Fi')).finally(refresh), { label: 'Wi‑Fi' });
+      const groups = [listGroup({ items: [row({ icon: 'wifi', iconColor: '#0a84ff', title: 'Wi‑Fi', trailing: power })], footer: st.airplane ? 'Le mode avion est activé.' : null })];
+      if (!wifi.enabled) return groups;
+      const c = wifi.connected;
+      if (c) {
+        groups.push(listGroup({ items: [row({ leading: h('span.check-mark', icon('check', { size: 18, stroke: 2.6 })), title: c.ssid, subtitle: ['Connecté', c.ip].filter(Boolean).join(' · '), trailing: wifiMeta(c), chevron: true, onClick: () => wifiDetails(c) })] }));
+      }
+      const others = wifi.networks.filter((n) => !n.active && n.ssid !== c?.ssid);
+      groups.push(
+        listGroup({
+          header: h('span.scanning', 'Réseaux', scanning ? spinner(14) : null),
+          items: [
+            ...others.map((n) => row({ title: n.ssid, subtitle: joining === n.ssid ? 'Connexion…' : n.known ? 'Enregistré' : null, trailing: joining === n.ssid ? spinner(16) : wifiMeta(n), onClick: () => join(n) })),
+            row({ title: 'Autre réseau…', onClick: joinHidden }),
+          ],
+          footer: others.length ? null : scanning ? null : 'Aucun autre réseau à proximité.',
+        }),
+        listGroup({ items: [row({ icon: 'refresh', iconColor: '#0a84ff', title: 'Rechercher à nouveau', onClick: rescan })] }),
+      );
+      return groups;
     });
+
+    async function rescan() {
+      if (scanning) return;
+      scanning = true;
+      p.onShow();
+      await net.refresh({ rescan: true }).catch(failed('Recherche impossible'));
+      scanning = false;
+      p.onShow();
+    }
+
+    async function join(n, { ssid = n?.ssid, password = null } = {}) {
+      if (joining) return;
+      if (n?.security && !n.known && password == null) {
+        password = await ctx.ui.prompt({ title: `Mot de passe pour « ${ssid} »`, type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
+        if (password == null) return;
+      }
+      joining = ssid;
+      p.onShow();
+      try {
+        await net.connect(ssid, password || null);
+        ctx.ui.toast(`Connecté à ${ssid}`);
+      } catch (error) {
+        ctx.ui.alert({ title: `Impossible de rejoindre « ${ssid} »`, message: n?.known ? `${error.message}\nSi le mot de passe a changé, oubliez ce réseau puis rejoignez-le à nouveau.` : error.message });
+      } finally {
+        joining = null;
+        p.onShow();
+      }
+    }
+
+    async function joinHidden() {
+      const ssid = (await ctx.ui.prompt({ title: 'Autre réseau', message: 'Nom du réseau (SSID)', placeholder: 'Nom', confirmLabel: 'Suivant' }))?.trim();
+      if (!ssid) return;
+      const password = await ctx.ui.prompt({ title: `Mot de passe pour « ${ssid} »`, message: 'Laissez vide pour un réseau ouvert.', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
+      if (password == null) return;
+      join(null, { ssid, password });
+    }
+
+    function wifiDetails(c) {
+      const band = c.frequency ? (c.frequency >= 5900 ? '6 GHz' : c.frequency >= 4900 ? '5 GHz' : '2,4 GHz') : null;
+      open(c.ssid, () => [
+        listGroup({
+          items: [
+            row({ title: 'Signal', detail: c.signal != null ? `${c.signal} %` : '—' }),
+            row({ title: 'Sécurité', detail: c.security || 'Aucune (réseau ouvert)' }),
+            band ? row({ title: 'Bande', detail: `${band} (${c.frequency} MHz)` }) : null,
+            row({ title: 'Adresse IP', detail: c.ip || '—' }),
+          ].filter(Boolean),
+        }),
+        listGroup({
+          items: [
+            row({ title: 'Se déconnecter', onClick: () => net.disconnect().then(() => nav.pop(), failed('Déconnexion impossible')) }),
+            row({
+              title: 'Oublier ce réseau',
+              destructive: true,
+              onClick: async () => {
+                if (!(await ctx.ui.confirm({ title: `Oublier « ${c.ssid} » ?`, message: 'Le mot de passe enregistré sera effacé.', confirmLabel: 'Oublier', destructive: true }))) return;
+                net.forget(c.ssid).then(() => nav.pop(), failed('Impossible d\'oublier ce réseau'));
+              },
+            }),
+          ],
+        }),
+      ], { back: 'Wi‑Fi', large: false });
+    }
+
+    live(p, ['network:change'], net.watch());
+    if (net.state.wifi.enabled) rescan();
+  }
+
+  const BT_ICONS = { audio: 'volume', phone: 'phone', computer: 'code', keyboard: 'keypad', mouse: 'hand', gamepad: 'gamepad', watch: 'clock', ble: 'bluetooth', other: 'bluetooth' };
+
+  function bluetoothPage() {
+    const bt = k.bluetooth;
+    let busy = null;
+    const p = open('Bluetooth', (refresh) => {
+      if (!bt.available) {
+        return listGroup({
+          items: [row({ icon: 'bluetooth', iconColor: '#8e8e93', title: 'Bluetooth', detail: 'Indisponible' })],
+          footer: `${unsupportedReason()} Sur Android, Chrome permet de connecter des appareils Bluetooth basse consommation (montres, capteurs…). Installé sur un ordinateur ou une tablette, Orion gère tous les appareils Bluetooth.`,
+        });
+      }
+      const st = bt.state;
+      const power = toggle(st.enabled, (on) => bt.setPowered(on).catch(failed('Bluetooth')).finally(refresh), { label: 'Bluetooth' });
+      const groups = [
+        listGroup({
+          items: [row({ icon: 'bluetooth', iconColor: '#0a84ff', title: 'Bluetooth', trailing: power })],
+          footer: st.mode === 'bridge' ? `Visible sous le nom « ${k.bridge.info?.hostname ?? s.get('deviceName')} » pendant la recherche.` : 'Orion se connecte aux appareils Bluetooth basse consommation (montres, capteurs, balises…) choisis dans la fenêtre du navigateur. Les écouteurs et enceintes s\'appairent dans les réglages Bluetooth du téléphone.',
+        }),
+      ];
+      if (!st.enabled) return groups;
+      const describe = (d) => [busy === d.id ? 'Connexion…' : d.connected ? 'Connecté' : d.paired ? 'Non connecté' : null, d.battery != null ? `batterie ${d.battery} %` : null, d.error ?? null].filter(Boolean).join(' · ') || null;
+      const deviceRow = (d) =>
+        row({
+          icon: BT_ICONS[d.kind] ?? 'bluetooth',
+          iconColor: d.connected ? '#0a84ff' : '#8e8e93',
+          title: d.name,
+          subtitle: describe(d),
+          trailing: busy === d.id ? spinner(16) : null,
+          onClick: () => (d.paired ? deviceActions(d) : act(d, () => bt.pair(d.id), `${d.name} appairé`)),
+        });
+      const devices = st.devices;
+      const paired = devices.filter((d) => d.paired);
+      groups.push(listGroup({ header: 'Mes appareils', items: paired.map(deviceRow), footer: paired.length ? null : 'Aucun appareil.' }));
+      if (st.mode === 'bridge') {
+        const others = devices.filter((d) => !d.paired);
+        groups.push(
+          listGroup({
+            header: h('span.scanning', 'Autres appareils', st.scanning ? spinner(14) : null),
+            items: [...others.map(deviceRow), st.scanning ? null : row({ icon: 'refresh', iconColor: '#0a84ff', title: 'Rechercher', onClick: () => bt.scan().catch(failed('Recherche impossible')) })].filter(Boolean),
+            footer: 'Mettez l\'appareil en mode appairage pour qu\'il apparaisse.',
+          }),
+        );
+      } else {
+        groups.push(listGroup({ items: [row({ icon: 'plus', iconColor: '#0a84ff', title: 'Ajouter un appareil…', onClick: () => bt.add().then((d) => d && ctx.ui.toast(`${d.name || 'Appareil'} connecté`), failed('Bluetooth')) })] }));
+      }
+      return groups;
+    });
+
+    async function act(d, action, done) {
+      busy = d.id;
+      p.onShow();
+      try {
+        await action();
+        if (done) ctx.ui.toast(done);
+      } catch (error) {
+        ctx.ui.alert({ title: d.name, message: error.message });
+      } finally {
+        busy = null;
+        p.onShow();
+      }
+    }
+
+    async function deviceActions(d) {
+      const choice = await ctx.ui.actionSheet({
+        title: d.name,
+        actions: [d.connected ? { label: 'Déconnecter', value: 'disconnect' } : { label: 'Connecter', value: 'connect' }, { label: 'Oublier cet appareil', value: 'forget', destructive: true }],
+      });
+      if (choice === 'connect') act(d, () => bt.connect(d.id), `${d.name} connecté`);
+      else if (choice === 'disconnect') act(d, () => bt.disconnect(d.id));
+      else if (choice === 'forget') act(d, () => bt.forget(d.id), `${d.name} oublié`);
+    }
+
+    live(p, ['bluetooth:change'], bt.watch());
+    if (bt.mode === 'bridge' && bt.enabled) bt.scan().catch(() => {});
   }
 
   function cellularPage() {
-    open('Réseau mobile', () => {
-      const net = k.telephony.network;
+    const tel = k.telephony;
+    const MODES = { modem: 'Modem', handoff: 'Apps du téléphone', simulated: 'Simulation' };
+    const p = open('Réseau mobile', (refresh) => {
+      const n = tel.network;
+      const groups = [];
+      if (n.mode === 'modem') {
+        groups.push(
+          listGroup({
+            items: [
+              row({ icon: 'antenna', iconColor: '#30d158', title: 'Données mobiles', trailing: toggle(n.data, (on) => tel.setMobileData(on).catch(failed('Données mobiles')).finally(refresh), { label: 'Données mobiles' }) }),
+              row({ icon: 'power', iconColor: '#8e8e93', title: 'Modem', trailing: toggle(n.enabled, (on) => tel.setModemEnabled(on).catch(failed('Modem')).finally(refresh), { label: 'Modem' }) }),
+            ],
+          }),
+          listGroup({
+            header: 'Opérateur',
+            items: [
+              row({ title: 'Opérateur', detail: n.operator }),
+              row({ title: 'Réseau', detail: [n.type, n.roaming ? 'itinérance' : null].filter(Boolean).join(' · ') || '—' }),
+              row({ title: 'Signal', detail: n.signalPercent != null && n.cellular ? `${n.signalPercent} %` : '—' }),
+              row({ title: 'Carte SIM', detail: n.sim === false ? 'Absente' : n.sim ? 'Présente' : '—' }),
+              row({ title: 'Numéro', detail: n.number ?? '—' }),
+            ],
+            footer: 'Les appels et SMS passent par le modem (ModemManager). Le son des appels dépend de la prise en charge du modem.',
+          }),
+        );
+      } else {
+        const pref = s.get('telephony.mode') ?? 'auto';
+        groups.push(
+          listGroup({
+            header: 'Appels et SMS',
+            items: [h('div.list-item', segmented([{ value: 'auto', label: 'Auto' }, { value: 'handoff', label: 'Téléphone' }, { value: 'simulated', label: 'Simulation' }], pref, (v) => { s.set('telephony.mode', v); refresh(); }))],
+            footer: n.mode === 'handoff'
+              ? 'Une page web n\'a pas accès au modem du téléphone : Orion confie chaque appel à l\'app Téléphone et chaque SMS à l\'app Messages du système. Ce sont de vrais appels et de vrais SMS ; Orion garde l\'historique et vos conversations. Les messages reçus arrivent dans l\'app Messages du téléphone.'
+              : 'Mode démonstration : aucun appel ni SMS ne quitte l\'appareil, les correspondants répondent automatiquement. Sur un téléphone, choisissez « Téléphone » pour passer de vrais appels.',
+          }),
+          listGroup({ items: [row({ title: 'Utilisé en ce moment', detail: MODES[n.mode] })] }),
+        );
+        if (n.mode === 'simulated') groups.push(listGroup({ header: 'Réseau simulé', items: [toggleRow('Réseau mobile simulé', 'cellular', { onChange: refresh }), row({ title: 'Opérateur', detail: n.operator })] }));
+        groups.push(listGroup({ header: 'Connexion du navigateur', items: connectionRows(k.network.state) }));
+      }
+      return groups;
+    });
+    live(p, ['network:change']);
+  }
+
+  function locationPage() {
+    const loc = k.location;
+    let measuring = false;
+    const p = open('Service de localisation', (refresh) => {
+      const position = loc.last;
+      const sourceLabel = loc.source === 'gps' ? 'Récepteur GPS (gpsd)' : loc.source === 'browser' ? 'Navigateur (GPS, Wi‑Fi et antennes du téléphone)' : 'Aucune';
+      const apps = visibleApps().filter((pkg) => pkg.permissions.includes('location'));
       return [
-        listGroup({ items: [toggleRow('Données cellulaires', 'cellular')] }),
+        listGroup({ items: [toggleRow('Service de localisation', 'location', { icon: 'location', color: '#0a84ff', onChange: refresh })], footer: 'Les applications doivent aussi obtenir votre autorisation. Sur un téléphone, le navigateur demande en plus la sienne.' }),
         listGroup({
-          header: 'Opérateur',
-          items: [row({ title: 'Opérateur', detail: net.operator }), row({ title: 'Technologie', detail: net.cellular ? '5G' : '—' }), row({ title: 'Numéro', detail: '+33 6 00 00 00 00' })],
+          header: 'Source',
+          items: [
+            row({ title: 'Source', detail: sourceLabel }),
+            position ? row({ title: 'Dernière position', subtitle: formatCoordinates(position), detail: relativeTime(position.time, k.now()) }) : null,
+            position?.accuracy != null ? row({ title: 'Précision', detail: `± ${Math.round(position.accuracy)} m` }) : null,
+            position?.satellites != null ? row({ title: 'Satellites', detail: String(position.satellites) }) : null,
+            loc.error ? row({ title: 'État', subtitle: loc.error }) : null,
+            s.get('location') && loc.source
+              ? measuring
+                ? row({ title: 'Recherche de la position…', trailing: spinner(18) })
+                : row({
+                    icon: 'crosshair',
+                    iconColor: '#0a84ff',
+                    title: 'Localiser maintenant',
+                    onClick: async () => {
+                      measuring = true;
+                      refresh();
+                      await loc.current({ maxAge: 0 }).catch((error) => ctx.ui.alert({ title: 'Localisation', message: error.message }));
+                      measuring = false;
+                      refresh();
+                    },
+                  })
+              : null,
+          ].filter(Boolean),
+        }),
+        listGroup({
+          header: 'Applications',
+          items: apps.map((pkg) => row({ leading: appIcon(pkg, { size: 30 }), title: pkg.name, detail: { granted: 'Autorisée', denied: 'Refusée', prompt: 'Demander' }[k.permissions.check(pkg.id, 'location')] ?? '', chevron: true, onClick: () => permissionPage('location', PERMISSIONS.location) })),
+          footer: apps.length ? null : 'Aucune application ne demande la position.',
         }),
       ];
     });
+    live(p, ['location:change', 'permission:change']);
   }
 
   // ───────────── Notifications & sons ─────────────
@@ -582,7 +864,7 @@ export function mount(root, ctx) {
 
   function privacyPage() {
     open('Confidentialité', () => [
-      listGroup({ items: [toggleRow('Service de localisation', 'location', { icon: 'location', color: '#0a84ff' })] }),
+      listGroup({ items: [row({ icon: 'location', iconColor: '#0a84ff', title: 'Service de localisation', detail: s.get('location') ? 'Activé' : 'Désactivé', chevron: true, onClick: locationPage })] }),
       listGroup({
         header: 'Autorisations',
         items: Object.entries(PERMISSIONS).map(([perm, info]) => {
@@ -712,7 +994,7 @@ export function mount(root, ctx) {
     const choice = (key, options) => {
       const control = segmented(options, s.get(key), (v) => s.set(key, v));
       // Réglage modifié ailleurs (bouton retardateur de l'appareil photo) : le contrôle suit.
-      ctx.on('destroy', s.watch(key, (v) => control.set(v)));
+      keep(s.watch(key, (v) => control.set(v)));
       return h('div.list-item', control);
     };
     open('Appareil photo', () => [
@@ -794,9 +1076,14 @@ export function mount(root, ctx) {
   /** Mot de passe oublié : le propriétaire en choisit un nouveau après son code de verrouillage. */
   async function forgotDeveloperPassword(refresh) {
     if (!dev.canManage) return ctx.ui.alert({ title: 'Mot de passe oublié', message: `Demandez-le à ${dev.ownerName}, propriétaire de l'appareil.` });
-    if (s.get('passcode')) {
-      if (!(await checkCurrentCode())) return;
-    } else if (!(await ctx.ui.confirm({ title: 'Remplacer le mot de passe ?', message: 'Sans code de verrouillage, l\'appareil ne peut pas vérifier votre identité. Définissez un code pour mieux protéger le mode développeur.', confirmLabel: 'Remplacer' }))) return;
+    // Sans code de verrouillage, n'importe qui peut ouvrir la session du propriétaire : seul l'effacement reste possible.
+    if (!s.get('passcode')) {
+      return ctx.ui.alert({
+        title: 'Mot de passe oublié',
+        message: 'Sans code de verrouillage, l\'appareil ne peut pas vérifier que vous êtes le propriétaire. Pour retrouver l\'accès au mode développeur, effacez l\'appareil (Réglages › Général › Effacer contenu et réglages). Définissez un code de verrouillage pour pouvoir remplacer ce mot de passe à l\'avenir.',
+      });
+    }
+    if (!(await checkCurrentCode())) return;
     const p = open('Nouveau mot de passe', (done) => newPasswordForm({ title: 'Nouveau mot de passe développeur', text: 'Il remplace l\'ancien pour tous les comptes de l\'appareil.', action: (pw) => dev.replace(pw), onDone: () => { ctx.ui.toast('Mot de passe modifié'); nav.pop(); refresh(); } }), { back: 'Mode développeur' });
     p.developer = true;
   }
@@ -815,8 +1102,8 @@ export function mount(root, ctx) {
     async function submit() {
       if (!field.input.value || dev.wait) return;
       const result = await dev.unlock(field.input.value);
-      if (result.ok) {
-        ctx.ui.toast('Mode développeur déverrouillé');
+      if (result.ok || result.missing) {
+        if (result.ok) ctx.ui.toast('Mode développeur déverrouillé');
         refresh();
         return;
       }
@@ -874,8 +1161,7 @@ export function mount(root, ctx) {
         }),
       ];
     });
-    const off = k.events.on('battery:change', () => nav.top === p && p.onShow());
-    ctx.on('destroy', off);
+    live(p, ['battery:change']);
   }
 
   function storagePage() {
@@ -990,7 +1276,7 @@ export function mount(root, ctx) {
         items: [
           row({ title: 'Réinitialiser tous les réglages', destructive: true, onClick: async () => {
             if (!(await ctx.ui.confirm({ title: 'Réinitialiser les réglages ?', message: 'Vos données sont conservées, seuls les réglages sont rétablis.', confirmLabel: 'Réinitialiser', destructive: true }))) return;
-            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved', 'developerState'].includes(key)) s.reset(key);
+            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved', 'developerState', 'telephony.seenSms'].includes(key)) s.reset(key);
             ctx.ui.toast('Réglages réinitialisés');
           } }),
           me().owner
@@ -1053,13 +1339,15 @@ export function mount(root, ctx) {
 
   /** Mode développeur : création du mot de passe, déverrouillage, puis options. */
   function developerPage() {
-    open('Mode développeur', (refresh) => {
+    const p = open('Mode développeur', (refresh) => {
       if (dev.unlocked) return developerOptions(refresh);
       if (dev.configured) return unlockForm(refresh);
       if (!dev.canManage) return [devHero('Mode développeur non configuré', `Demandez à ${dev.ownerName}, propriétaire de l'appareil, de définir le mot de passe développeur.`)];
       return newPasswordForm({
         title: 'Créer le mot de passe développeur',
-        text: 'Il protège les options pour les développeurs et le Terminal, pour tous les comptes de l\'appareil. Vous seul pourrez le modifier.',
+        text: s.get('passcode')
+          ? 'Il protège les options pour les développeurs et le Terminal, pour tous les comptes de l\'appareil. Vous seul pourrez le modifier.'
+          : 'Il protège les options pour les développeurs et le Terminal, pour tous les comptes de l\'appareil. Conseil : définissez aussi un code de verrouillage, sinon un mot de passe oublié ne pourra pas être remplacé.',
         action: (pw) => dev.create(pw),
         onDone: () => {
           ctx.ui.toast('Mode développeur déverrouillé');
@@ -1067,6 +1355,7 @@ export function mount(root, ctx) {
         },
       });
     });
+    p.devRoot = true;
   }
 
   function developerOptions(refresh) {
@@ -1166,7 +1455,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, cellular: cellularPage, location: locationPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;
@@ -1178,16 +1467,21 @@ export function mount(root, ctx) {
   nav.push(mainPage());
   handleIntent(ctx.intent);
   ctx.onBack(async () => (nav.depth > 1 ? nav.pop() : false));
-  const offs = ['settings:change', 'package:install', 'package:uninstall'].map((type) =>
-    k.events.on(type, () => {
-      if (nav.depth === 1) nav.top?.onShow?.();
-    }),
-  );
-  ctx.on('destroy', () => offs.forEach((off) => off()));
+  // Redessins regroupés : un téléchargement émet un événement par fichier.
+  let redrawTimer = null;
+  const redraw = (wanted) => {
+    if (!wanted(nav.top) || redrawTimer) return;
+    redrawTimer = ctx.setTimeout(() => {
+      redrawTimer = null;
+      if (wanted(nav.top)) nav.top?.onShow?.();
+    }, 250);
+  };
+  const isRoot = () => nav.depth === 1;
+  for (const type of ['settings:change', 'package:install', 'package:uninstall', 'network:change', 'bluetooth:change']) ctx.subscribe(type, () => redraw(isRoot));
   // Mises à jour : la page suit la vérification et le téléchargement en direct.
-  ctx.subscribe('update:change', () => {
-    if (nav.top?.updates || nav.depth === 1) nav.top?.onShow?.();
-  });
+  ctx.subscribe('update:change', () => redraw((top) => top?.updates || isRoot()));
+  // Mot de passe développeur changé ou supprimé (autre fenêtre) : la page se met à jour.
+  ctx.subscribe('account:change', () => redraw((top) => top?.devRoot || isRoot()));
   // Mode développeur verrouillé : ses sous-pages se ferment, sa page redemande le mot de passe.
   ctx.subscribe('developer:lock', async () => {
     while (nav.top?.developer) await nav.pop({ animated: false });

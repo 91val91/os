@@ -1125,6 +1125,76 @@ const COMMANDS = {
       throw new ShellError('usage : sim call <numéro> | sim sms <numéro> <texte>', 2);
     },
   },
+  net: {
+    desc: 'État du réseau (connexion, Wi‑Fi, modem, pont matériel)',
+    run({ k }) {
+      const n = k.network.state;
+      const t = k.telephony.network;
+      const rows = [
+        ['Connexion', `${n.online ? paint('green', 'en ligne') : paint('red', 'hors ligne')} · ${n.type}${n.airplane ? ' · mode avion' : ''}`],
+        ['Pont matériel', k.bridge.available ? `orion-server ${k.bridge.info?.version ?? ''}${k.bridge.simulated ? ' (simulé)' : ''} : ${Object.keys(k.bridge.capabilities).filter((c) => k.bridge.capabilities[c]).join(', ')}` : 'absent (API du navigateur)'],
+        ['Wi‑Fi', n.wifi.controllable ? (n.wifi.enabled ? n.wifi.connected ? `${n.wifi.connected.ssid} (${n.wifi.connected.signal} %)` : 'non connecté' : 'désactivé') : 'géré par le système du téléphone'],
+        ['Téléphonie', `${t.mode} · ${t.operator}${t.type ? ` · ${t.type}` : ''}`],
+        n.ip ? ['Adresse IP', n.ip] : null,
+        n.quality ? ['Qualité estimée', `${n.quality}${n.downlink ? ` · ${n.downlink} Mb/s` : ''}${n.rtt ? ` · ${n.rtt} ms` : ''}`] : null,
+      ].filter(Boolean);
+      return rows.map(([key, value]) => `${paint('cyan', key.padEnd(16))}${value}`).join('\n');
+    },
+  },
+  wifi: {
+    desc: 'Wi‑Fi (avec orion-server)',
+    usage: 'wifi [scan | connect <réseau> [mot de passe] | disconnect | on | off]',
+    async run({ args, k }) {
+      const net = k.network;
+      if (!net.controllable) throw new ShellError('Le Wi‑Fi est géré par le système de cet appareil (pas de pont orion-server).');
+      const [what, ssid, password] = args;
+      if (what === 'on' || what === 'off') await net.setWifiEnabled(what === 'on');
+      else if (what === 'connect') {
+        requireArgs(args, 2, 'wifi connect <réseau> [mot de passe]');
+        await net.connect(ssid, password);
+        return `Connecté à ${ssid}.`;
+      } else if (what === 'disconnect') await net.disconnect();
+      else if (what && what !== 'scan') throw new ShellError(`usage : ${COMMANDS.wifi.usage}`, 2);
+      const st = await net.refresh({ rescan: what === 'scan' });
+      if (!st.wifi.enabled) return 'Wi‑Fi désactivé.';
+      return table([['', 'RÉSEAU', 'SIGNAL', 'SÉCURITÉ'], ...st.wifi.networks.map((w) => [w.active ? '*' : '', w.ssid, `${w.signal} %`, w.security || 'ouvert'])]);
+    },
+  },
+  bt: {
+    desc: 'Bluetooth',
+    usage: 'bt [scan | connect <id> | disconnect <id> | on | off]',
+    async run({ args, k }) {
+      const bt = k.bluetooth;
+      if (!bt.available) throw new ShellError('Bluetooth indisponible sur cet appareil.');
+      const [what, id] = args;
+      if (what === 'on' || what === 'off') await bt.setPowered(what === 'on');
+      else if (what === 'scan') {
+        await bt.scan(8);
+        return 'Recherche pendant 8 s… (relancez « bt » ensuite)';
+      } else if (what === 'connect' || what === 'disconnect') {
+        requireArgs(args, 2, `bt ${what} <id>`);
+        await bt[what](id);
+      } else if (what) throw new ShellError(`usage : ${COMMANDS.bt.usage}`, 2);
+      if (!bt.enabled) return 'Bluetooth désactivé.';
+      const devices = bt.devices();
+      if (!devices.length) return 'Aucun appareil.';
+      return table([['ID', 'NOM', 'ÉTAT', 'BATTERIE'], ...devices.map((d) => [d.id, d.name, d.connected ? 'connecté' : d.paired ? 'appairé' : 'découvert', d.battery != null ? `${d.battery} %` : ''])]);
+    },
+  },
+  gps: {
+    desc: 'Position actuelle (GPS ou navigateur)',
+    async run({ k }) {
+      const p = await k.location.current({ timeout: 15_000, maxAge: 5000 });
+      return [
+        `${paint('cyan', 'Position'.padEnd(12))}${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`,
+        p.accuracy != null ? `${paint('cyan', 'Précision'.padEnd(12))}± ${Math.round(p.accuracy)} m` : null,
+        p.alt != null ? `${paint('cyan', 'Altitude'.padEnd(12))}${Math.round(p.alt)} m` : null,
+        p.speed != null ? `${paint('cyan', 'Vitesse'.padEnd(12))}${(p.speed * 3.6).toFixed(1)} km/h` : null,
+        p.satellites != null ? `${paint('cyan', 'Satellites'.padEnd(12))}${p.satellites}` : null,
+        `${paint('cyan', 'Source'.padEnd(12))}${p.source === 'gps' ? 'récepteur GPS (gpsd)' : 'navigateur'}`,
+      ].filter(Boolean).join('\n');
+    },
+  },
   vibrate: {
     desc: 'Fait vibrer l\'appareil',
     run({ args, k }) {

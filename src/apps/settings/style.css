@@ -553,3 +553,8 @@
   font-size: .75rem;
   font-weight: 700;
 }
+
+/* Force du signal Wi‑Fi : arcs estompés au-delà du niveau. */
+.wifi-strength { display: flex; }
+.wifi-strength[data-level="2"] svg path:nth-child(1),
+.wifi-strength[data-level="1"] svg path:nth-child(-n+2) { opacity: .3; }

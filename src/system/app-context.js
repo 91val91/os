@@ -7,6 +7,21 @@
 import { EventBus } from '../kernel/events.js';
 import { sandbox, USER_SPACE } from '../kernel/vfs.js';
 
+/**
+ * Façade d'un service : seulement les méthodes et propriétés listées. Les
+ * champs internes (fs du noyau, réglages, pont matériel…) restent inaccessibles.
+ */
+function expose(service, methods, getters = []) {
+  const api = {};
+  for (const name of methods) api[name] = (...args) => service[name](...args);
+  for (const name of getters) Object.defineProperty(api, name, { get: () => service[name], enumerable: true });
+  return Object.freeze(api);
+}
+
+const CONTACTS_API = ['list', 'get', 'findByPhone', 'search', 'add', 'update', 'remove', 'nameFor'];
+const TELEPHONY_API = ['threads', 'thread', 'unreadCount', 'sendSms', 'setActiveThread', 'markRead', 'deleteThread', 'callLog', 'clearCallLog', 'dial', 'answer', 'hangup', 'setCallOption', 'nameFor', 'setMobileData', 'setModemEnabled'];
+const DEVICE_API = ['vibrate', 'info', 'uptime'];
+
 export function createAppContext({ ui, proc, pkg }) {
   const kernel = ui.kernel;
   const appId = pkg.id;
@@ -23,6 +38,34 @@ export function createAppContext({ ui, proc, pkg }) {
       off();
       disposers.delete(off);
     };
+  };
+
+  /** Position : autorisation de l'app vérifiée à chaque demande, suivi arrêté si elle est retirée. */
+  const location = {
+    get available() {
+      return Boolean(kernel.location.source);
+    },
+    async current(options) {
+      if (!(await kernel.permissions.request(appId, 'location'))) throw new Error('Accès à la position refusé');
+      return kernel.location.current(options);
+    },
+    async watch(fn, { onError } = {}) {
+      if (!(await kernel.permissions.request(appId, 'location'))) throw new Error('Accès à la position refusé');
+      const stop = kernel.location.watch(fn);
+      const offError = kernel.events.on('location:change', ({ error }) => error && onError?.(error));
+      const offPermission = kernel.events.on('permission:change', (e) => {
+        if (e.appId === appId && kernel.permissions.check(appId, 'location') !== 'granted') {
+          end();
+          onError?.('Accès à la position retiré');
+        }
+      });
+      const end = track(() => {
+        stop();
+        offError();
+        offPermission();
+      });
+      return end;
+    },
   };
 
   const storage = {
@@ -55,9 +98,10 @@ export function createAppContext({ ui, proc, pkg }) {
     fs: sandbox(kernel.fs, [...USER_SPACE, dataDir]),
     dataDir,
     storage,
-    contacts: kernel.contacts,
-    telephony: kernel.telephony,
-    device: kernel.device,
+    contacts: expose(kernel.contacts, CONTACTS_API),
+    telephony: expose(kernel.telephony, TELEPHONY_API, ['call', 'network', 'mode']),
+    device: expose(kernel.device, DEVICE_API, ['battery', 'connectivity']),
+    location,
     sound: ui.sound,
     now: () => kernel.now(),
     log: (message) => kernel.log.info(appId, message),

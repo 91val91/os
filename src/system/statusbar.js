@@ -1,5 +1,9 @@
 /**
  * Barre d'état : heure, îlot d'activités en direct, réseau, batterie.
+ *
+ * Les icônes réseau montrent l'état réel : signal du modem et force du Wi‑Fi
+ * avec orion-server ; type de connexion et qualité estimée par le navigateur
+ * sur un téléphone (rien n'est affiché quand le navigateur ne le sait pas).
  */
 import { h, render } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
@@ -20,7 +24,7 @@ export class StatusBar {
 
   start() {
     const refresh = () => this.render();
-    for (const type of ['settings:change', 'battery:change', 'network:change', 'alarm:change', 'call:state']) this.k.events.on(type, refresh);
+    for (const type of ['settings:change', 'battery:change', 'network:change', 'bluetooth:change', 'location:change', 'alarm:change', 'call:state']) this.k.events.on(type, refresh);
     this.timer = setInterval(() => {
       this.#renderTime();
       this.#renderIsland();
@@ -44,21 +48,40 @@ export class StatusBar {
   }
 
   #renderIcons() {
-    const { settings, device, alarms } = this.k;
-    const net = device.connectivity;
+    const { settings, device, alarms, network, telephony, bluetooth, location } = this.k;
+    const net = network.state;
+    const tel = telephony.network;
     const items = [];
     if (settings.get('dnd')) items.push(icon('moon-fill', { size: 14 }));
     const nextAlarm = alarms.next({ kind: 'alarm' });
     if (nextAlarm && nextAlarm.at - this.k.now() < 86_400_000) items.push(icon('alarm', { size: 14, stroke: 2.4 }));
-    if (settings.get('bluetooth') && !net.airplane) items.push(icon('bluetooth', { size: 14, stroke: 2.4 }));
+    if (location.active) items.push(h('span.sb-location', icon('location-fill', { size: 11 })));
+    if (bluetooth.enabled && !net.airplane) items.push(icon('bluetooth', { size: 14, stroke: 2.4 }));
     if (net.airplane) {
       items.push(icon('airplane', { size: 15 }));
     } else {
-      const level = net.cellular ? 4 : 0;
-      items.push(h('span.sb-signal', [1, 2, 3, 4].map((i) => h(`i${i <= level ? '.on' : ''}`, { style: { height: `${3 + i * 2.2}px` } }))));
-      if (net.cellular && !net.wifi) items.push(h('span.sb-net', '5G'));
+      // Réseau mobile : barres du modem, de la simulation, ou qualité estimée par le navigateur.
+      let bars = null;
+      let label = null;
+      if (tel.mode === 'modem' || tel.mode === 'simulated') {
+        bars = tel.signal;
+        label = tel.cellular ? tel.type : null;
+      } else if (net.type === 'cellular') {
+        bars = net.qualityBars ?? 4;
+        label = net.quality && net.quality !== 'slow-2g' ? net.quality.toUpperCase() : null;
+      }
+      if (bars != null) items.push(h('span.sb-signal', [1, 2, 3, 4].map((i) => h(`i${i <= bars ? '.on' : ''}`, { style: { height: `${3 + i * 2.2}px` } }))));
+      if (label && net.type !== 'wifi' && net.type !== 'ethernet') items.push(h('span.sb-net', label));
+      if (net.type === 'wifi') {
+        const signal = net.wifi.connected?.signal;
+        const level = signal == null ? 3 : signal >= 60 ? 3 : signal >= 35 ? 2 : 1;
+        items.push(h('span.sb-wifi', { dataset: { level: String(level) } }, icon('wifi', { size: 16, stroke: 2.6 })));
+      } else if (net.type === 'ethernet') {
+        items.push(icon('ethernet', { size: 15, stroke: 2.2 }));
+      } else if (!net.online) {
+        items.push(h('span.sb-offline', { title: 'Hors ligne' }, icon('wifi-off', { size: 15, stroke: 2.4 })));
+      }
     }
-    if (net.wifi) items.push(icon('wifi', { size: 16, stroke: 2.6 }));
     const b = device.battery;
     const pct = Math.round(b.level * 100);
     const low = pct <= 20 && !b.charging;

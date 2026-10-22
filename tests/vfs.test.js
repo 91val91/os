@@ -138,6 +138,17 @@ test('bac à sable des applications : pas d\'accès aux fichiers système', asyn
   ]) {
     assert.throws(attempt, (e) => e instanceof FsError && e.code === 'EACCES');
   }
+  // Seules les méthodes publiques : pas de stockage brut, de constructeur ni de liste des chemins protégés.
+  for (const key of ['store', 'constructor', 'readonly', 'events', 'mount']) assert.equal(app[key] === Object || app[key] === undefined, true, key);
+  assert.equal(Object.isFrozen(app), true);
+  // L'option « system » (écriture des chemins protégés) est ignorée pour une app.
+  const locked = await new FileSystem({ store: new Namespace(new MemoryBackend(), 'fs2'), readonly: ['/system', '/home/locked'] }).mount();
+  locked.mkdir('/home/locked', { recursive: true, system: true });
+  const app2 = sandbox(locked, ['/home']);
+  assert.throws(() => app2.writeFile('/home/locked/a.txt', 'x', { system: true }), (e) => e instanceof FsError);
+  assert.throws(() => app2.mkdir('/home/locked/d', { system: true }), (e) => e instanceof FsError);
+  app.writeJSON('/home/data.json', { system: true });
+  assert.deepEqual(fs.readJSON('/home/data.json'), { system: true }, 'le contenu n\'est pas modifié');
   assert.equal(inUserSpace('/home/Photos/a.jpg'), true);
   assert.equal(inUserSpace('/homework'), false);
   assert.equal(inUserSpace('/tmp/x'), true);

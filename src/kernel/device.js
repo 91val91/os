@@ -1,18 +1,18 @@
 /**
- * Couche d'abstraction matérielle (HAL) : batterie, réseau, vibreur, lampe,
+ * Couche d'abstraction matérielle (HAL) : batterie, vibreur, lampe,
  * informations sur l'appareil. Utilise les API du navigateur quand elles
- * existent et simule le reste.
+ * existent et simule le reste. Le réseau est géré par NetworkService.
  */
 export class DeviceService {
-  constructor({ events = null, settings = null, env = globalThis, now = Date.now, log = null } = {}) {
+  constructor({ events = null, settings = null, env = globalThis, now = Date.now, log = null, network = null } = {}) {
     this.events = events;
     this.settings = settings;
     this.env = env;
     this.now = now;
     this.log = log;
+    this.network = network;
     this.bootTime = now();
     this.battery = { level: 0.86, charging: false, simulated: true };
-    this.online = env.navigator?.onLine ?? true;
     this.lastDrain = now();
   }
 
@@ -36,23 +36,15 @@ export class DeviceService {
         /* simulation */
       }
     }
-    this.env.addEventListener?.('online', () => this.#setOnline(true));
-    this.env.addEventListener?.('offline', () => this.#setOnline(false));
     this.log?.info('hal', `batterie ${this.battery.simulated ? 'simulée' : 'réelle'}`);
     return this;
   }
 
-  #setOnline(online) {
-    this.online = online;
-    this.events?.emit('network:change', this.connectivity);
-  }
-
-  /** État de connectivité combinant réglages et état réel du navigateur. */
+  /** Résumé de la connexion (voir NetworkService pour le détail). */
   get connectivity() {
-    const airplane = Boolean(this.settings?.get('airplane'));
-    const wifi = !airplane && Boolean(this.settings?.get('wifi'));
-    const cellular = !airplane && this.settings?.get('cellular') !== false;
-    return { airplane, wifi, cellular, online: this.online && (wifi || cellular), network: wifi ? this.settings?.get('wifiNetwork') : null };
+    const n = this.network?.state;
+    const online = n ? n.online : this.env.navigator?.onLine ?? true;
+    return { airplane: Boolean(this.settings?.get('airplane')), online, type: n?.type ?? 'unknown', wifi: n?.type === 'wifi', cellular: n?.type === 'cellular', network: n?.wifi.connected?.ssid ?? null };
   }
 
   /** Avance la simulation de batterie (appelé périodiquement). */

@@ -22,9 +22,20 @@ export function passwordProblem(password, confirmation) {
 }
 
 export class DeveloperMode {
+  #unlockedWith = null; // empreinte du mot de passe qui a servi à déverrouiller
+
   constructor(ui) {
     this.ui = ui;
     this.unlocked = false;
+    // Mot de passe changé ou supprimé depuis une autre fenêtre d'Orion : cette fenêtre se reverrouille.
+    ui.kernel?.events.on('account:change', () => {
+      if (this.unlocked && this.#state.password?.hash !== this.#unlockedWith) this.lock();
+    });
+  }
+
+  #open() {
+    this.unlocked = true;
+    this.#unlockedWith = this.#state.password?.hash ?? null;
   }
 
   get #k() {
@@ -75,16 +86,18 @@ export class DeveloperMode {
   async create(password) {
     if (!this.canManage) throw new Error(`Seul ${this.ownerName} peut définir le mot de passe développeur`);
     await this.#save({ password: await createPasscode(password), failures: 0, blockedUntil: 0 });
-    this.unlocked = true;
+    this.#open();
   }
 
   /** Déverrouille ; renvoie { ok } ou { ok: false, left, wait }. */
   async unlock(password) {
     if (this.wait) return { ok: false, left: 0, wait: this.wait };
     const state = this.#state;
+    // Sans mot de passe (supprimé entre-temps, par exemple depuis une autre fenêtre), rien ne s'ouvre.
+    if (!state.password) return { ok: false, left: 0, wait: 0, missing: true };
     if (await verifyPasscode(state.password, password)) {
       if (state.failures) await this.#save({ failures: 0, blockedUntil: 0 });
-      this.unlocked = true;
+      this.#open();
       return { ok: true };
     }
     // Après 5 échecs : 30 s d'attente, puis le double à chaque nouvel échec (15 min au plus).
@@ -98,7 +111,7 @@ export class DeveloperMode {
   async replace(password) {
     if (!this.canManage) throw new Error(`Seul ${this.ownerName} peut changer le mot de passe développeur`);
     await this.#save({ password: await createPasscode(password), failures: 0, blockedUntil: 0 });
-    this.unlocked = true;
+    this.#open();
   }
 
   /** Supprime le mot de passe : le mode développeur n'est plus accessible jusqu'à un nouveau. */

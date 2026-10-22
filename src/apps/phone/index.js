@@ -111,7 +111,7 @@ export function mount(root, ctx) {
         return listItem({
           leading: h(`span.call-dir${c.missed ? '.missed' : ''}`, icon(c.missed ? 'phone-missed' : c.direction === 'out' ? 'phone-outgoing' : 'phone-incoming', { size: 16 })),
           title: h(`span${c.missed ? '.missed-text' : ''}`, c.name),
-          subtitle: `${kind}${c.duration ? ' · ' + formatDuration(c.duration * 1000) : ''}`,
+          subtitle: `${kind}${c.handoff ? ' · via le téléphone' : c.duration ? ' · ' + formatDuration(c.duration * 1000) : ''}`,
           detail: relativeTime(c.time, ctx.now()),
           trailing: h('button.info-btn', { type: 'button', 'aria-label': 'Infos', onclick: (e) => { e.stopPropagation(); contact ? ctx.startActivity({ app: 'contacts', action: 'view', data: { id: contact.id } }) : ctx.startActivity({ app: 'contacts', action: 'view', data: { phone: c.number } }); } }, icon('info', { size: 22 })),
           onClick: () => call(c.number),

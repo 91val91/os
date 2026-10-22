@@ -76,7 +76,7 @@ export class Dialogs {
     }
     panel.append(row);
     const promise = this.#mount(panel, { cancelValue: cancel ? cancel.value ?? null : null, backdropDismiss: Boolean(cancel) });
-    setTimeout(() => row.querySelector('.dialog-btn:not(.cancel)')?.focus(), 50);
+    setTimeout(() => row.querySelector('.dialog-btn:not(.cancel)')?.focus({ preventScroll: true }), 50);
     return promise;
   }
 
@@ -105,7 +105,7 @@ export class Dialogs {
     });
     const promise = this.#mount(panel, { cancelValue: null });
     setTimeout(() => {
-      input.focus();
+      input.focus({ preventScroll: true });
       input.select();
     }, 80);
     return promise;

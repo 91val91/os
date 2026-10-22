@@ -54,7 +54,7 @@ export class NotificationShade extends PullPanel {
     this.enableSwipeToClose(this.handle);
 
     for (const type of ['notification:post', 'notification:dismiss', 'notification:read']) k.events.on(type, () => this.isVisible && this.renderList());
-    k.events.on('settings:change', () => this.isVisible && this.renderTiles());
+    for (const type of ['settings:change', 'network:change', 'bluetooth:change']) k.events.on(type, () => this.isVisible && this.renderTiles());
     k.settings.watch('brightness', (v) => this.brightness.set(v));
   }
 

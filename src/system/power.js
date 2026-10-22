@@ -93,6 +93,7 @@ export class PowerManager {
     off.replaceChildren(h('div.shutdown', h('div.spinner.light'), h('span', message)));
     off.classList.add('visible', 'shutting');
     await animate(off, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: 'forwards' });
+    ui.updates?.stop();
     ui.kernel.shutdown();
     await new Promise((r) => setTimeout(r, 1200));
   }

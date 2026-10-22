@@ -20,6 +20,8 @@ export class CallScreen {
 
   start() {
     this.k.events.on('call:state', (call) => this.#onState(call));
+    // Modem : numéro refusé, pas de réseau, décrochage impossible…
+    this.k.events.on('call:error', ({ message }) => this.ui.dialogs.toast(message, { icon: 'phone-missed' }));
     setInterval(() => {
       if (this.k.telephony.call?.state === 'active') this.#renderStatus();
     }, 1000);

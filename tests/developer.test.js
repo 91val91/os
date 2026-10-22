@@ -89,3 +89,36 @@ test('mode développeur : l\'ancien mot de passe du propriétaire devient celui 
   lea.kernel.shutdown();
   camille.kernel.shutdown();
 });
+
+test('mode développeur : mot de passe supprimé ailleurs → plus rien ne s\'ouvre, les autres fenêtres se referment', async () => {
+  const { owner, guest, session } = await device();
+  const camille = await session(owner);
+  await camille.developer.create('orion2026');
+  const lea = await session(guest);
+  assert.equal((await lea.developer.unlock('orion2026')).ok, true);
+  // Le propriétaire supprime le mot de passe (autre fenêtre) : la session de Léa le voit au rechargement du registre.
+  await camille.developer.remove();
+  await flush();
+  await lea.kernel.accounts.load();
+  lea.kernel.events.emit('account:change', {});
+  assert.equal(lea.developer.unlocked, false, 'la fenêtre déverrouillée se referme');
+  assert.deepEqual(await lea.developer.unlock('nimporte'), { ok: false, left: 0, wait: 0, missing: true }, 'aucun mot de passe : refus');
+  assert.equal(lea.developer.unlocked, false);
+  camille.kernel.shutdown();
+  lea.kernel.shutdown();
+});
+
+test('mode développeur : un mot de passe changé ailleurs referme les autres fenêtres', async () => {
+  const { owner, session } = await device();
+  const a = await session(owner);
+  await a.developer.create('orion2026');
+  const b = await session(owner);
+  assert.equal((await b.developer.unlock('orion2026')).ok, true);
+  await a.developer.replace('nouveau2027');
+  await flush();
+  await b.kernel.accounts.load();
+  b.kernel.events.emit('account:change', {});
+  assert.equal(b.developer.unlocked, false);
+  a.kernel.shutdown();
+  b.kernel.shutdown();
+});

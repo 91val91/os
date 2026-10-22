@@ -197,36 +197,33 @@ export function mount(root, ctx) {
   }
 
   async function locate() {
-    const allowed = await ctx.requestPermission('location');
-    if (!allowed) {
-      ctx.ui.toast('Accès à la position refusé');
-      return;
-    }
-    if (!navigator.geolocation) {
+    if (!ctx.location.available) {
       ctx.ui.toast('Géolocalisation indisponible');
       return;
     }
     ctx.ui.toast('Localisation…');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        let name = 'Ma position';
-        try {
-          const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=fr`);
-          const place = await r.json();
-          name = place.city || place.locality || name;
-        } catch {
-          /* nom par défaut */
-        }
-        located = { name, latitude, longitude };
-        ctx.storage.set('located', located);
-        index = -1;
-        ctx.storage.set('index', index);
-        load();
-      },
-      () => ctx.ui.toast('Position introuvable'),
-      { timeout: 10_000, maximumAge: 600_000 },
-    );
+    let position;
+    try {
+      // Service de localisation d'Orion : GPS du téléphone, ou récepteur GPS d'Orion installé.
+      position = await ctx.location.current({ maxAge: 600_000 });
+    } catch (error) {
+      ctx.ui.toast(error.message);
+      return;
+    }
+    const { lat: latitude, lon: longitude } = position;
+    let name = 'Ma position';
+    try {
+      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=fr`);
+      const place = await r.json();
+      name = place.city || place.locality || name;
+    } catch {
+      /* nom par défaut */
+    }
+    located = { name, latitude, longitude };
+    ctx.storage.set('located', located);
+    index = -1;
+    ctx.storage.set('index', index);
+    load();
   }
 
   function cityList() {
