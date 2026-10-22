@@ -34,7 +34,7 @@ Ouvrez ensuite cette adresse sur le téléphone et installez-la :
 - **Android (Chrome)** : menu **⋮** → **Installer l'application** (ou « Ajouter à l'écran d'accueil »). L'icône Orion apparaît parmi vos applications ; elle s'ouvre en plein écran, sans barre d'adresse, et le bouton ou geste Retour d'Android agit dans Orion.
 - **iPhone / iPad (Safari)** : bouton **Partager** → **Sur l'écran d'accueil**, en laissant « Ouvrir en tant qu'app web » activé → **Ajouter**.
 
-Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la barre d'adresse reste visible et les gestes du bord de l'écran appartiennent au navigateur. Après la première ouverture, tout est en cache et le système démarre même sans réseau. Les mises à jour publiées sont téléchargées en arrière-plan et appliquées au lancement suivant, ou tout de suite en redémarrant Orion (bouton marche-arrêt du volet de notifications → Redémarrer).
+Lancez toujours Orion depuis cette icône : dans un onglet du navigateur, la barre d'adresse reste visible et les gestes du bord de l'écran appartiennent au navigateur. Après la première ouverture, toute la version installée est sur le téléphone et le système démarre même sans réseau. Quand une nouvelle version est publiée, Orion vous le signale par une notification : voir [Mises à jour](#mises-à-jour).
 
 **Sans hébergement**, depuis votre ordinateur :
 
@@ -77,6 +77,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Intents à la Android : « Ouvrir avec », « Partager avec », sélection d'une photo ou d'un contact depuis une autre app (`startActivityForResult`).
 - Alarmes système : réveils, minuteurs et rappels sonnent même si l'app est fermée.
 - Thèmes clair/sombre/automatique, Night Shift, luminosité, économiseur de batterie.
+- **Mises à jour du système** (**Réglages → Général → Mise à jour logicielle**) : voir [Mises à jour](#mises-à-jour).
 - **Mode développeur protégé par un mot de passe d'appareil** (**Réglages → Mode développeur**) : le propriétaire le choisit une fois (6 caractères minimum, lettres et chiffres) ; il vaut pour tous les comptes, seul le propriétaire peut le changer ou le supprimer, et « Réinitialiser les réglages » ne l'efface pas. Il est redemandé après chaque verrouillage de l'appareil. Après 5 erreurs, attente de 30 s, doublée à chaque nouvelle erreur (15 min au plus), même si l'on ferme les Réglages ou redémarre. Mot de passe oublié : le propriétaire le remplace avec son code de verrouillage.
 
 **Applications**
@@ -193,20 +194,33 @@ $ calc "sqrt(2) * 10"
 
 Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (`*.txt`), historique (↑/↓) et complétion (Tab). `help` liste toutes les commandes.
 
+## Mises à jour
+
+Le téléphone garde la version installée, entièrement en cache, jusqu'à ce que vous en installiez une nouvelle : une session ne mélange jamais deux versions.
+
+- **Vérification** : au démarrage puis toutes les 6 heures, et à l'ouverture de **Réglages → Général → Mise à jour logicielle**. Une nouvelle version est annoncée par une notification et en tête des Réglages, avec ses nouveautés et la taille réellement à télécharger.
+- **Téléchargement** : la nouvelle version est préparée à côté de l'actuelle. Seuls les fichiers modifiés transitent par le réseau ; chacun est vérifié avec son empreinte SHA-256 (un fichier altéré ou une publication en cours fait échouer la mise à jour, sans rien casser).
+- **Installation** : « Installer maintenant » redémarre Orion sur la nouvelle version ; l'ancienne est effacée. Vos données, comptes et réglages sont conservés.
+- **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil se verrouille).
+
+**Publier une version** : changez le numéro et les nouveautés dans `src/kernel/version.js`, lancez `npm run release` (qui régénère `version.json` : version, notes, empreinte et taille de chaque fichier), puis poussez. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
+
 ## Tests
 
 ```bash
-npm test            # 56 tests unitaires du noyau (node:test, sans dépendance)
+npm test            # 62 tests unitaires du noyau (node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
 npm run screenshots # régénère les captures du README
+npm run release     # régénère version.json avant de publier une version
 ```
 
 ## Structure du projet
 
 ```
-index.html, manifest.webmanifest, sw.js   PWA (plein écran, hors ligne)
+index.html, manifest.webmanifest, sw.js   PWA (plein écran, hors ligne, mises à jour)
+version.json                              version publiée (npm run release)
 src/main.js                               point d'entrée
 src/kernel/                               noyau (services, shell, stockage)
 src/system/                               interface système
@@ -214,7 +228,7 @@ src/apps/                                 applications et registre
 src/lib/                                  DOM, icônes, gestes, kit d'interface, calcul, formats
 src/styles/                               jetons de design, interface système, composants
 tests/                                    tests unitaires et de bout en bout
-scripts/                                  serveur local, icônes PWA, captures du README
+scripts/                                  serveur local, publication (version.json), icônes PWA, captures
 ```
 
 ## Ce qui est réel, ce qui est simulé

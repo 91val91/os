@@ -3,7 +3,7 @@
  */
 import { h } from '../../lib/dom.js';
 import { icon } from '../../lib/icons.js';
-import { formatBytes, formatDuration } from '../../lib/format.js';
+import { formatBytes, formatDuration, relativeTime } from '../../lib/format.js';
 import { navStack, page, listGroup, listItem, toggle, slider, segmented, avatar, button, spinner } from '../../lib/ui.js';
 import { PERMISSIONS } from '../../kernel/permissions.js';
 import { createPasscode, verifyPasscode } from '../../kernel/settings.js';
@@ -81,6 +81,10 @@ export function mount(root, ctx) {
             accounts ? row({ icon: 'users', iconColor: '#8e8e93', title: 'Utilisateurs', detail: String(accounts.list().length), chevron: true, onClick: usersPage }) : null,
           ].filter(Boolean),
         }),
+        // Comme sur iOS : une mise à jour disponible est proposée en tête des Réglages.
+        ['available', 'downloading', 'ready'].includes(ui.updates?.status)
+          ? listGroup({ items: [row({ icon: 'download', iconColor: '#0a84ff', title: ui.updates.status === 'ready' ? 'Mise à jour prête à installer' : 'Mise à jour disponible', subtitle: `Orion OS ${ui.updates.available?.version ?? ''}`, detail: h('span.update-badge', '1'), chevron: true, onClick: updatesPage })] })
+          : null,
         listGroup({
           items: [
             toggleRow('Mode avion', 'airplane', { icon: 'airplane', color: '#ff9500', onChange: render }),
@@ -643,6 +647,65 @@ export function mount(root, ctx) {
     return false;
   }
 
+  // ───────────── Mise à jour logicielle ─────────────
+
+  function updatesPage() {
+    const up = ui.updates;
+    const p = open('Mise à jour logicielle', () => {
+      const a = up.available;
+      const busy = ['checking', 'downloading', 'installing'].includes(up.status);
+      const notes = (list) => h('ul.update-notes', list.map((note) => h('li', note)));
+      let card;
+      if (a && ['available', 'downloading', 'ready', 'installing', 'error'].includes(up.status)) {
+        const progress = up.progress?.total ? up.progress.done / up.progress.total : 0;
+        card = h(
+          'div.update-card',
+          h('div.update-head', h('div.update-logo', logo(44)), h('div', h('strong', `Orion OS ${a.version}`), h('span', [a.date && new Date(a.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }), up.status === 'available' && a.download != null ? `${formatBytes(a.download)} à télécharger` : a.size ? formatBytes(a.size) : null].filter(Boolean).join(' · ')))),
+          a.notes?.length ? notes(a.notes) : null,
+          up.status === 'downloading'
+            ? h('div.update-progress', h('div.update-bar', h('span', { style: { width: `${Math.round(progress * 100)}%` } })), h('small', up.progress?.total ? `Téléchargement… ${Math.round(progress * 100)} % (${up.progress.done} fichiers sur ${up.progress.total}, ${formatBytes(up.progress.downloaded ?? 0)} reçus)` : 'Préparation du téléchargement…'))
+            : null,
+          up.status === 'installing' ? h('div.update-progress', spinner(18), h('small', 'Installation…')) : null,
+          up.status === 'error' ? h('p.update-error', up.error) : null,
+          up.status === 'available' || up.status === 'error' ? button('Télécharger', { block: true, onClick: () => up.download() }) : null,
+          up.status === 'ready'
+            ? [button('Installer maintenant', { block: true, onClick: () => up.install() }), h('p.update-hint', 'Orion redémarre sur la nouvelle version ; vos données et réglages sont conservés.')]
+            : null,
+        );
+      } else {
+        card = h(
+          'div.update-card.center',
+          h('div.update-logo', logo(56)),
+          h('strong', `Orion OS ${up.installed.version}`),
+          up.status === 'checking'
+            ? h('p', spinner(16), ' Recherche de mises à jour…')
+            : up.status === 'error'
+              ? h('p.update-error', up.error)
+              : h('p', up.lastCheck ? 'Votre logiciel est à jour.' : 'Aucune vérification pour le moment.'),
+          button('Rechercher des mises à jour', { variant: 'tinted', block: true, disabled: busy, onClick: () => up.check() }),
+        );
+      }
+      return [
+        card,
+        up.lastCheck ? h('p.update-checked', `Dernière vérification : ${relativeTime(up.lastCheck, Date.now())}`) : null,
+        listGroup({
+          items: [
+            toggleRow('Téléchargement automatique', 'updates.autoDownload', { subtitle: 'Télécharger les nouvelles versions dès leur publication' }),
+            toggleRow('Installation automatique', 'updates.autoInstall', { subtitle: 'Installer une version téléchargée quand l\'appareil se verrouille' }),
+          ],
+        }),
+        listGroup({
+          header: `Nouveautés d'Orion OS ${up.installed.version}`,
+          items: [h('div.list-item.update-current', notes(up.installed.notes))],
+          footer: `Build ${up.installed.build}${up.installed.date ? ` du ${new Date(up.installed.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.`,
+        }),
+      ];
+    }, { back: 'Général' });
+    p.updates = true;
+    // Pas de vérification récente : on en lance une en ouvrant la page.
+    if (Date.now() - up.lastCheck > 60_000 && !['downloading', 'ready', 'installing'].includes(up.status)) up.check();
+  }
+
   // ───────────── Appareil photo ─────────────
 
   function cameraPage() {
@@ -912,6 +975,7 @@ export function mount(root, ctx) {
       listGroup({
         items: [
           row({ title: 'Informations', chevron: true, onClick: aboutPage }),
+          row({ title: 'Mise à jour logicielle', detail: ['available', 'ready'].includes(ui.updates?.status) ? h('span.update-badge', '1') : null, chevron: true, onClick: updatesPage }),
           row({ title: 'Langue et région', detail: 'Français (France)' }),
           toggleRow('Format 24 heures', 'use24h'),
         ],
@@ -1102,7 +1166,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;
@@ -1120,6 +1184,10 @@ export function mount(root, ctx) {
     }),
   );
   ctx.on('destroy', () => offs.forEach((off) => off()));
+  // Mises à jour : la page suit la vérification et le téléchargement en direct.
+  ctx.subscribe('update:change', () => {
+    if (nav.top?.updates || nav.depth === 1) nav.top?.onShow?.();
+  });
   // Mode développeur verrouillé : ses sous-pages se ferment, sa page redemande le mot de passe.
   ctx.subscribe('developer:lock', async () => {
     while (nav.top?.developer) await nav.pop({ animated: false });

@@ -32,13 +32,14 @@ import { TelephonyService } from './telephony.js';
 import { DeviceService } from './device.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
+import { RELEASE } from './version.js';
 
 export const OS = Object.freeze({
   name: 'Orion OS',
-  version: '1.0.0',
-  codename: 'Andromède',
-  build: 'OR1A.261020.001',
-  kernel: 'orion-kernel 1.0.0-js',
+  version: RELEASE.version,
+  codename: RELEASE.codename,
+  build: RELEASE.build,
+  kernel: `orion-kernel ${RELEASE.version}-js`,
 });
 
 /**

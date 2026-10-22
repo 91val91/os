@@ -437,3 +437,119 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Mise à jour logicielle */
+
+.update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 4px 16px 10px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.update-card.center {
+  align-items: center;
+  text-align: center;
+}
+
+.update-card.center p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--fg-2);
+}
+
+.update-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.update-head strong,
+.update-card.center strong {
+  display: block;
+  font-size: 1.15rem;
+}
+
+.update-head span {
+  font-size: .85rem;
+  color: var(--fg-2);
+}
+
+.update-logo {
+  display: grid;
+  place-items: center;
+}
+
+.update-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: .92rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.update-current {
+  display: block;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--fg-2);
+}
+
+.update-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.update-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width .3s;
+}
+
+.update-error {
+  margin: 0;
+  color: var(--red);
+  font-size: .9rem;
+}
+
+.update-hint,
+.update-checked {
+  margin: 0;
+  font-size: .82rem;
+  color: var(--fg-2);
+}
+
+.update-checked {
+  margin: 0 32px 18px;
+}
+
+.update-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--red);
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+}

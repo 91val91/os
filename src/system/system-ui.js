@@ -29,6 +29,7 @@ import { SetupWizard } from './setup.js';
 import { PowerManager, logo } from './power.js';
 import { platform } from './platform.js';
 import { DeveloperMode } from './developer.js';
+import { UpdateManager } from './updates.js';
 
 const LAYERS = ['wallpaper', 'home', 'drawer', 'windows', 'recents', 'navbar', 'lock', 'system', 'setup', 'shade', 'controlCenter', 'statusbar', 'banners', 'dialogs', 'hud', 'toasts', 'filters', 'boot', 'off'];
 const SCREEN_W = 393;
@@ -162,6 +163,7 @@ export class SystemUI {
     this.#syncAccount();
     this.developer = new DeveloperMode(this);
     this.developer.migrate();
+    this.updates = new UpdateManager(this);
     await this.#watchOtherAlarms();
 
     const k = this.kernel;
@@ -217,6 +219,7 @@ export class SystemUI {
       this.setState('home');
     }
     this.#prefetchApps();
+    this.updates.start();
   }
 
   /** Le nom du compte et celui des réglages (utilisé par les apps) restent identiques. */

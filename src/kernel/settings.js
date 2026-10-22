@@ -48,6 +48,10 @@ export const DEFAULT_SETTINGS = {
   'camera.mirror': true, // selfies enregistrés comme dans le viseur
   'camera.shutterSound': true,
   'camera.preserve': false, // garde mode, filtre et caméra d'une ouverture à l'autre
+  // Mises à jour du système
+  'updates.autoDownload': true, // télécharger dès qu'une version est publiée
+  'updates.autoInstall': false, // installer quand l'appareil se verrouille
+  'updates.lastCheck': 0,
   // Développeur (le mot de passe du mode développeur est enregistré avec les comptes)
   animScale: 1,
   showTouches: false,

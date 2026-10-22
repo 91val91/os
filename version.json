@@ -1,0 +1,454 @@
+{
+ "version": "1.1.0",
+ "build": "OR1A.261022.001",
+ "codename": "Andromède",
+ "date": "2026-10-22",
+ "notes": [
+  "Mises à jour du système : vérification, téléchargement des seuls fichiers modifiés et installation au redémarrage, automatiques si vous le souhaitez.",
+  "Comptes utilisateurs : chacun ses apps, fichiers, réglages et code, changement d'utilisateur depuis l'écran verrouillé.",
+  "Nouvelles icônes des applications, dessinées pour Orion.",
+  "Réglages de l'appareil photo : format, qualité, retardateur, grille, miroir.",
+  "Mode développeur protégé par un mot de passe d'appareil ; le Terminal n'est plus visible ailleurs.",
+  "Les applications n'ont plus accès aux fichiers système.",
+  "Plus de contacts, d'événements ni de conversations de démonstration."
+ ],
+ "size": 1040422,
+ "files": {
+  "./index.html": {
+   "hash": "f9d4f229927b0cc1d774193c2f76d1aece0576d17c916bc3a500fd5cd1781a06",
+   "size": 1214
+  },
+  "./manifest.webmanifest": {
+   "hash": "8d7eaf176613a24701164d37926c833abc4a214e4d1fee36f2ec2dbbc7f4c71c",
+   "size": 819
+  },
+  "./assets/icon-192.png": {
+   "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
+   "size": 23327
+  },
+  "./assets/icon-512.png": {
+   "hash": "9a297eb9f18873559a10b566da92511892e5c67d130af6b86dfbd92b848dc14d",
+   "size": 141034
+  },
+  "./assets/icon-maskable-512.png": {
+   "hash": "fefa0e8cd6768cc09b8628f20d8c6dc14391562c6bb1198133bbf3700f0d11ce",
+   "size": 77453
+  },
+  "./assets/icon.svg": {
+   "hash": "ebb1edb49d4628e2aaf6b2037a0b86d9562342130cfab8b15e5d6f1aab2bd603",
+   "size": 824
+  },
+  "./src/apps/browser/index.js": {
+   "hash": "335d4cee1869441c51a73c291db78af62574bb58adec6462202a9101f258e424",
+   "size": 8186
+  },
+  "./src/apps/browser/style.css": {
+   "hash": "7dd44ddc8c28118b1957ca9a4f1311b158db701598604bac45c167e675a5f730",
+   "size": 2771
+  },
+  "./src/apps/calculator/index.js": {
+   "hash": "8e3711d782787d585ca726fb3dd9786db9119f9c6b8219d63145e8bb0947b0da",
+   "size": 8195
+  },
+  "./src/apps/calculator/style.css": {
+   "hash": "66b7a6f12a5d739d3179935b7084b5c8024392d3b87e961a7d0364f0db1376dd",
+   "size": 3631
+  },
+  "./src/apps/calendar/index.js": {
+   "hash": "acb649d84dab75cc6e25200547b56a96b583039c426bc4cf395b36b566009b65",
+   "size": 8956
+  },
+  "./src/apps/calendar/style.css": {
+   "hash": "1f2e43ea7a675bf575b926ee0ed43339f73cef3ba99058dcd7209af71bceb9b5",
+   "size": 3275
+  },
+  "./src/apps/camera/index.js": {
+   "hash": "c275d40730ca1697c59abf54ef3350ed82119792953505fd92d726006c194f81",
+   "size": 13518
+  },
+  "./src/apps/camera/style.css": {
+   "hash": "e4053612ef1503e49845584a15db0122b054b0e190979845bc34629711f60e88",
+   "size": 4461
+  },
+  "./src/apps/clock/index.js": {
+   "hash": "e25439e7ccdc6fa4f7e80996e8d05542efb74f3e38abb5462f50ac6ffa6d613a",
+   "size": 15519
+  },
+  "./src/apps/clock/style.css": {
+   "hash": "47708862b805115c4bb6ad7d5d09c1fffa441ed6b3d5cbb028524c625da0386f",
+   "size": 3434
+  },
+  "./src/apps/contacts/index.js": {
+   "hash": "0fc8fd34fb11651090de631d2b056035fad2c81aa3a15de056e101f468ed9d6f",
+   "size": 8337
+  },
+  "./src/apps/contacts/style.css": {
+   "hash": "8c8ecb6dd7c0e53185461ffe713484a4921b6a8bdfd48b9e979483f12e230557",
+   "size": 1495
+  },
+  "./src/apps/files/index.js": {
+   "hash": "bdb04e54977b1ea3474fd3f3d32da2fa67e3d20dccda5bcdfece2df3db3d8ee2",
+   "size": 11814
+  },
+  "./src/apps/files/style.css": {
+   "hash": "bfa711524cac8a8952fe0915ac1d370e68ca1ce20c4713c78553b5a445b2c219",
+   "size": 1098
+  },
+  "./src/apps/game2048/index.js": {
+   "hash": "7d4cc6bf0970d34cc96c5e61e0796c7fc51d3213117760e6498ce743ea57c4ab",
+   "size": 3698
+  },
+  "./src/apps/game2048/logic.js": {
+   "hash": "8ec9b2b7d6c576c5af9b2799804663caebb356a5ebb4a3277a432e319f45f81b",
+   "size": 2090
+  },
+  "./src/apps/game2048/style.css": {
+   "hash": "122584d269ea2131c4c19829d906ee8311fd5ba0cb8d1e975b060645a37c0a89",
+   "size": 2773
+  },
+  "./src/apps/messages/index.js": {
+   "hash": "9a4ad04612abfc545406fd10c3aa02626c28f2c0d27dfbd986b513de311c0784",
+   "size": 11169
+  },
+  "./src/apps/messages/style.css": {
+   "hash": "8bc2239b35761be47f0d2560c365404a064db588412cb7b42e2b560c32d0be6b",
+   "size": 5152
+  },
+  "./src/apps/music/index.js": {
+   "hash": "f5032ff672701d64bf0c906a766b57fbb783ad9c80bb579a049c5a81f244fdc4",
+   "size": 11745
+  },
+  "./src/apps/music/style.css": {
+   "hash": "ad206b87de01c33ea254771c2b8fe036e21b82a84f6918483e52f652af232a60",
+   "size": 3283
+  },
+  "./src/apps/music/synth.js": {
+   "hash": "1873733e5b6154981fcf939259d84372d794d419d13bbf154e8d98af6ab5df74",
+   "size": 8034
+  },
+  "./src/apps/notes/index.js": {
+   "hash": "285ce53663dd248fd4241b4a8855fd4737feb72510b05df3dd3b302d86366916",
+   "size": 6705
+  },
+  "./src/apps/notes/style.css": {
+   "hash": "9603ca5f014dad375804476246a1a9f2c1d272a86499b71e334adf06445436cb",
+   "size": 1257
+  },
+  "./src/apps/paint/index.js": {
+   "hash": "b20ea188ebe52d8ca9e80af84075ce267df0b1d367f68da6f7a37f3af1a83866",
+   "size": 6472
+  },
+  "./src/apps/paint/style.css": {
+   "hash": "c5b63890ce8795090140c5801812f2731d066f6acf4e68fc6e9e05aa6a7c17e3",
+   "size": 1233
+  },
+  "./src/apps/phone/index.js": {
+   "hash": "b438d7cdfb00da127c36c0e57e639fbd149b422cb5709788c0612e12e4144fb3",
+   "size": 10402
+  },
+  "./src/apps/phone/style.css": {
+   "hash": "7196ffcd12234d97cb32cd3dcec062a069eb0829bb20396f639e94aff3212d19",
+   "size": 2172
+  },
+  "./src/apps/photos/index.js": {
+   "hash": "8c4e0ba4ec49a3ad91ffae47211477564f5c4e8e0b9c12c6ad811ee398dacbc2",
+   "size": 11128
+  },
+  "./src/apps/photos/style.css": {
+   "hash": "652c339e4d26cb1b4f90e8693adcc5b42ba54658b85376ea465158a3a8d5740a",
+   "size": 2755
+  },
+  "./src/apps/recorder/index.js": {
+   "hash": "e25ac0e665f7dcd8c0675bf106fb664dc199e1e604dffe8680a170a016e7a983",
+   "size": 7419
+  },
+  "./src/apps/recorder/style.css": {
+   "hash": "467b39122e38f0d48e6b29a26a2407fe5ba9ec679de4211d2f332312c4bed7ea",
+   "size": 1078
+  },
+  "./src/apps/registry.js": {
+   "hash": "c7fcf6d61e34bd9ed9fbc535fb4995ffbe846c50bd9ddf9fc015aa05fa6f69ce",
+   "size": 8379
+  },
+  "./src/apps/settings/index.js": {
+   "hash": "a6d822855b3527a7395ba6261111428de0408f6ab15b868320d64439ffffbd34",
+   "size": 60596
+  },
+  "./src/apps/settings/style.css": {
+   "hash": "9f80a24afadfb131d10f1ed72788ed55f3b7ac208881e73276291a21326f5977",
+   "size": 8607
+  },
+  "./src/apps/snake/index.js": {
+   "hash": "b3fb224253a05a9a97646c80f7a2e3f925dd83953fa78cf2ea3a52022edde337",
+   "size": 5397
+  },
+  "./src/apps/snake/style.css": {
+   "hash": "868dc1788c0f10fc054b14b6432c1c0a7b495278d65394cae3d17e61988d6432",
+   "size": 1368
+  },
+  "./src/apps/store/index.js": {
+   "hash": "72d3ded20dc6431d19c2c3fdca85c0796d6113d991089ced1adb9294977da354",
+   "size": 9298
+  },
+  "./src/apps/store/style.css": {
+   "hash": "da7cdb71a9f5061740463b45138139cd4ae2bd59c2fb39a89f5bd593f2e43dcc",
+   "size": 3376
+  },
+  "./src/apps/terminal/index.js": {
+   "hash": "2325e590d03bc058bcc1812a2667c08adf001add69c35c6a52fa196e3c177b07",
+   "size": 6474
+  },
+  "./src/apps/terminal/style.css": {
+   "hash": "7e4af1b2494d540e57d6e783048d906d8817d024c76f224bb9bdf118aa9b4d53",
+   "size": 1159
+  },
+  "./src/apps/weather/index.js": {
+   "hash": "407b2c5e967ebdb1da53e896e8b1bb20c7e00060781a655dbacd9a079a4ca557",
+   "size": 14293
+  },
+  "./src/apps/weather/style.css": {
+   "hash": "a6f0d05135897c36f854e615418b797e320abd9889fec214928afe90d9bb6fad",
+   "size": 4113
+  },
+  "./src/kernel/accounts.js": {
+   "hash": "5d89e3167eb0b3c86d9c8668d6e748d85e3bb803c8cf87e89407b67e4079a01c",
+   "size": 7980
+  },
+  "./src/kernel/alarms.js": {
+   "hash": "9113361c3521b2db198fca328e87b70d86ef2d1be93f33cf46376ab829a440ec",
+   "size": 5628
+  },
+  "./src/kernel/chatbot.js": {
+   "hash": "4cbefe1f50a940bc5f4c91e9c7f5a22bd38fa28e2bd54057730555b95e17bc43",
+   "size": 2150
+  },
+  "./src/kernel/contacts.js": {
+   "hash": "c2e4a36633a3aada3e2132839118b321b6c84db2816ee96b180eee004316b094",
+   "size": 3611
+  },
+  "./src/kernel/device.js": {
+   "hash": "cc5fd2b641d7c18c7df0b6f6666bf7140ff9d24c3cdb70d2146a2e26525f2f71",
+   "size": 4245
+  },
+  "./src/kernel/events.js": {
+   "hash": "692c2025fa12d666167744a53a6b1d28f7af061bb0fabcadf97db8fa01a7188c",
+   "size": 1111
+  },
+  "./src/kernel/intents.js": {
+   "hash": "eae60ea03506a4210624ebd7d4f72edb1ca05fbc6e0a8ec8bc28cd4df8e581b1",
+   "size": 3972
+  },
+  "./src/kernel/kernel.js": {
+   "hash": "bc6085220fb0654298ee8f2a67d3ce921ef2cff133b3c23361fcf949ba050a5c",
+   "size": 6562
+  },
+  "./src/kernel/log.js": {
+   "hash": "e4944db860b8fd5be6a1c7eb729f6894d2f825d42c1ec6bd6e7b6a1fb20dd4c9",
+   "size": 1630
+  },
+  "./src/kernel/media.js": {
+   "hash": "f50db07a450900ffc7f16241797bbfae88139da388ffcfaf6060975304dfa20c",
+   "size": 1381
+  },
+  "./src/kernel/notifications.js": {
+   "hash": "b5e2a6ef3556a360b07ca347164413c5af32de02b3a8763ab93a118ae2ee8a92",
+   "size": 3111
+  },
+  "./src/kernel/packages.js": {
+   "hash": "4e88bce8821de34d72ec0ba392b7f300bb01b7005015b7ef0b4d870390efe2fd",
+   "size": 3320
+  },
+  "./src/kernel/permissions.js": {
+   "hash": "4e2da9e4ac8e4d88e8b0e950f90b8ffb323ebb311bf506dae3a36c49c60c1c5a",
+   "size": 3205
+  },
+  "./src/kernel/processes.js": {
+   "hash": "d6ec4418e32d916ea282bf11a14c126b4fa11db6e2cd8ce114ded4e4d385cf85",
+   "size": 3509
+  },
+  "./src/kernel/seed.js": {
+   "hash": "af626be1735b9ec7f3caf2651d22a7a94ce0b9e2b4d915c5e6a49741d735d454",
+   "size": 3209
+  },
+  "./src/kernel/settings.js": {
+   "hash": "d001b18c37091781e37031143bea8c0a8899bb0b57020b2b36f7b1571f4a4cfd",
+   "size": 4386
+  },
+  "./src/kernel/shell.js": {
+   "hash": "7e4c83f579240058e8b9e61b28dc61202d6933fc24bca9f979014ca0e39aee0f",
+   "size": 42706
+  },
+  "./src/kernel/storage.js": {
+   "hash": "7c7e48a64f97c3e9edd03c6e492377316e3ef24e840fabe47ce5d6730c969f87",
+   "size": 5861
+  },
+  "./src/kernel/telephony.js": {
+   "hash": "5a2c7cf83d425cba9202aa50be0d380e9396b77a782a02eaac2555a5d0c6f60c",
+   "size": 10870
+  },
+  "./src/kernel/version.js": {
+   "hash": "cb68f6fd2cf66baba7075466768806b3757bad98cb6d7907d44f236ae89352ff",
+   "size": 1114
+  },
+  "./src/kernel/vfs.js": {
+   "hash": "19df090249b8104446ec5a18a2540d5f99b123dd77a96d1db779918202ff54b5",
+   "size": 12371
+  },
+  "./src/lib/artwork.js": {
+   "hash": "58821c67ff142f202de09af6dc6d7f3775e75e2c3a937a7a22cdbab69ceecd61",
+   "size": 4480
+  },
+  "./src/lib/dom.js": {
+   "hash": "af7fb86b67fd1dad14970839d9250077f392b683f56d97bfa57b446f95ad0197",
+   "size": 4124
+  },
+  "./src/lib/expr.js": {
+   "hash": "e313eb246571bde20da13a8ee359f650d0c770334f98c8dc89e9c569855ea525",
+   "size": 7624
+  },
+  "./src/lib/format.js": {
+   "hash": "7029c7faf65382fbce1a9ffefb223adea4c3cb37796e67459ea4f8758d6844e2",
+   "size": 2937
+  },
+  "./src/lib/gesture.js": {
+   "hash": "dc7594705042fe62c2a4cde3fed66aad9bba291cb69c09e0f6888cfb5537d005",
+   "size": 5648
+  },
+  "./src/lib/icons.js": {
+   "hash": "7f001f992feca2af402e813e7b31b0e37381c1026974129e01dc34c8534cd09c",
+   "size": 20584
+  },
+  "./src/lib/sha256.js": {
+   "hash": "f55e6423475871b2907969a623126156fd8b30dc1788dcd2049cd5e29e9ab51e",
+   "size": 2109
+  },
+  "./src/lib/ui.js": {
+   "hash": "5708eabbf3f80a3544de454c6b8b9d485aaa3a845e6a0350b493d2ad9378a426",
+   "size": 14596
+  },
+  "./src/lib/weather-codes.js": {
+   "hash": "e8e61bb494722e3835a0de42c875eb4d2966630249645efd432d98c4299e774a",
+   "size": 1393
+  },
+  "./src/main.js": {
+   "hash": "1ae6d64d3a398824012cea24261618aa1a45aa9dfed877ac6e7b41e581c1653f",
+   "size": 773
+  },
+  "./src/styles/base.css": {
+   "hash": "c080dca3381d68d0c026791170d3987175edd6ecf63dbd5bc207853e04337155",
+   "size": 8648
+  },
+  "./src/styles/kit.css": {
+   "hash": "f7156f8fdacdcefcaed8ef0905420f55deb63873f867598579b411c7ef2e6da1",
+   "size": 13635
+  },
+  "./src/styles/system.css": {
+   "hash": "8462bb7f1e4510c48926e4a6f60fc8b04ceef21d05dcf1d91c767e122847f83e",
+   "size": 51518
+  },
+  "./src/system/alarm-screen.js": {
+   "hash": "59255c094d3012ef1fc95cfb41231f6d67fbb7c8cd1715dd66fadc85fe6b3133",
+   "size": 3642
+  },
+  "./src/system/app-art.js": {
+   "hash": "e217f5aeab4dc352d6b8fea3ecc52bd8f5f2652126d676a2e10777b2ff96daa3",
+   "size": 18641
+  },
+  "./src/system/app-context.js": {
+   "hash": "e1bf014a978c2a658e6364646aed24fac748e12e41871991f703b22dc5f4fe86",
+   "size": 6034
+  },
+  "./src/system/app-icon.js": {
+   "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
+   "size": 4624
+  },
+  "./src/system/banners.js": {
+   "hash": "563899c6c61665d7d4f42df91761ee2c08ff81f019b4a3de78faff4cf749a9fe",
+   "size": 2962
+  },
+  "./src/system/call-screen.js": {
+   "hash": "0565dd492610ed94e1068ea9375845e7ad29a5085beaa75619b786da1340b1e8",
+   "size": 6355
+  },
+  "./src/system/control-center.js": {
+   "hash": "4c2791a5a0a63a1f5058c583741dce0d7047b8250ec85fdc7a582e81ec6ac430",
+   "size": 5998
+  },
+  "./src/system/developer.js": {
+   "hash": "c60a6e4c768a3a9980f4b45521e6c364f42bc1dc909024bd5dd786309bb73d8b",
+   "size": 4810
+  },
+  "./src/system/dialogs.js": {
+   "hash": "5df18a5229c183c8f9defcf3fa6c1ffd7e9f069d7d8a98a097de82f83c009e06",
+   "size": 7793
+  },
+  "./src/system/drawer.js": {
+   "hash": "abe1af9237983eb22c0d0fc4dcdec7fff37e8c1989c60b74638a635fe482f433",
+   "size": 9014
+  },
+  "./src/system/home.js": {
+   "hash": "54d79199a49ab5755a2d3e9c47f1ab20703066eb1a5f2a18b6cf0ae6c8f4640b",
+   "size": 20575
+  },
+  "./src/system/lockscreen.js": {
+   "hash": "86a3d55bc07ac0a15afa6bfbc4f74f2de19c630ab56840e043b71d2b6ddbb8b3",
+   "size": 10984
+  },
+  "./src/system/navigation.js": {
+   "hash": "1a3f29558747887846d869947e7361f51ee9b2d3939abee46be47555f00702fe",
+   "size": 6581
+  },
+  "./src/system/platform.js": {
+   "hash": "b5c37c8af27e63e3be4aca6e48063fe0b6f76d82cb5186dc1c8373a3faf0cbe3",
+   "size": 1269
+  },
+  "./src/system/power.js": {
+   "hash": "3595dea1a9279bd3861d92d8dcc0e471c34dca6a896e94d7bf281bcf6874bf56",
+   "size": 5441
+  },
+  "./src/system/pull-panel.js": {
+   "hash": "ca2c38c61accdf51702820f2dea5aa767723cb7958ac69bf634b49ba32e3b424",
+   "size": 2427
+  },
+  "./src/system/quick-settings.js": {
+   "hash": "40921fb2b8bafc7b299555d7c37f9f35ddbf0223547e26a84ab8de1740428cdf",
+   "size": 2397
+  },
+  "./src/system/setup.js": {
+   "hash": "95929a85679e4099bdd4a0a2f6a6e18b1e8d1a42703f0bef46ad572648fd0b31",
+   "size": 11905
+  },
+  "./src/system/shade.js": {
+   "hash": "fff8f97c24bb72c685e93c0446b26b2678a29525c6d41f989b5aad88adbd56a3",
+   "size": 6616
+  },
+  "./src/system/sound.js": {
+   "hash": "970b21eeb27687997ba44c2d283b52a21b6e92fc08ea78ce1b471ada0ac50ed8",
+   "size": 5956
+  },
+  "./src/system/statusbar.js": {
+   "hash": "cac95f3c2501825aeb9891ee180a2645e799129e979c5b6c0081f742fa7d4d21",
+   "size": 4681
+  },
+  "./src/system/system-ui.js": {
+   "hash": "859c6177c6c5a7d8d9c23d28280fb54d593db6baef89bbc26cc04514b6eced79",
+   "size": 26710
+  },
+  "./src/system/theme.js": {
+   "hash": "99c6e8f2aebd4204d53844df1bc0b4d30a6574766e529b237d5238742d01a618",
+   "size": 2235
+  },
+  "./src/system/updates.js": {
+   "hash": "87f67926ce1c23e236a07574b65f1d4fdbf4fb773c14efa100bcdd7d8281a230",
+   "size": 7309
+  },
+  "./src/system/wallpapers.js": {
+   "hash": "dffd49888bdd864365f125ecf38eaba8d4e8d75fa45382a0972822c2ca9bf6f9",
+   "size": 2843
+  },
+  "./src/system/window-manager.js": {
+   "hash": "fd0f96aa7d9061ed96801a6483c6d0cba9495ee506be23e1733911c6fd448f58",
+   "size": 21633
+  }
+ }
+}
