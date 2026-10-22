@@ -1,0 +1,76 @@
+# Paquets de l'image Orion OS (Debian 12 « bookworm », amd64).
+# live-boot, live-config et live-config-systemd sont aussi ajoutés par lb config.
+
+# Interface : compositeur Wayland « kiosque » + Chromium plein écran
+cage
+chromium
+chromium-l10n
+libgl1-mesa-dri
+fonts-noto-core
+fonts-noto-ui-core
+fonts-noto-mono
+fonts-noto-color-emoji
+fonts-dejavu-core
+
+# Son (PipeWire, y compris pour les casques Bluetooth)
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+libspa-0.2-bluetooth
+alsa-ucm-conf
+alsa-utils
+
+# Réseau : Wi-Fi et Ethernet (NetworkManager), réseau mobile (ModemManager)
+network-manager
+network-manager-config-connectivity-debian
+wpasupplicant
+wireless-regdb
+iw
+rfkill
+modemmanager
+usb-modeswitch
+ca-certificates
+
+# Bluetooth
+bluez
+bluez-firmware
+
+# GPS (récepteurs USB détectés automatiquement)
+gpsd
+
+# Serveur d'Orion (orion-server)
+python3
+
+# Système
+polkitd
+dbus-user-session
+systemd-timesyncd
+upower
+locales
+keyboard-configuration
+console-setup
+tzdata
+unattended-upgrades
+user-setup
+live-boot
+live-config
+live-config-systemd
+pciutils
+usbutils
+less
+nano
+
+# Micrologiciels (cartes Wi-Fi, Bluetooth, son, graphismes)
+firmware-linux-free
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-libertas
+firmware-sof-signed
+firmware-intel-sound
+firmware-amd-graphics
+intel-microcode
+amd64-microcode

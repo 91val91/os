@@ -1,0 +1,119 @@
+#!/bin/bash
+# Session graphique d'Orion OS : cage (compositeur Wayland « kiosque ») affiche
+# Chromium en plein écran sur l'interface servie par orion-server.
+# Lancé par ~/.bash_profile sur tty1 (connexion automatique de l'utilisateur
+# orion). Si Chromium se ferme ou plante, il est relancé.
+# Journal : journalctl -t orion-kiosk
+set -u
+
+ORION_PORT=8080
+ORION_KIOSK_FLAGS=""
+if [ -r /etc/default/orion ]; then
+	# shellcheck disable=SC1091
+	. /etc/default/orion
+fi
+ORION_URL="http://127.0.0.1:${ORION_PORT}/"
+PROFILE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/orion/chromium"
+mkdir -p "$PROFILE_DIR"
+
+log() {
+	if command -v systemd-cat >/dev/null 2>&1; then
+		printf '%s\n' "$*" | systemd-cat -t orion-kiosk
+	else
+		printf '%s\n' "$*" >&2
+	fi
+}
+
+# Clavier du système (/etc/default/keyboard) pour cage.
+if [ -r /etc/default/keyboard ]; then
+	# shellcheck disable=SC1091
+	. /etc/default/keyboard
+	export XKB_DEFAULT_LAYOUT="${XKBLAYOUT:-fr}"
+	export XKB_DEFAULT_VARIANT="${XKBVARIANT:-}"
+	export XKB_DEFAULT_MODEL="${XKBMODEL:-pc105}"
+	export XKB_DEFAULT_OPTIONS="${XKBOPTIONS:-}"
+fi
+export XDG_SESSION_TYPE=wayland
+# Dans une machine virtuelle, le curseur matériel est souvent invisible.
+if systemd-detect-virt --quiet --vm 2>/dev/null; then
+	export WLR_NO_HARDWARE_CURSORS=1
+fi
+
+FLAGS=(
+	--kiosk
+	"--app=$ORION_URL"
+	--ozone-platform=wayland
+	"--user-data-dir=$PROFILE_DIR"
+	--lang=fr
+	--no-first-run
+	--no-default-browser-check
+	--noerrdialogs
+	--disable-infobars
+	--disable-session-crashed-bubble
+	--hide-crash-restore-bubble
+	"--disable-features=Translate,TranslateUI,OverscrollHistoryNavigation,MediaRouter,DialMediaRouteProvider,HardwareMediaKeyHandling"
+	--overscroll-history-navigation=0
+	--touch-events=enabled
+	--disable-pinch
+	--enable-features=OverlayScrollbar
+	--enable-wayland-ime
+	--autoplay-policy=no-user-gesture-required
+	--password-store=basic
+	--check-for-update-interval=31536000
+	--disable-component-update
+	--disable-background-networking
+)
+if [ -n "$ORION_KIOSK_FLAGS" ]; then
+	read -r -a extra <<<"$ORION_KIOSK_FLAGS"
+	FLAGS+=("${extra[@]}")
+fi
+
+wait_for_server() {
+	local _
+	for _ in $(seq 1 120); do
+		if (exec 3<>"/dev/tcp/127.0.0.1/$ORION_PORT") 2>/dev/null; then
+			return 0
+		fi
+		sleep 0.5
+	done
+	return 1
+}
+
+# Après un arrêt brutal, Chromium proposerait de « restaurer les pages ».
+mark_clean_exit() {
+	local prefs="$PROFILE_DIR/Default/Preferences"
+	if [ -f "$prefs" ]; then
+		sed -i -e 's/"exited_cleanly":[[:space:]]*false/"exited_cleanly":true/' \
+			-e 's/"exit_type":[[:space:]]*"[^"]*"/"exit_type":"Normal"/' "$prefs" || true
+	fi
+}
+
+failures=0
+gpu_flags=()
+while :; do
+	wait_for_server || log "orion-server ne répond pas sur le port $ORION_PORT : lancement quand même"
+	mark_clean_exit
+	started=$(date +%s)
+	log "Lancement de l'interface (${WLR_RENDERER:-rendu matériel})"
+	systemd-cat -t orion-kiosk cage -d -s -- chromium "${FLAGS[@]}" "${gpu_flags[@]}"
+	status=$?
+	elapsed=$(($(date +%s) - started))
+	log "L'interface s'est arrêtée (code $status, après ${elapsed} s)"
+	if [ "$elapsed" -lt 20 ]; then
+		failures=$((failures + 1))
+	else
+		failures=0
+	fi
+	# Cage qui échoue tout de suite : souvent un pilote graphique absent. Rendu logiciel.
+	if [ "$failures" -ge 3 ] && [ -z "${WLR_RENDERER:-}" ]; then
+		log "Échecs répétés : passage au rendu logiciel (pixman)"
+		export WLR_RENDERER=pixman
+		gpu_flags=(--disable-gpu)
+		failures=0
+	fi
+	if [ "$failures" -ge 5 ]; then
+		sleep 30
+	else
+		sleep 2
+	fi
+done

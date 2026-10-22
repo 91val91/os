@@ -1,0 +1,12 @@
+# Réglages d'Orion OS (lus par orion-server, orion-update et orion-kiosk).
+# Après une modification : systemctl restart orion-server (puis redémarrer).
+
+# Port local de l'interface (http://127.0.0.1:<port>/). En cas de changement,
+# adapter aussi les adresses de /etc/chromium/policies/managed/orion.json.
+ORION_PORT=8080
+
+# Adresse de publication des mises à jour (doit contenir version.json).
+ORION_UPDATE_SOURCE=https://91val91.github.io/os/
+
+# Options supplémentaires de Chromium, séparées par des espaces (ex. --force-device-scale-factor=1.5).
+ORION_KIOSK_FLAGS=

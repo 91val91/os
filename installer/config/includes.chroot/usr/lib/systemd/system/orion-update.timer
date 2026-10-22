@@ -1,0 +1,10 @@
+[Unit]
+Description=Orion OS : recherche d'une nouvelle version toutes les 6 heures
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target
