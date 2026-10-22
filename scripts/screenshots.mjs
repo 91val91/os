@@ -91,8 +91,12 @@ try {
   await run(() => window.orion.ui.home.exitEditMode());
   await wait(500);
 
-  // Terminal, Musique, Météo, Store.
-  await run(() => window.orion.ui.launch('terminal'));
+  // Terminal (mode développeur), Musique, Météo, Store.
+  await run(() => {
+    window.orion.kernel.settings.set('developer', true);
+    window.orion.ui.unlockDeveloper();
+    window.orion.ui.launch('terminal');
+  });
   await wait(900);
   for (const command of ['neofetch', 'users']) {
     await page.fill('.term-input', command);

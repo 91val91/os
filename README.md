@@ -4,7 +4,7 @@
 
 Comme Firefox OS ou KaiOS, il est construit sur les technologies du Web : un **noyau JavaScript** gère les processus, le système de fichiers, les paquets, les intents, les notifications, les alarmes, les permissions et une pile téléphonie ; une **interface système** fournit l'écran verrouillé, l'accueil, les gestes, le multitâche ; et **20 applications** sont livrées (dont 4 à installer depuis le Store).
 
-![Écran verrouillé, accueil, centre de contrôle et Messages](docs/screenshots/apercu.jpg)
+![Écran verrouillé, accueil, centre de contrôle et compte](docs/screenshots/apercu.jpg)
 
 ## Démarrage rapide
 
