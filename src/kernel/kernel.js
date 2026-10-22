@@ -45,17 +45,18 @@ export const OS = Object.freeze({
  * @param {object} options
  * @param {object} [options.backend] pilote de stockage (mémoire par défaut)
  * @param {import('./accounts.js').AccountRegistry} [options.accounts] registre des comptes
+ * @param {string} [options.accountId] compte de cette session (le registre peut changer de compte courant)
  * @param {object[]} [options.manifests] manifestes des applications
  * @param {(step: string, progress: number) => void} [options.onProgress]
  */
-export async function bootKernel({ backend = new MemoryBackend(), accounts = null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false } = {}) {
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false } = {}) {
   const log = new SystemLog({ now, echo: echoLog });
   const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
   log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
   log.info('kernel', `stockage : ${backend.kind}`);
   if (accounts) {
     accounts.events = events;
-    log.info('accounts', `${accounts.list().length} compte(s), session de « ${accounts.current?.name || 'nouveau compte'} »`);
+    log.info('accounts', `${accounts.list().length} compte(s), session de « ${accounts.get(accountId)?.name || 'nouveau compte'} »`);
   }
 
   const snapshot = await backend.getAll();
@@ -115,9 +116,13 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     os: OS,
     backend: backend.kind,
     accounts,
-    /** Compte de la session en cours (null sans registre, dans les tests). */
+    /**
+     * Compte de la session en cours (null sans registre, ou s'il a été supprimé
+     * depuis une autre fenêtre). Une autre fenêtre peut changer le compte
+     * courant du registre : cette session reste sur ses propres données.
+     */
     get account() {
-      return accounts?.current ?? null;
+      return accounts?.get(accountId) ?? null;
     },
     firstBoot,
     now,

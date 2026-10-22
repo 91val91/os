@@ -7,8 +7,9 @@ import { h } from '../lib/dom.js';
 import { avatar } from '../lib/ui.js';
 import { viewport } from '../lib/gesture.js';
 import { bootKernel } from '../kernel/kernel.js';
-import { openBestBackend, deleteBackend } from '../kernel/storage.js';
+import { openBestBackend, deleteBackend, Namespace } from '../kernel/storage.js';
 import { openSession, eraseAllAccounts } from '../kernel/accounts.js';
+import { AlarmService } from '../kernel/alarms.js';
 import { MANIFESTS } from '../apps/registry.js';
 import { ThemeManager } from './theme.js';
 import { SoundManager } from './sound.js';
@@ -150,9 +151,10 @@ export class SystemUI {
     if (platform.installed) {
       navigator.storage?.persisted?.().then((persisted) => persisted || navigator.storage.persist()).catch(() => {});
     }
-    this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
+    this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, accountId: session?.account.id, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
     this.#syncAccount();
+    await this.#watchOtherAlarms();
 
     const k = this.kernel;
     this.theme = new ThemeManager(this);
@@ -222,6 +224,33 @@ export class SystemUI {
 
   // ───────────── Comptes ─────────────
 
+  /**
+   * Réveils et minuteurs des autres comptes : ils sonnent aussi pendant cette
+   * session (leurs rappels de calendrier attendent le retour de leur titulaire).
+   */
+  async #watchOtherAlarms() {
+    this.otherAlarms = [];
+    const { accounts, account } = this.kernel;
+    for (const other of accounts?.list() ?? []) {
+      if (other.id === account?.id) continue;
+      try {
+        const backend = await openBestBackend(globalThis, { name: other.db });
+        const service = await new AlarmService({ store: new Namespace(backend, 'alarms'), now: this.kernel.now }).load();
+        this.otherAlarms.push({ account: other, service });
+      } catch (error) {
+        console.warn(`Réveils de ${other.name} indisponibles`, error);
+      }
+    }
+  }
+
+  /** Renonce à un compte tout juste créé et revient à la session qui l'a créé. */
+  async cancelNewAccount(account) {
+    const accounts = this.kernel.accounts;
+    await accounts.remove(account.id);
+    if (accounts.get(account.returnTo)) await accounts.setCurrent(account.returnTo);
+    await this.power.restart('Retour à la session précédente…');
+  }
+
   /** Ouvre la session d'un autre compte (redémarrage sur ses données). */
   async switchAccount(id) {
     const accounts = this.kernel.accounts;
@@ -243,8 +272,9 @@ export class SystemUI {
       await this.power.restart('Suppression du compte…');
       return true;
     }
-    await deleteBackend(globalThis, account.db).catch(() => {});
-    await accounts.forgetRemoved(account.db);
+    this.otherAlarms = this.otherAlarms.filter((entry) => entry.account.id !== id);
+    // Encore ouverte dans une autre fenêtre : elle sera effacée à un prochain démarrage.
+    if (await deleteBackend(globalThis, account.db).catch(() => false)) await accounts.forgetRemoved(account.db);
     return true;
   }
 
@@ -308,6 +338,9 @@ export class SystemUI {
     const k = this.kernel;
     setInterval(() => {
       k.alarms.tick();
+      for (const { account, service } of this.otherAlarms ?? []) {
+        for (const alarm of service.tick(undefined, { kinds: ['alarm', 'timer'] })) this.alarmScreen.ring(alarm, { account, service });
+      }
       k.device.tick();
       this.#checkAutoLock();
     }, 1000);

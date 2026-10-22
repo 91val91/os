@@ -239,7 +239,6 @@ export function mount(root, ctx) {
   window.addEventListener('keydown', onKey);
   ctx.on('destroy', () => {
     window.removeEventListener('keydown', onKey);
-    window.speechSynthesis?.cancel();
   });
 
   return { onIntent: handleIntent };

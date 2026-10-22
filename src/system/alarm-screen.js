@@ -16,7 +16,7 @@ export class AlarmScreen {
   }
 
   start() {
-    this.k.events.on('alarm:fire', (alarm) => this.#fire(alarm));
+    this.k.events.on('alarm:fire', (alarm) => this.ring(alarm));
     this.k.events.on('alarm:change', () => this.#trackTimer());
     this.#trackTimer();
   }
@@ -40,7 +40,11 @@ export class AlarmScreen {
     });
   }
 
-  #fire(alarm) {
+  /**
+   * Fait sonner une alarme. `source` désigne un autre compte de l'appareil
+   * (son nom est affiché, Répéter et Relancer passent par son service).
+   */
+  ring(alarm, source = null) {
     if (alarm.kind === 'reminder') {
       this.k.notifications.post({
         appId: alarm.appId,
@@ -52,6 +56,7 @@ export class AlarmScreen {
     }
     if (this.ringing) this.#stop();
     this.ringing = alarm;
+    this.source = source;
     if (this.ui.state === 'off') this.ui.wake();
     this.ui.sound.startLoop('alarm');
     this.k.device.vibrate([500, 300, 500, 300, 500]);
@@ -70,6 +75,7 @@ export class AlarmScreen {
         h('div.alarm-icon', icon(isTimer ? 'timer' : 'alarm', { size: 40 })),
         h('div.alarm-time', formatTime(this.k.now(), this.k.settings.get('use24h'))),
         h('div.alarm-label', isTimer ? 'Minuteur terminé' : alarm.label || 'Réveil'),
+        this.source ? h('div.alarm-owner', `${isTimer ? 'Minuteur' : 'Réveil'} de ${this.source.account.name}`) : null,
       ),
       h(
         'div.alarm-actions',
@@ -82,20 +88,21 @@ export class AlarmScreen {
   }
 
   #snooze() {
-    this.k.alarms.snooze(this.ringing, 9);
+    (this.source?.service ?? this.k.alarms).snooze(this.ringing, 9);
     this.ui.dialogs.toast('Répétition dans 9 minutes');
     this.#stop();
   }
 
   #repeat() {
     const duration = this.ringing.duration ?? 60_000;
-    this.k.alarms.schedule({ appId: this.ringing.appId, kind: 'timer', at: this.k.now() + duration, duration, label: this.ringing.label });
+    (this.source?.service ?? this.k.alarms).schedule({ appId: this.ringing.appId, kind: 'timer', at: this.k.now() + duration, duration, label: this.ringing.label });
     this.#stop();
   }
 
   #stop() {
     this.ui.sound.stopLoop('alarm');
     this.ringing = null;
+    this.source = null;
     this.el.classList.remove('visible');
   }
 

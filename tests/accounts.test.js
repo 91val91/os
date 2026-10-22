@@ -80,8 +80,38 @@ test('session : chaque compte a ses propres données, effacées avec lui', async
   assert.ok(!localStorage.keys().some((key) => key.startsWith(guest.db)), 'données du compte effacées');
   assert.ok(localStorage.keys().includes('orion:fs:/home'));
 
+  // Réinitialisation : les autres comptes, les bases orphelines et le registre sont effacés ;
+  // la base du propriétaire est vidée à part (kernel.factoryReset), pas supprimée.
+  localStorage.setItem('orion-os-uperdu:fs:/home', 'orphelin');
   await eraseAllAccounts(fourth.registry, env);
-  assert.deepEqual(localStorage.keys(), [], 'réinitialisation : tout est effacé');
+  assert.deepEqual(localStorage.keys(), ['orion:fs:/home']);
+});
+
+test('registre : deux fenêtres d\'Orion ne s\'écrasent pas', async () => {
+  const backend = new MemoryBackend();
+  // Verrou partagé entre fenêtres, comme navigator.locks dans le navigateur.
+  let chain = Promise.resolve();
+  const locks = { request: (name, fn) => (chain = chain.then(fn, fn)) };
+  const open = () => new AccountRegistry({ store: new Namespace(backend, 'accounts'), locks }).load();
+  const a = await open();
+  a.create({ name: 'Camille', owner: true });
+  await flush();
+  const b = await open();
+  // Fenêtre B : ajout de Bob ; fenêtre A (pas rechargée) : simple mise à jour de son profil, en même temps.
+  b.create({ name: 'Bob' });
+  a.update('owner', { lastLogin: 42 });
+  await flush();
+  const c = await open();
+  assert.deepEqual(c.list().map((x) => x.name), ['Camille', 'Bob'], 'Bob n\'est pas perdu');
+  assert.equal(c.get('owner').lastLogin, 42);
+  assert.equal(a.list().length, 2, 'la fenêtre A a relu le registre');
+
+  // B supprime Bob ; une mise à jour tardive de Bob depuis A ne le ressuscite pas.
+  const bob = c.list()[1];
+  await b.remove(bob.id);
+  await a.update(bob.id, { name: 'Bob 2' });
+  await flush();
+  assert.deepEqual((await open()).list().map((x) => x.name), ['Camille']);
 });
 
 test('noyau : compte de la session et événement de changement', async () => {

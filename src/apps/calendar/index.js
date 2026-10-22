@@ -23,7 +23,9 @@ const fromKey = (key) => {
 export function mount(root, ctx) {
   // Les événements de démonstration des premières versions sont retirés.
   const stored = ctx.storage.get('events', []);
-  let events = stored.filter((e) => DEMO_EVENTS[e.id] !== e.title);
+  const isDemo = (e) => DEMO_EVENTS[e.id] === e.title;
+  for (const e of stored) if (isDemo(e) && e.reminderId) ctx.alarms.cancel(e.reminderId);
+  let events = stored.filter((e) => !isDemo(e));
   if (events.length !== stored.length) ctx.storage.set('events', events);
 
   const today = new Date();

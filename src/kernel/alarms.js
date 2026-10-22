@@ -145,11 +145,12 @@ export class AlarmService {
     });
   }
 
-  tick(now = this.now()) {
+  /** @param {{ kinds?: string[] }} [options] types à traiter (les autres attendent) */
+  tick(now = this.now(), { kinds = null } = {}) {
     const fired = [];
     let changed = false;
     for (const alarm of [...this.#alarms]) {
-      if (!alarm.enabled || alarm.at > now) continue;
+      if (!alarm.enabled || alarm.at > now || (kinds && !kinds.includes(alarm.kind))) continue;
       fired.push({ ...alarm });
       changed = true;
       if (alarm.kind === 'alarm' && alarm.days?.length) {

@@ -34,7 +34,7 @@ export function mount(root, ctx) {
 
   const accounts = k.accounts;
   /** Compte de la session (profil minimal si les comptes sont indisponibles). */
-  const me = () => k.account ?? { id: null, name: s.get('userName'), email: '', color: s.get('accent'), photo: null, owner: true, createdAt: null };
+  const me = () => k.account ?? { id: null, name: s.get('userName'), email: '', color: s.get('accent'), photo: null, owner: !accounts, createdAt: null };
   const accountAvatar = (a, size) => avatar(a.name || '?', { size, color: a.color, photo: a.photo });
   const row = (opts) => listItem(opts);
   const toggleRow = (title, key, { icon: iconName, color, subtitle, invert = false, onChange } = {}) => {
@@ -257,8 +257,11 @@ export function mount(root, ctx) {
     if (!name) return;
     const account = accounts.create({ name });
     refresh();
-    if (await ctx.ui.confirm({ title: `Passer à ${name} maintenant ?`, message: 'La configuration de son compte va commencer.', confirmLabel: 'Changer' })) ui.switchAccount(account.id);
-    else ctx.ui.toast(`${name} a été ajouté`);
+    if (await ctx.ui.confirm({ title: `Passer à ${name} maintenant ?`, message: 'La configuration de son compte va commencer.', confirmLabel: 'Changer' })) {
+      // L'assistant du nouveau compte pourra être annulé pour revenir ici.
+      accounts.update(account.id, { returnTo: me().id });
+      ui.switchAccount(account.id);
+    } else ctx.ui.toast(`${name} a été ajouté`);
   }
 
   async function removeUser(a) {

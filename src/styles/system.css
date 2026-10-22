@@ -2346,6 +2346,12 @@ html.android body.fullscreen .edge-zone {
   color: rgba(255, 255, 255, .8);
 }
 
+.alarm-owner {
+  margin-top: 6px;
+  font-size: .95rem;
+  color: rgba(255, 255, 255, .6);
+}
+
 .alarm-actions {
   display: flex;
   flex-direction: column;

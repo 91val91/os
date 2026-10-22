@@ -150,20 +150,22 @@ export async function openBestBackend(env = globalThis, { name = 'orion-os' } = 
   return new MemoryBackend();
 }
 
-/** Efface une base, quel que soit le pilote qui l'a créée. */
+/**
+ * Efface une base, quel que soit le pilote qui l'a créée. Renvoie false si
+ * elle est encore ouverte ailleurs : l'effacement aura lieu à sa fermeture.
+ */
 export async function deleteBackend(env = globalThis, name) {
   try {
     if (env.localStorage) await new LocalStorageBackend(env.localStorage, prefixFor(name)).clear();
   } catch {
     /* stockage indisponible */
   }
-  if (!env.indexedDB) return;
-  await new Promise((resolve, reject) => {
+  if (!env.indexedDB) return true;
+  return new Promise((resolve, reject) => {
     const req = env.indexedDB.deleteDatabase(name);
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => resolve(true);
     req.onerror = () => reject(req.error);
-    // Encore ouverte quelque part : elle sera effacée dès sa fermeture.
-    req.onblocked = () => resolve();
+    req.onblocked = () => resolve(false);
   });
 }
 

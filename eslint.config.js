@@ -14,7 +14,7 @@ export default [
         requestAnimationFrame: 'readonly', cancelAnimationFrame: 'readonly', queueMicrotask: 'readonly',
         performance: 'readonly', structuredClone: 'readonly', fetch: 'readonly', URL: 'readonly', URLSearchParams: 'readonly',
         AbortController: 'readonly', Blob: 'readonly', FileReader: 'readonly', Audio: 'readonly', Node: 'readonly',
-        TextEncoder: 'readonly', MediaRecorder: 'readonly', ResizeObserver: 'readonly', SpeechSynthesisUtterance: 'readonly',
+        TextEncoder: 'readonly', MediaRecorder: 'readonly', ResizeObserver: 'readonly',
         getComputedStyle: 'readonly', getSelection: 'readonly', globalThis: 'readonly', self: 'readonly', caches: 'readonly',
         history: 'readonly', Request: 'readonly', Response: 'readonly', process: 'readonly',
       },

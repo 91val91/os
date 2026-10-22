@@ -89,8 +89,12 @@ export class SetupWizard {
             animate(word, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 300, fill: 'forwards' });
           });
         }, 1800);
-        // Nouveau compte ajouté depuis les Réglages : on peut renoncer et revenir au propriétaire.
-        const cancel = this.account && !this.account.owner ? { label: 'Annuler et revenir à la session précédente', action: () => this.ui.deleteAccount(this.account.id) } : null;
+        // Compte tout juste ajouté depuis les Réglages : on peut y renoncer et revenir à la session
+        // qui l'a créé. Sinon (compte à configurer ou effacé), on peut seulement changer d'utilisateur.
+        const a = this.account;
+        let cancel = null;
+        if (a && !a.owner && a.returnTo && this.k.accounts.get(a.returnTo)) cancel = { label: 'Annuler et revenir à la session précédente', action: () => this.ui.cancelNewAccount(a) };
+        else if (a && (this.k.accounts?.list().length ?? 0) > 1) cancel = { label: 'Changer d\'utilisateur', action: () => this.ui.showAccountPicker() };
         this.#screen([h('div.setup-logo', icon('sparkles', { size: 40 })), word, h('p.setup-lead', `Bienvenue sur ${this.k.os.name}`)], { next: () => this.#step(1), nextLabel: 'Commencer', skip: cancel });
       },
       () => {
@@ -236,7 +240,7 @@ export class SetupWizard {
   async #finish() {
     const s = this.k.settings;
     if (this.values.userName.trim()) s.set('userName', this.values.userName.trim());
-    if (this.account) this.k.accounts.update(this.account.id, { name: this.values.userName.trim(), email: this.values.email.trim(), lastLogin: Date.now() });
+    if (this.account) this.k.accounts.update(this.account.id, { name: this.values.userName.trim(), email: this.values.email.trim(), lastLogin: Date.now(), returnTo: null });
     s.set('theme', this.values.theme);
     s.set('navigation', this.values.navigation);
     if (this.values.passcode) {

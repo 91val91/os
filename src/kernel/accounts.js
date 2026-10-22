@@ -13,31 +13,55 @@ export const OWNER_DB = 'orion-os';
 export const REGISTRY_DB = 'orion-accounts';
 
 const COLORS = ['#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f', '#64d2ff', '#5e5ce6', '#ff453a'];
-const EDITABLE = ['name', 'email', 'color', 'photo', 'lastLogin'];
+const EDITABLE = ['name', 'email', 'color', 'photo', 'lastLogin', 'returnTo'];
+const EMPTY = () => ({ accounts: [], current: null, removed: [] });
 
 export class AccountRegistry {
-  #data = { accounts: [], current: null, removed: [] };
+  #data = EMPTY();
+  #queue = Promise.resolve();
 
   /**
    * @param {object} options
    * @param {{ get(key: string): Promise<unknown>, put(key: string, value: unknown): Promise<unknown> }} options.store
+   * @param {{ request(name: string, fn: () => Promise<unknown>): Promise<unknown> }} [options.locks] verrou partagé entre fenêtres (navigator.locks)
+   * @param {{ postMessage(m: unknown): void, onmessage: unknown }} [options.channel] canal vers les autres fenêtres d'Orion (BroadcastChannel)
    */
-  constructor({ store, now = Date.now, random = Math.random }) {
+  constructor({ store, now = Date.now, random = Math.random, locks = null, channel = null }) {
     this.store = store;
     this.now = now;
     this.random = random;
+    this.locks = locks;
+    this.channel = channel;
     this.events = null;
+    if (channel) channel.onmessage = () => this.load().then(() => this.events?.emit('account:change', {}));
   }
 
   async load() {
     const data = await this.store.get('registry');
-    if (data) this.#data = { accounts: [], current: null, removed: [], ...data };
+    if (data) this.#data = { ...EMPTY(), ...data };
     return this;
   }
 
-  #save() {
+  /**
+   * Applique une modification tout de suite en mémoire, puis à la copie
+   * enregistrée relue juste avant l'écriture : une autre fenêtre d'Orion (app
+   * installée et onglet, par exemple) a pu changer le registre entre-temps.
+   */
+  #commit(mutate) {
+    mutate(this.#data);
     this.events?.emit('account:change', {});
-    return this.store.put('registry', structuredClone(this.#data));
+    const write = async () => {
+      const stored = await this.store.get('registry');
+      if (stored) {
+        this.#data = { ...EMPTY(), ...stored };
+        mutate(this.#data);
+      }
+      await this.store.put('registry', structuredClone(this.#data));
+      this.channel?.postMessage('change');
+    };
+    const run = () => (this.locks ? this.locks.request(REGISTRY_DB, write) : write());
+    this.#queue = this.#queue.then(run, run);
+    return this.#queue;
   }
 
   /** Le propriétaire d'abord, puis par ordre de création. */
@@ -77,24 +101,28 @@ export class AccountRegistry {
       createdAt: this.now(),
       lastLogin: null,
     };
-    this.#data.accounts.push(account);
-    this.#data.current ??= id;
-    this.#save();
+    this.#commit((data) => {
+      if (owner && data.accounts.some((a) => a.owner)) return;
+      if (!data.accounts.some((a) => a.id === id)) data.accounts.push({ ...account });
+      data.current ??= id;
+    });
     return { ...account };
   }
 
   update(id, patch) {
-    const account = this.#data.accounts.find((a) => a.id === id);
-    if (!account) return null;
-    for (const key of EDITABLE) if (key in patch) account[key] = typeof patch[key] === 'string' && key !== 'photo' ? patch[key].trim() : patch[key];
-    this.#save();
-    return { ...account };
+    if (!this.get(id)) return null;
+    const changes = {};
+    for (const key of EDITABLE) if (key in patch) changes[key] = typeof patch[key] === 'string' && key !== 'photo' ? patch[key].trim() : patch[key];
+    // Seulement si le compte existe encore dans la copie enregistrée (pas de résurrection).
+    this.#commit((data) => Object.assign(data.accounts.find((a) => a.id === id) ?? {}, changes));
+    return this.get(id);
   }
 
   setCurrent(id) {
     if (!this.get(id)) throw new Error('Compte introuvable');
-    this.#data.current = id;
-    return this.#save();
+    return this.#commit((data) => {
+      if (data.accounts.some((a) => a.id === id)) data.current = id;
+    });
   }
 
   /** Retire un compte ; sa base sera effacée au prochain démarrage (elle peut être ouverte). */
@@ -102,15 +130,17 @@ export class AccountRegistry {
     const account = this.get(id);
     if (!account) return Promise.resolve(false);
     if (account.owner) throw new Error('Le compte du propriétaire ne peut pas être supprimé');
-    this.#data.accounts = this.#data.accounts.filter((a) => a.id !== id);
-    this.#data.removed.push(account.db);
-    if (this.#data.current === id) this.#data.current = this.owner?.id ?? null;
-    return this.#save().then(() => true);
+    return this.#commit((data) => {
+      data.accounts = data.accounts.filter((a) => a.id !== id);
+      if (!data.removed.includes(account.db)) data.removed.push(account.db);
+      if (data.current === id) data.current = data.accounts.find((a) => a.owner)?.id ?? null;
+    }).then(() => true);
   }
 
   forgetRemoved(db) {
-    this.#data.removed = this.#data.removed.filter((name) => name !== db);
-    return this.#save();
+    return this.#commit((data) => {
+      data.removed = data.removed.filter((name) => name !== db);
+    });
   }
 }
 
@@ -120,18 +150,38 @@ export class AccountRegistry {
  * le compte du propriétaire est créé ; son nom est complété par l'assistant.
  */
 export async function openSession(env = globalThis) {
-  const registry = await new AccountRegistry({ store: new Namespace(await openBestBackend(env, { name: REGISTRY_DB }), 'accounts') }).load();
+  const registry = await new AccountRegistry({
+    store: new Namespace(await openBestBackend(env, { name: REGISTRY_DB }), 'accounts'),
+    locks: env.navigator?.locks ?? null,
+    channel: env.BroadcastChannel ? new env.BroadcastChannel(REGISTRY_DB) : null,
+  }).load();
+  // Bases des comptes supprimés : oubliées seulement une fois réellement effacées.
   for (const db of registry.removed) {
-    await deleteBackend(env, db).catch(() => {});
-    await registry.forgetRemoved(db);
+    if (await deleteBackend(env, db).catch(() => false)) await registry.forgetRemoved(db);
   }
   const account = registry.current ?? registry.create({ owner: true });
   const backend = await openBestBackend(env, { name: account.db });
   return { registry, account, backend };
 }
 
-/** Efface toutes les données de l'appareil : chaque compte et le registre. */
+/**
+ * Efface les données de tous les comptes et le registre. La base du
+ * propriétaire a déjà été vidée par kernel.factoryReset() : la supprimer
+ * pourrait rester en attente derrière une autre fenêtre et bloquer le
+ * démarrage suivant. Les bases orphelines (comptes perdus) partent aussi.
+ */
 export async function eraseAllAccounts(registry, env = globalThis) {
-  for (const db of [...registry.list().map((a) => a.db), ...registry.removed]) await deleteBackend(env, db).catch(() => {});
+  const names = new Set([...registry.list().map((a) => a.db), ...registry.removed]);
+  for (const { name } of (await env.indexedDB?.databases?.().catch(() => [])) ?? []) if (name?.startsWith(`${OWNER_DB}-`)) names.add(name);
+  try {
+    for (let i = 0; i < (env.localStorage?.length ?? 0); i++) {
+      const key = env.localStorage.key(i);
+      if (key?.startsWith(`${OWNER_DB}-`)) names.add(key.slice(0, key.indexOf(':')));
+    }
+  } catch {
+    /* stockage indisponible */
+  }
+  names.delete(OWNER_DB);
+  for (const db of names) await deleteBackend(env, db).catch(() => {});
   await deleteBackend(env, REGISTRY_DB).catch(() => {});
 }

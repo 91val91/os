@@ -190,7 +190,7 @@ Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (
 ## Tests
 
 ```bash
-npm test            # 50 tests unitaires du noyau (node:test, sans dépendance)
+npm test            # 52 tests unitaires du noyau (node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
@@ -215,7 +215,7 @@ scripts/                                  serveur local, icônes PWA, captures d
 
 Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, mais il s'appuie sur le navigateur (et donc sur Android ou iOS) pour le matériel. Concrètement :
 
-- **réels** quand le navigateur les fournit : appareil photo, micro, géolocalisation, niveau de batterie, vibreur, son, réseau (état en ligne, API météo), synthèse vocale, plein écran et hors ligne ;
+- **réels** quand le navigateur les fournit : appareil photo, micro, géolocalisation, niveau de batterie, vibreur, son, réseau (état en ligne, API météo), plein écran et hors ligne ;
 - **simulés** : le modem (appels et SMS avec correspondants automatiques), les réseaux Wi‑Fi/Bluetooth listés, la lampe torche, la batterie sur un ordinateur sans batterie.
 
 Pour en faire le système principal d'un appareil, il faudrait le placer au-dessus d'un noyau Linux et d'une couche matérielle native, à la manière de Firefox OS (B2G) ou KaiOS : un navigateur en mode kiosque lancé au démarrage, avec des API natives pour la téléphonie.
