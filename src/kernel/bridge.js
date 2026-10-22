@@ -23,9 +23,11 @@ export class HardwareBridge {
     this.info = null;
   }
 
-  /** Le pont n'existe que lorsqu'Orion est servi par orion-server (adresse locale). */
+  /** Le pont n'existe que lorsqu'Orion est servi par orion-server : adresse locale, à la racine. */
   get #reachable() {
-    return LOOPBACK.has(this.env.location?.hostname) && typeof this.env.fetch === 'function';
+    const where = this.env.location;
+    if (!LOOPBACK.has(where?.hostname) || typeof this.env.fetch !== 'function') return false;
+    return !where.pathname || /^\/(index\.html)?$/.test(where.pathname);
   }
 
   async detect({ timeout = 1500 } = {}) {

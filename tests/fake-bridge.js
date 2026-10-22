@@ -68,11 +68,13 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
     },
     'POST bluetooth/pair': ({ address }) => {
       const d = state.bt.devices.find((x) => x.address === address);
-      Object.assign(d, { paired: true, trusted: true, connected: true });
+      Object.assign(d, { paired: true, trusted: true }); // comme BlueZ : appairé, pas encore connecté
       return ok();
     },
     'POST bluetooth/connect': ({ address }) => {
-      state.bt.devices.find((x) => x.address === address).connected = true;
+      const d = state.bt.devices.find((x) => x.address === address);
+      if (!d.paired) return fail(400, 'Appareil non appairé');
+      d.connected = true;
       return ok();
     },
     'POST bluetooth/disconnect': ({ address }) => {

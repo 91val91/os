@@ -16,5 +16,6 @@ export const RELEASE = Object.freeze({
     'Barre d\'état et réglages rapides fidèles à la réalité : force du Wi‑Fi, signal, localisation en cours.',
     'Mises à jour plus sûres : une version retirée n\'est plus installée, un téléchargement interrompu ne bloque plus, la copie hors ligne est protégée.',
     'Les applications n\'ont plus accès aux données internes du système.',
+    'Premier jet d\'une image installable pour PC et machine virtuelle (orion-server pilote le Wi‑Fi, le Bluetooth, le modem et le GPS).',
   ]),
 });

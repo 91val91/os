@@ -85,7 +85,14 @@ export class DeveloperMode {
 
   async create(password) {
     if (!this.canManage) throw new Error(`Seul ${this.ownerName} peut définir le mot de passe développeur`);
-    await this.#save({ password: await createPasscode(password), failures: 0, blockedUntil: 0 });
+    await this.#store(password);
+  }
+
+  /** Enregistre un nouveau mot de passe et déverrouille (sans que cette fenêtre se croie changée « ailleurs »). */
+  async #store(password) {
+    const record = await createPasscode(password);
+    this.#unlockedWith = record.hash;
+    await this.#save({ password: record, failures: 0, blockedUntil: 0 });
     this.#open();
   }
 
@@ -110,8 +117,7 @@ export class DeveloperMode {
   /** Nouveau mot de passe (le propriétaire, déverrouillé ou après son code de verrouillage). */
   async replace(password) {
     if (!this.canManage) throw new Error(`Seul ${this.ownerName} peut changer le mot de passe développeur`);
-    await this.#save({ password: await createPasscode(password), failures: 0, blockedUntil: 0 });
-    this.#open();
+    await this.#store(password);
   }
 
   /** Supprime le mot de passe : le mode développeur n'est plus accessible jusqu'à un nouveau. */

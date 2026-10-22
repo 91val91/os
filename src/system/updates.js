@@ -236,14 +236,14 @@ export class UpdateManager {
     if (Date.now() - this.lastCheck >= CHECK_EVERY) this.check({ auto: true });
   }
 
-  /** L'appareil est verrouillé et rien n'est en cours : un redémarrage ne dérange personne. */
+  /** Appareil verrouillé (ou écran éteint) et rien en cours : un redémarrage ne dérange personne. */
   get #idle() {
-    return this.ui.state === 'locked' && !this.ui.poweredOff && !this.k.telephony.call && !this.ui.alarmScreen?.isVisible && !this.k.media.get()?.playing;
+    return ['locked', 'off'].includes(this.ui.state) && !this.ui.poweredOff && !this.k.telephony.call && !this.ui.alarmScreen?.isVisible && !this.k.media.get()?.playing;
   }
 
   #autoInstall() {
-    if (this.status !== 'ready' || !this.k.settings.get('updates.autoInstall') || !this.#idle) return;
-    // Revérifié au moment d'installer : déverrouillage rapide, appel, réveil ou musique entre-temps.
+    if (this.status !== 'ready' || !this.k.settings.get('updates.autoInstall')) return;
+    // Vérifié au moment d'installer (l'événement précède le verrouillage) : déverrouillage rapide, appel, réveil ou musique.
     setTimeout(() => this.status === 'ready' && this.#idle && this.install(), 1500);
   }
 }

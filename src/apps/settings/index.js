@@ -514,7 +514,7 @@ export function mount(root, ctx) {
           title: d.name,
           subtitle: describe(d),
           trailing: busy === d.id ? spinner(16) : null,
-          onClick: () => (d.paired ? deviceActions(d) : act(d, () => bt.pair(d.id), `${d.name} appairé`)),
+          onClick: () => (d.paired ? deviceActions(d) : act(d, () => bt.connect(d.id), `${d.name} connecté`)),
         });
       const devices = st.devices;
       const paired = devices.filter((d) => d.paired);
@@ -1032,6 +1032,9 @@ export function mount(root, ctx) {
   // ───────────── Mode développeur (mot de passe de l'appareil) ─────────────
 
   const dev = ui.developer;
+  /** État affiché par la page Mode développeur (pour ne la redessiner que s'il change). */
+  const devState = () => `${dev.configured}|${dev.unlocked}|${dev.canManage}`;
+  let devShown = null;
 
   /** Champ de mot de passe avec bouton pour l'afficher. */
   function passwordField(label, { autofocus = false, onEnter = null } = {}) {
@@ -1340,6 +1343,7 @@ export function mount(root, ctx) {
   /** Mode développeur : création du mot de passe, déverrouillage, puis options. */
   function developerPage() {
     const p = open('Mode développeur', (refresh) => {
+      devShown = devState();
       if (dev.unlocked) return developerOptions(refresh);
       if (dev.configured) return unlockForm(refresh);
       if (!dev.canManage) return [devHero('Mode développeur non configuré', `Demandez à ${dev.ownerName}, propriétaire de l'appareil, de définir le mot de passe développeur.`)];
@@ -1467,21 +1471,30 @@ export function mount(root, ctx) {
   nav.push(mainPage());
   handleIntent(ctx.intent);
   ctx.onBack(async () => (nav.depth > 1 ? nav.pop() : false));
-  // Redessins regroupés : un téléchargement émet un événement par fichier.
+  // Redessins regroupés : immédiat, puis au plus un toutes les 250 ms (un téléchargement émet un événement par fichier).
   let redrawTimer = null;
+  let redrawAgain = null;
   const redraw = (wanted) => {
-    if (!wanted(nav.top) || redrawTimer) return;
+    if (!wanted(nav.top)) return;
+    if (redrawTimer) {
+      redrawAgain = wanted;
+      return;
+    }
+    nav.top?.onShow?.();
     redrawTimer = ctx.setTimeout(() => {
       redrawTimer = null;
-      if (wanted(nav.top)) nav.top?.onShow?.();
+      const again = redrawAgain;
+      redrawAgain = null;
+      if (again) redraw(again);
     }, 250);
   };
   const isRoot = () => nav.depth === 1;
   for (const type of ['settings:change', 'package:install', 'package:uninstall', 'network:change', 'bluetooth:change']) ctx.subscribe(type, () => redraw(isRoot));
   // Mises à jour : la page suit la vérification et le téléchargement en direct.
   ctx.subscribe('update:change', () => redraw((top) => top?.updates || isRoot()));
-  // Mot de passe développeur changé ou supprimé (autre fenêtre) : la page se met à jour.
-  ctx.subscribe('account:change', () => redraw((top) => top?.devRoot || isRoot()));
+  // Mot de passe développeur créé, changé ou supprimé (autre fenêtre) : la page se met à jour.
+  // Un simple essai raté (compté dans le registre) ne la redessine pas : le message d'erreur reste.
+  ctx.subscribe('account:change', () => redraw((top) => (top?.devRoot && devState() !== devShown) || isRoot()));
   // Mode développeur verrouillé : ses sous-pages se ferment, sa page redemande le mot de passe.
   ctx.subscribe('developer:lock', async () => {
     while (nav.top?.developer) await nav.pop({ animated: false });

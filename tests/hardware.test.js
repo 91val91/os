@@ -46,6 +46,13 @@ test('pont : détecté sur 127.0.0.1, requêtes POST protégées, erreurs lisibl
   assert.equal(post.headers['Content-Type'], 'application/json');
 });
 
+test('pont : pas cherché quand Orion est servi dans un sous-dossier (serveur de développement)', async () => {
+  let calls = 0;
+  const bridge = await new HardwareBridge({ env: { location: { hostname: '127.0.0.1', pathname: '/os/' }, fetch: async () => calls++ } }).detect();
+  assert.equal(bridge.available, false);
+  assert.equal(calls, 0);
+});
+
 test('pont : un serveur qui n\'est pas orion-server est ignoré', async () => {
   const env = { location: { hostname: 'localhost' }, fetch: async () => ({ ok: false, status: 404, json: async () => { throw new Error('html'); } }) };
   const bridge = await new HardwareBridge({ env }).detect();

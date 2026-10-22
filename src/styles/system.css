@@ -2405,12 +2405,38 @@ html.android body.fullscreen .edge-zone {
 
 .setup-body {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
   gap: 10px;
+  /* Écran bas (téléphone en paysage) : l'étape défile au lieu de cacher ses champs. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Centrage vertical qui s'efface quand le contenu dépasse (le haut reste accessible). */
+.setup-body::before,
+.setup-body::after {
+  content: '';
+  flex: 1 0 0;
+}
+
+.setup-body > * {
+  flex-shrink: 0;
+}
+
+@media (max-height: 520px) {
+  .setup-page {
+    padding-top: calc(var(--sat) + 6px);
+    padding-bottom: calc(var(--sab) + 6px);
+  }
+
+  .setup-body h1 { font-size: 1.5rem; }
+  .setup-avatar { margin-bottom: 4px; }
+  .setup-lead { margin-bottom: 6px; }
 }
 
 .setup-body h1 {

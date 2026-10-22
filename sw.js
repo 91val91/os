@@ -203,7 +203,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   // version.json va toujours au réseau : c'est par lui qu'on apprend qu'une mise à jour existe.
-  if (request.method !== 'GET' || !inScope(url) || url.pathname.endsWith('/version.json')) return;
+  // api/ : le pont matériel d'Orion installé (orion-server), jamais mis en cache.
+  if (request.method !== 'GET' || !inScope(url) || url.pathname.endsWith('/version.json') || url.href.startsWith(at('./api/'))) return;
   event.respondWith(respond(request, url));
 });
 

@@ -216,6 +216,20 @@ Une page web n'a pas le droit de piloter les radios d'un téléphone : c'est And
 
 Sur un ordinateur sans modem, **Réglages → Réseau mobile** permet de choisir le mode démonstration (appels et SMS simulés, correspondants qui répondent).
 
+## Installer Orion sur un PC ou une machine virtuelle
+
+Le dossier [`installer/`](installer/README.md) construit une **image ISO d'Orion OS** (PC 64 bits, BIOS et UEFI) : une Debian 12 minimale qui démarre directement sur Orion en plein écran (Chromium en mode kiosque dans `cage`), avec `orion-server` pour le matériel.
+
+- **Machine virtuelle** : `installer/run-vm.sh` (QEMU), ou VirtualBox, VMware, GNOME Boxes, UTM.
+- **Vrai PC ou tablette x86** : l'ISO s'écrit sur une clé USB (balenaEtcher, Rufus en mode DD, `dd`) et démarre sans toucher au disque.
+- **Installation sur le disque** (*expérimental*) : entrée « Install » du menu de démarrage, avec l'installateur de Debian.
+- **Construire l'image** : `sudo installer/build.sh` sur Debian 12, `installer/build-in-docker.sh` partout ailleurs, ou l'action GitHub `installer.yml` (onglet **Actions**, et jointe aux publications `v*`).
+- **Mises à jour** : `orion-update.timer` télécharge et vérifie la dernière version publiée toutes les 6 heures ; Orion la propose ensuite comme sur le Web.
+
+Pour développer sans le matériel : `python3 server/orion_server.py --simulate`, puis http://127.0.0.1:8080 (Wi‑Fi, Bluetooth, modem et GPS imités ; mot de passe Wi‑Fi `orion1234`). L'API est décrite dans [`server/API.md`](server/API.md).
+
+> L'image n'a pas encore été construite ni démarrée sur de vrais PC : c'est un premier jet, à essayer d'abord en machine virtuelle. Les téléphones ARM (PinePhone, Librem 5…) viendront plus tard.
+
 ## Mises à jour
 
 Le téléphone garde la version installée, entièrement en cache, jusqu'à ce que vous en installiez une nouvelle : une session ne mélange jamais deux versions.
@@ -237,6 +251,7 @@ npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, g
 npm run lint        # ESLint
 npm run screenshots # régénère les captures du README
 npm run release     # régénère version.json avant de publier une version
+python3 -m unittest discover -s server   # tests d'orion-server (pont matériel, synchronisation)
 ```
 
 ## Structure du projet
@@ -252,6 +267,8 @@ src/lib/                                  DOM, icônes, gestes, kit d'interface,
 src/styles/                               jetons de design, interface système, composants
 tests/                                    tests unitaires et de bout en bout
 scripts/                                  serveur local, publication (version.json), icônes PWA, captures
+server/                                   orion-server : pont matériel et mises à jour d'Orion installé (Python)
+installer/                                image ISO installable (live-build), machine virtuelle, Docker
 ```
 
 ## Ce qui est réel, ce qui est simulé

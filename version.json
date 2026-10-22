@@ -10,9 +10,10 @@
   "Nouveau : service de localisation (GPS) et app Plans — carte, position en direct, recherche de lieux, itinéraires et trajets enregistrés (GPX).",
   "Barre d'état et réglages rapides fidèles à la réalité : force du Wi‑Fi, signal, localisation en cours.",
   "Mises à jour plus sûres : une version retirée n'est plus installée, un téléchargement interrompu ne bloque plus, la copie hors ligne est protégée.",
-  "Les applications n'ont plus accès aux données internes du système."
+  "Les applications n'ont plus accès aux données internes du système.",
+  "Premier jet d'une image installable pour PC et machine virtuelle (orion-server pilote le Wi‑Fi, le Bluetooth, le modem et le GPS)."
  ],
- "size": 1163313,
+ "size": 1165060,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -179,8 +180,8 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "4ef9ebb5953a4c78facac4c344076c272c070b620d854cf33506abf140a2698a",
-   "size": 77292
+   "hash": "9d9cc6e69fa19684dfe04041f9ebfbdd4b1dc49d162acb546a391c3baff08434",
+   "size": 77859
   },
   "./src/apps/settings/style.css": {
    "hash": "0cbbe7fb12c0e84d7b39e62e70201d8bf2fffe43a45e598ae163b0be0ca6573a",
@@ -227,12 +228,12 @@
    "size": 5628
   },
   "./src/kernel/bluetooth.js": {
-   "hash": "f7e9dc5ee2acc23d6681253dc73c30af855c06b50946c1c9fdd2edc93114f0fe",
-   "size": 11108
+   "hash": "547f1e9c49d4fe77350c895296832eed903ca2736e6ec73e48c9d8f3bf6ee5c1",
+   "size": 11200
   },
   "./src/kernel/bridge.js": {
-   "hash": "9c9df7a7506fadd759f658910dc58a1381cdfcbef5bfdaea56dbf460b665e9d6",
-   "size": 4714
+   "hash": "b93eda2ae3ae1f8d74c3d3bd73899624a65670e807beb2edc8da4397872bbe84",
+   "size": 4838
   },
   "./src/kernel/chatbot.js": {
    "hash": "4cbefe1f50a940bc5f4c91e9c7f5a22bd38fa28e2bd54057730555b95e17bc43",
@@ -311,8 +312,8 @@
    "size": 21690
   },
   "./src/kernel/version.js": {
-   "hash": "38b982be5059f657c334653cb7cad41389fe40ee4563258526198ea6f34cda08",
-   "size": 1449
+   "hash": "b9cf0d6f78a508e2fd7f371c60b8f17fb3ecd7432883c0ed54ee64033f045808",
+   "size": 1590
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
@@ -367,8 +368,8 @@
    "size": 13635
   },
   "./src/styles/system.css": {
-   "hash": "17d6467541933b8b89658bca0c105e84e75d0f19851fae56791504f28a1d1671",
-   "size": 51809
+   "hash": "1c08f929efdbd13eaf69070aa19a5936661bed50aa6adbc0c22458b18323aef7",
+   "size": 52428
   },
   "./src/system/alarm-screen.js": {
    "hash": "59255c094d3012ef1fc95cfb41231f6d67fbb7c8cd1715dd66fadc85fe6b3133",
@@ -399,8 +400,8 @@
    "size": 6063
   },
   "./src/system/developer.js": {
-   "hash": "9bc9cb5a46e396993b2bddb6fdd461307fa58dbe04e8ed5850c9889d60e02c65",
-   "size": 5419
+   "hash": "b105d9a9beb87b0244e65ffb31b0543603018d976b4d0ca8bfde4f081efd6993",
+   "size": 5587
   },
   "./src/system/dialogs.js": {
    "hash": "5c25443529b71be80fa4da01eb1166fccc971e69124647060f61888a2fc5d66e",
@@ -463,8 +464,8 @@
    "size": 2235
   },
   "./src/system/updates.js": {
-   "hash": "16dc8c1f15a985e7148854b2bbfab1926ec73948b7e61a8395279292f8ad13b5",
-   "size": 10502
+   "hash": "40f5c1ac627a80f78c80162b4be1eca73a44d3ba1f464f0ae4f709708faa1736",
+   "size": 10538
   },
   "./src/system/wallpapers.js": {
    "hash": "dffd49888bdd864365f125ecf38eaba8d4e8d75fa45382a0972822c2ca9bf6f9",

@@ -238,8 +238,9 @@ export class BluetoothService {
 
   async connect(id) {
     if (this.mode === 'bridge') {
-      const device = this.devices().find((d) => d.id === id);
-      return this.#bridgeAction(device?.paired ? 'connect' : 'pair', id);
+      // Appairer un appareil ne le connecte pas (BlueZ) : on enchaîne les deux.
+      if (!this.devices().find((d) => d.id === id)?.paired) await this.#bridgeAction('pair', id);
+      return this.#bridgeAction('connect', id);
     }
     if (!this.enabled) throw new Error('Activez le Bluetooth');
     const entry = this.#web.get(id);
