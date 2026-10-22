@@ -265,11 +265,16 @@ body.fullscreen .layer-statusbar {
   pointer-events: none;
 }
 
-/* Pictogramme des apps sans illustration */
+/* Fond clair : liseré sombre, sinon l'icône se fond dans une liste blanche */
+.app-icon.light::after {
+  box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .1);
+}
+
+/* Pictogramme des apps sans illustration, ombre nette comme les illustrations */
 .app-icon .glyph {
   width: 56%;
   height: 56%;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .12));
+  filter: drop-shadow(0 1.2px 0 rgba(0, 0, 0, .18));
 }
 
 .icon-badge {

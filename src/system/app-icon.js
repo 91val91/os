@@ -38,12 +38,17 @@ function watchClock(svg) {
   return svg;
 }
 
-/** Graduations et aiguilles d'un cadran 100 × 100 (centre 50, 50). */
-function clockHands({ seconds = true, dark = true } = {}) {
+/**
+ * Graduations et aiguilles d'un cadran 100 × 100 (centre 50, 50).
+ * minor : épaisseur des petites graduations (0 : aucune).
+ */
+function clockHands({ seconds = true, dark = true, minor = 2.2 } = {}) {
   const ink = dark ? '#fff' : '#1c1d22';
-  const ticks = Array.from({ length: 12 }, (_, i) =>
-    svgEl('line', { x1: 50, y1: 8, x2: 50, y2: i % 3 ? 13 : 16.5, stroke: i % 3 ? (dark ? '#8e8e93' : '#a1a3aa') : ink, 'stroke-width': i % 3 ? 2.2 : 3.6, 'stroke-linecap': 'round', transform: `rotate(${i * 30} 50 50)` }),
-  );
+  const ticks = Array.from({ length: 12 }, (_, i) => i)
+    .filter((i) => minor || !(i % 3))
+    .map((i) =>
+      svgEl('line', { x1: 50, y1: 8, x2: 50, y2: i % 3 ? 13 : 16.5, stroke: i % 3 ? (dark ? '#8e8e93' : '#a1a3aa') : ink, 'stroke-width': i % 3 ? minor : 3.6, 'stroke-linecap': 'round', transform: `rotate(${i * 30} 50 50)` }),
+    );
   return [
     ...ticks,
     svgEl('line', { class: 'h', x1: 50, y1: 53, x2: 50, y2: 28, stroke: ink, 'stroke-width': 5.4, 'stroke-linecap': 'round' }),
@@ -79,18 +84,22 @@ export function appIcon(pkg, { size = 60, badge = 0 } = {}) {
   const art = appArt(pkg.id);
   if (art) {
     el.append(art);
+    el.classList.toggle('light', art.classList.contains('art-light'));
     if (pkg.id === 'calendar') {
       el.classList.add('live-calendar');
       setCalendarDate(art);
     } else if (pkg.id === 'clock') {
+      // En petit, ni trotteuse ni petites graduations : ce seraient des fils
+      const small = parseFloat(size) < 40;
       el.classList.add('live-clock');
-      art.querySelector('.art-dial').append(...clockHands({ dark: false }));
+      art.querySelector('.art-dial').append(...clockHands({ dark: false, seconds: !small, minor: small ? 0 : 2.6 }));
       watchClock(art);
     }
   } else {
+    // Lumière en haut à gauche, comme les illustrations
     const [from, to] = pkg.color ?? ['#8e8e93', '#636366'];
-    el.style.background = `linear-gradient(160deg, ${from}, ${to})`;
-    el.append(icon(pkg.icon ?? 'apps', { size: 24, stroke: pkg.iconStroke ?? 2, className: 'glyph' }));
+    el.style.background = `linear-gradient(160deg, rgba(255, 255, 255, .18), transparent 55%), linear-gradient(160deg, ${from}, ${to})`;
+    el.append(icon(pkg.icon ?? 'apps', { size: 24, stroke: pkg.iconStroke ?? 2.4, className: 'glyph' }));
   }
   if (badge) el.append(h('span.icon-badge', badge > 99 ? '99+' : String(badge)));
   return el;

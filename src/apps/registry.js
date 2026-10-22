@@ -254,7 +254,7 @@ export const MANIFESTS = [
     id: 'recorder',
     name: 'Dictaphone',
     icon: 'waveform',
-    color: ['#ff8080', '#c81d39'],
+    color: ['#4a4d55', '#0f1013'],
     iconStroke: 2.4,
     category: 'Utilitaires',
     version: '1.1.0',
