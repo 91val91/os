@@ -27,8 +27,8 @@ Quelques astuces pour bien démarrer :
 
 Vous préférez les boutons Android ? Réglages → Personnalisation → Navigation.
 
-En mode développeur (Réglages → Général → Informations : touchez 7 fois
-le numéro de build), le Terminal vous donne accès au shell « osh » : essayez help, neofetch,
+En mode développeur (Réglages → Mode développeur, avec le mot de passe de
+l'appareil), le Terminal vous donne accès au shell « osh » : essayez help, neofetch,
 ls -l, ps ou pm list -a.
 `;
 

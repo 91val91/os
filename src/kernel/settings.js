@@ -48,9 +48,7 @@ export const DEFAULT_SETTINGS = {
   'camera.mirror': true, // selfies enregistrés comme dans le viseur
   'camera.shutterSound': true,
   'camera.preserve': false, // garde mode, filtre et caméra d'une ouverture à l'autre
-  // Développeur
-  developer: false,
-  developerPassword: null, // { salt, hash } : protège les options et le Terminal
+  // Développeur (le mot de passe du mode développeur est enregistré avec les comptes)
   animScale: 1,
   showTouches: false,
 };

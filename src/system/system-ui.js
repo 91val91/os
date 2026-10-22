@@ -28,6 +28,7 @@ import { AlarmScreen } from './alarm-screen.js';
 import { SetupWizard } from './setup.js';
 import { PowerManager, logo } from './power.js';
 import { platform } from './platform.js';
+import { DeveloperMode } from './developer.js';
 
 const LAYERS = ['wallpaper', 'home', 'drawer', 'windows', 'recents', 'navbar', 'lock', 'system', 'setup', 'shade', 'controlCenter', 'statusbar', 'banners', 'dialogs', 'hud', 'toasts', 'filters', 'boot', 'off'];
 const SCREEN_W = 393;
@@ -40,14 +41,17 @@ export class SystemUI {
     this.animScale = 1;
     this.screenRadius = 0;
     this.lastActivity = Date.now();
-    // Options pour les développeurs déverrouillées (mot de passe) jusqu'au prochain verrouillage.
-    this.developerUnlocked = false;
     platform.applyClasses();
     this.#buildDom();
   }
 
   dur(ms) {
     return ms * this.animScale;
+  }
+
+  /** Mode développeur déverrouillé (mot de passe de l'appareil) : Terminal et options accessibles. */
+  get developerUnlocked() {
+    return Boolean(this.developer?.unlocked);
   }
 
   // ───────────── Construction de l'écran ─────────────
@@ -156,6 +160,8 @@ export class SystemUI {
     this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, accountId: session?.account.id, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
     this.#syncAccount();
+    this.developer = new DeveloperMode(this);
+    this.developer.migrate();
     await this.#watchOtherAlarms();
 
     const k = this.kernel;
@@ -320,7 +326,6 @@ export class SystemUI {
 
   #wireKernelEvents() {
     const k = this.kernel;
-    k.settings.watch('developer', (on) => !on && this.lockDeveloper());
     k.events.on('power:request', ({ action }) => {
       if (action === 'lock') this.lockNow();
       if (action === 'reboot') this.power.reboot();
@@ -455,21 +460,8 @@ export class SystemUI {
     if (account) this.kernel.accounts.update(account.id, { lastLogin: Date.now() });
   }
 
-  /** Mot de passe développeur saisi : options et Terminal accessibles jusqu'au verrouillage. */
-  unlockDeveloper() {
-    this.developerUnlocked = true;
-  }
-
-  /** Referme l'accès développeur : les apps qui en dépendent (Terminal) sont fermées. */
-  lockDeveloper() {
-    if (!this.developerUnlocked) return;
-    this.developerUnlocked = false;
-    for (const [pid, win] of [...this.wm.windows]) if (win.pkg.developer) this.wm.close(pid);
-    this.kernel.events.emit('developer:lock', {});
-  }
-
   lockNow() {
-    this.lockDeveloper();
+    this.developer.lock();
     this.closeOverlays();
     this.dialogs.closeAll();
     if (this.state === 'recents') this.wm.closeRecents();

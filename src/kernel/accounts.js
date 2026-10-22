@@ -14,7 +14,7 @@ export const REGISTRY_DB = 'orion-accounts';
 
 const COLORS = ['#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f', '#64d2ff', '#5e5ce6', '#ff453a'];
 const EDITABLE = ['name', 'email', 'color', 'photo', 'lastLogin', 'returnTo'];
-const EMPTY = () => ({ accounts: [], current: null, removed: [] });
+const EMPTY = () => ({ accounts: [], current: null, removed: [], developer: null });
 
 export class AccountRegistry {
   #data = EMPTY();
@@ -85,6 +85,20 @@ export class AccountRegistry {
   /** Bases des comptes supprimés, à effacer au prochain démarrage. */
   get removed() {
     return [...this.#data.removed];
+  }
+
+  /**
+   * Mode développeur de l'appareil, commun à tous les comptes : empreinte du
+   * mot de passe et tentatives échouées (le blocage survit aux redémarrages).
+   */
+  get developer() {
+    return { password: null, failures: 0, blockedUntil: 0, ...this.#data.developer };
+  }
+
+  setDeveloper(patch) {
+    return this.#commit((data) => {
+      data.developer = { ...data.developer, ...patch };
+    });
   }
 
   create({ name = '', email = '', color = null, owner = false } = {}) {

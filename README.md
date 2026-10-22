@@ -77,7 +77,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Intents à la Android : « Ouvrir avec », « Partager avec », sélection d'une photo ou d'un contact depuis une autre app (`startActivityForResult`).
 - Alarmes système : réveils, minuteurs et rappels sonnent même si l'app est fermée.
 - Thèmes clair/sombre/automatique, Night Shift, luminosité, économiseur de batterie.
-- **Mode développeur protégé par mot de passe** : touchez 7 fois **Réglages → Général → Informations → Numéro de build** et choisissez un mot de passe. Il est redemandé pour ouvrir les options pour les développeurs après chaque verrouillage de l'appareil (5 essais, puis 30 s d'attente ; « Mot de passe oublié ? » avec le code de verrouillage).
+- **Mode développeur protégé par un mot de passe d'appareil** (**Réglages → Mode développeur**) : le propriétaire le choisit une fois (6 caractères minimum, lettres et chiffres) ; il vaut pour tous les comptes, seul le propriétaire peut le changer ou le supprimer, et « Réinitialiser les réglages » ne l'efface pas. Il est redemandé après chaque verrouillage de l'appareil. Après 5 erreurs, attente de 30 s, doublée à chaque nouvelle erreur (15 min au plus), même si l'on ferme les Réglages ou redémarre. Mot de passe oublié : le propriétaire le remplace avec son code de verrouillage.
 
 **Applications**
 
@@ -176,7 +176,7 @@ Les apps système reçoivent en plus `ctx.kernel` et `ctx.system`.
 
 ## Le shell `osh`
 
-Accessible depuis le Terminal, en mode développeur (**Réglages → Options pour les développeurs → Terminal**).
+Accessible depuis le Terminal, en mode développeur (**Réglages → Mode développeur → Terminal**).
 
 ```sh
 $ neofetch
@@ -195,7 +195,7 @@ Opérateurs `|`, `>`, `>>`, `;`, `&&`, `||`, variables (`$HOME`, `$?`), jokers (
 ## Tests
 
 ```bash
-npm test            # 52 tests unitaires du noyau (node:test, sans dépendance)
+npm test            # 56 tests unitaires du noyau (node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint

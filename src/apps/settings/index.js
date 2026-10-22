@@ -10,6 +10,7 @@ import { createPasscode, verifyPasscode } from '../../kernel/settings.js';
 import { displayName } from '../../kernel/contacts.js';
 import { WALLPAPERS, wallpaperCss } from '../../system/wallpapers.js';
 import { appIcon } from '../../system/app-icon.js';
+import { passwordProblem, MIN_PASSWORD_LENGTH } from '../../system/developer.js';
 import { logo } from '../../system/power.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
@@ -38,7 +39,7 @@ export function mount(root, ctx) {
   const accountAvatar = (a, size) => avatar(a.name || '?', { size, color: a.color, photo: a.photo });
   const row = (opts) => listItem(opts);
   /** Apps listées dans les Réglages : les apps cachées (Terminal) seulement en mode développeur. */
-  const visibleApps = () => k.packages.list().filter((p) => !p.hidden || s.get('developer'));
+  const visibleApps = () => k.packages.list().filter((p) => !p.hidden || ui.developerUnlocked);
   const toggleRow = (title, key, { icon: iconName, color, subtitle, invert = false, onChange } = {}) => {
     const sw = toggle(invert ? !s.get(key) : s.get(key), (v) => {
       s.set(key, invert ? !v : v);
@@ -115,7 +116,7 @@ export function mount(root, ctx) {
             row({ icon: 'apps', iconColor: '#5856d6', title: 'Applications', detail: String(visibleApps().length), chevron: true, onClick: appsPage }),
             row({ icon: 'camera', iconColor: '#8e8e93', title: 'Appareil photo', chevron: true, onClick: cameraPage }),
             row({ icon: 'settings', iconColor: '#8e8e93', title: 'Général', chevron: true, onClick: generalPage }),
-            s.get('developer') ? row({ icon: 'code', iconColor: '#636366', title: 'Options pour les développeurs', detail: ui.developerUnlocked ? null : icon('lock', { size: 15 }), chevron: true, onClick: openDeveloper }) : null,
+            row({ icon: 'code', iconColor: '#636366', title: 'Mode développeur', detail: dev.unlocked ? 'Déverrouillé' : icon('lock', { size: 15 }), chevron: true, onClick: developerPage }),
             row({ icon: 'info', iconColor: '#8e8e93', title: `À propos de ${k.os.name}`, chevron: true, onClick: aboutPage }),
           ].filter(Boolean),
         }),
@@ -678,97 +679,89 @@ export function mount(root, ctx) {
     ]);
   }
 
-  // ───────────── Mode développeur (mot de passe) ─────────────
+  // ───────────── Mode développeur (mot de passe de l'appareil) ─────────────
 
-  let developerFailures = 0;
-  let developerBlockedUntil = 0;
+  const dev = ui.developer;
 
-  /** Demande un nouveau mot de passe développeur (deux fois) ; renvoie son empreinte. */
-  async function askDeveloperPassword(title = 'Mot de passe développeur') {
-    const first = await ctx.ui.prompt({ title, message: 'Il protège les options pour les développeurs et le Terminal (4 caractères minimum).', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Suivant' });
-    if (first == null) return null;
-    if (first.length < 4) {
-      await ctx.ui.alert({ title: 'Mot de passe trop court', message: 'Choisissez au moins 4 caractères.' });
-      return null;
-    }
-    const second = await ctx.ui.prompt({ title: 'Confirmez le mot de passe', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Valider' });
-    if (second == null) return null;
-    if (second !== first) {
-      await ctx.ui.alert({ title: 'Les mots de passe ne correspondent pas', message: 'Recommencez.' });
-      return null;
-    }
-    return createPasscode(first);
-  }
-
-  /** Vérifie le mot de passe développeur (5 essais, puis 30 secondes d'attente). */
-  async function checkDeveloperPassword() {
-    if (Date.now() < developerBlockedUntil) {
-      await ctx.ui.alert({ title: 'Trop de tentatives', message: 'Réessayez dans 30 secondes.' });
-      return false;
-    }
-    const value = await ctx.ui.prompt({ title: 'Options pour les développeurs', message: 'Saisissez le mot de passe développeur.', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Déverrouiller' });
-    if (value == null) return false;
-    if (await verifyPasscode(s.get('developerPassword'), value)) {
-      developerFailures = 0;
-      return true;
-    }
-    if (++developerFailures >= 5) {
-      developerFailures = 0;
-      developerBlockedUntil = Date.now() + 30_000;
-    }
-    const choice = await ctx.ui.alert({
-      title: 'Mot de passe incorrect',
-      buttons: [{ label: 'Réessayer', value: 'retry', role: 'default' }, { label: 'Mot de passe oublié ?', value: 'forgot' }, { label: 'Annuler', value: null, role: 'cancel' }],
+  /** Champ de mot de passe avec bouton pour l'afficher. */
+  function passwordField(label, { autofocus = false, onEnter = null } = {}) {
+    const input = h('input.dev-input', { type: 'password', placeholder: label, 'aria-label': label, autocomplete: 'off', autocapitalize: 'off', spellcheck: false });
+    const eye = h('button.dev-eye', { type: 'button', 'aria-label': 'Afficher le mot de passe' }, icon('eye', { size: 18 }));
+    eye.addEventListener('click', () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      eye.replaceChildren(icon(show ? 'eye-off' : 'eye', { size: 18 }));
     });
-    if (choice === 'retry') return checkDeveloperPassword();
-    if (choice === 'forgot') return resetDeveloperPassword();
-    return false;
+    if (onEnter) input.addEventListener('keydown', (e) => e.key === 'Enter' && onEnter());
+    if (autofocus) setTimeout(() => input.focus(), 350);
+    return { el: h('div.dev-field', input, eye), input };
   }
 
-  /**
-   * Mot de passe oublié : avec le code de verrouillage, on en choisit un nouveau ;
-   * sans code, le mode développeur est désactivé (il faudra le réactiver).
-   */
-  async function resetDeveloperPassword() {
+  const devHero = (title, text, iconName = 'code') => h('div.settings-hero', h('div.hero-icon.dev-hero', icon(iconName, { size: 34 })), h('h2', title), h('p', text));
+
+  /** Formulaire « nouveau mot de passe » (création, changement, oubli). */
+  function newPasswordForm({ title, text, action, onDone }) {
+    const error = h('p.dev-error');
+    const submit = async () => {
+      const problem = passwordProblem(first.input.value, second.input.value);
+      if (problem) {
+        error.textContent = problem;
+        return;
+      }
+      try {
+        await action(first.input.value);
+        onDone();
+      } catch (e) {
+        error.textContent = e.message;
+      }
+    };
+    const first = passwordField('Nouveau mot de passe', { autofocus: true });
+    const second = passwordField('Confirmer le mot de passe', { onEnter: submit });
+    return [
+      devHero(title, text, 'lock-fill'),
+      h('div.dev-form', first.el, second.el, h('p.dev-hint', `Au moins ${MIN_PASSWORD_LENGTH} caractères, avec des lettres et des chiffres.`), error, button('Valider', { block: true, onClick: submit })),
+    ];
+  }
+
+  /** Mot de passe oublié : le propriétaire en choisit un nouveau après son code de verrouillage. */
+  async function forgotDeveloperPassword(refresh) {
+    if (!dev.canManage) return ctx.ui.alert({ title: 'Mot de passe oublié', message: `Demandez-le à ${dev.ownerName}, propriétaire de l'appareil.` });
     if (s.get('passcode')) {
-      if (!(await checkCurrentCode())) return false;
-      const record = await askDeveloperPassword('Nouveau mot de passe développeur');
-      if (!record) return false;
-      s.set('developerPassword', record);
-      ctx.ui.toast('Mot de passe modifié');
-      return true;
-    }
-    if (!(await ctx.ui.confirm({ title: 'Désactiver le mode développeur ?', message: 'Sans code de verrouillage, le mot de passe ne peut pas être réinitialisé : le mode développeur est désactivé. Réactivez-le depuis le numéro de build pour en choisir un nouveau.', confirmLabel: 'Désactiver', destructive: true }))) return false;
-    s.patch({ developer: false, developerPassword: null });
-    return false;
+      if (!(await checkCurrentCode())) return;
+    } else if (!(await ctx.ui.confirm({ title: 'Remplacer le mot de passe ?', message: 'Sans code de verrouillage, l\'appareil ne peut pas vérifier votre identité. Définissez un code pour mieux protéger le mode développeur.', confirmLabel: 'Remplacer' }))) return;
+    const p = open('Nouveau mot de passe', (done) => newPasswordForm({ title: 'Nouveau mot de passe développeur', text: 'Il remplace l\'ancien pour tous les comptes de l\'appareil.', action: (pw) => dev.replace(pw), onDone: () => { ctx.ui.toast('Mot de passe modifié'); nav.pop(); refresh(); } }), { back: 'Mode développeur' });
+    p.developer = true;
   }
 
-  /** Ouvre les options pour les développeurs : mot de passe demandé une fois par déverrouillage. */
-  async function openDeveloper() {
-    if (!ui.developerUnlocked) {
-      if (!s.get('developerPassword')) {
-        // Mode développeur activé avant l'arrivée des mots de passe : on en choisit un.
-        const record = await askDeveloperPassword('Choisissez un mot de passe développeur');
-        if (!record) return;
-        s.set('developerPassword', record);
-      } else if (!(await checkDeveloperPassword())) return;
-      ui.unlockDeveloper();
+  function unlockForm(refresh) {
+    const error = h('p.dev-error');
+    const submitBtn = button('Déverrouiller', { block: true, onClick: () => submit() });
+    const field = passwordField('Mot de passe développeur', { autofocus: true, onEnter: () => submit() });
+    const showWait = () => {
+      const wait = dev.wait;
+      submitBtn.disabled = Boolean(wait);
+      if (!wait) return;
+      error.textContent = `Trop de tentatives. Réessayez dans ${wait} s.`;
+      setTimeout(() => (error.isConnected ? showWait() : null), 1000);
+    };
+    async function submit() {
+      if (!field.input.value || dev.wait) return;
+      const result = await dev.unlock(field.input.value);
+      if (result.ok) {
+        ctx.ui.toast('Mode développeur déverrouillé');
+        refresh();
+        return;
+      }
+      field.input.value = '';
+      ctx.ui.vibrate([60, 40, 60]);
+      error.textContent = result.left ? `Mot de passe incorrect. Encore ${result.left} essai${result.left > 1 ? 's' : ''} avant un temps d'attente.` : 'Mot de passe incorrect.';
+      showWait();
     }
-    developerPage();
-  }
-
-  /** Numéro de build touché 7 fois : active le mode développeur (mot de passe à créer ou à saisir). */
-  async function enableDeveloper() {
-    if (s.get('developerPassword')) {
-      if (!(await checkDeveloperPassword())) return;
-    } else {
-      const record = await askDeveloperPassword('Créez un mot de passe développeur');
-      if (!record) return;
-      s.set('developerPassword', record);
-    }
-    s.set('developer', true);
-    ui.unlockDeveloper();
-    ctx.ui.toast('Vous êtes maintenant développeur !');
+    showWait();
+    return [
+      devHero('Mode développeur verrouillé', 'Saisissez le mot de passe développeur de l\'appareil pour ouvrir les options et le Terminal. Il est redemandé après chaque verrouillage.', 'lock-fill'),
+      h('div.dev-form', field.el, error, submitBtn, h('button.dev-link', { type: 'button', onclick: () => forgotDeveloperPassword(refresh) }, 'Mot de passe oublié ?')),
+    ];
   }
 
   function passcodePage() {
@@ -869,7 +862,7 @@ export function mount(root, ctx) {
         h('div.app-hero', appIcon(pkg, { size: 76 }), h('h2', pkg.name), h('p', `${pkg.category} · version ${pkg.version}`)),
         h(
           'div.app-actions',
-          button('Ouvrir', { variant: 'tinted', icon: 'arrow-right', onClick: () => ctx.startActivity({ app: id, action: 'main' }) }),
+          button('Ouvrir', { variant: 'tinted', icon: 'arrow-right', onClick: () => ctx.startActivity({ app: id, action: 'main' }).catch((error) => ctx.ui.toast(error.message)) }),
           button("Forcer l'arrêt", { variant: 'gray', icon: 'stop', disabled: !proc, onClick: () => { k.processes.killApp(id, 'force-stop'); ctx.ui.toast(`${pkg.name} arrêtée`); refresh(); } }),
         ),
         listGroup({
@@ -928,7 +921,7 @@ export function mount(root, ctx) {
         items: [
           row({ title: 'Réinitialiser tous les réglages', destructive: true, onClick: async () => {
             if (!(await ctx.ui.confirm({ title: 'Réinitialiser les réglages ?', message: 'Vos données sont conservées, seuls les réglages sont rétablis.', confirmLabel: 'Réinitialiser', destructive: true }))) return;
-            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved'].includes(key)) s.reset(key);
+            for (const key of Object.keys(s.all())) if (!['setupDone', 'userName', 'passcode', 'demoDataRemoved', 'developerState'].includes(key)) s.reset(key);
             ctx.ui.toast('Réglages réinitialisés');
           } }),
           me().owner
@@ -959,13 +952,13 @@ export function mount(root, ctx) {
             row({
               title: 'Numéro de build',
               detail: k.os.build,
+              // Geste Android : 7 touchers ouvrent le mode développeur.
               onClick: () => {
-                if (s.get('developer')) return ctx.ui.toast('Vous êtes déjà développeur');
                 taps++;
                 if (taps >= 7) {
                   taps = 0;
-                  enableDeveloper();
-                } else if (taps >= 3) ctx.ui.toast(`Plus que ${7 - taps} étape(s) pour devenir développeur`);
+                  developerPage();
+                } else if (taps >= 3) ctx.ui.toast(`Plus que ${7 - taps} étape(s) pour le mode développeur`);
               },
             }),
             row({ title: 'Noyau', detail: k.os.kernel }),
@@ -989,18 +982,59 @@ export function mount(root, ctx) {
     return p;
   }
 
+  /** Mode développeur : création du mot de passe, déverrouillage, puis options. */
   function developerPage() {
-    const p = open('Développeur', (refresh) => [
-      listGroup({
-        items: [toggleRow('Options pour les développeurs', 'developer', { onChange: (v) => !v && nav.pop() })],
-        footer: 'Protégées par votre mot de passe développeur, demandé de nouveau après chaque verrouillage de l\'appareil.',
-      }),
+    open('Mode développeur', (refresh) => {
+      if (dev.unlocked) return developerOptions(refresh);
+      if (dev.configured) return unlockForm(refresh);
+      if (!dev.canManage) return [devHero('Mode développeur non configuré', `Demandez à ${dev.ownerName}, propriétaire de l'appareil, de définir le mot de passe développeur.`)];
+      return newPasswordForm({
+        title: 'Créer le mot de passe développeur',
+        text: 'Il protège les options pour les développeurs et le Terminal, pour tous les comptes de l\'appareil. Vous seul pourrez le modifier.',
+        action: (pw) => dev.create(pw),
+        onDone: () => {
+          ctx.ui.toast('Mode développeur déverrouillé');
+          refresh();
+        },
+      });
+    });
+  }
+
+  function developerOptions(refresh) {
+    const openTerminal = () => ctx.startActivity({ app: 'terminal', action: 'main' }).catch((error) => ctx.ui.toast(error.message));
+    return [
       listGroup({
         items: [
-          row({ leading: appIcon(k.packages.get('terminal'), { size: 30 }), title: 'Terminal', subtitle: 'Shell osh : accès complet au système', chevron: true, onClick: () => ctx.startActivity({ app: 'terminal', action: 'main' }) }),
-          row({ icon: 'lock', iconColor: '#636366', title: 'Modifier le mot de passe développeur', onClick: async () => { const record = await askDeveloperPassword('Nouveau mot de passe développeur'); if (record) { s.set('developerPassword', record); ctx.ui.toast('Mot de passe modifié'); } } }),
+          row({ leading: appIcon(k.packages.get('terminal'), { size: 30 }), title: 'Terminal', subtitle: 'Shell osh : accès complet au système', chevron: true, onClick: openTerminal }),
+          row({ icon: 'lock', iconColor: '#636366', title: 'Verrouiller le mode développeur', onClick: () => dev.lock() }),
         ],
+        footer: 'Le mode développeur se verrouille aussi avec l\'appareil ; le Terminal est alors fermé.',
       }),
+      dev.canManage
+        ? listGroup({
+            header: 'Mot de passe de l\'appareil',
+            items: [
+              row({
+                title: 'Changer le mot de passe',
+                chevron: true,
+                onClick: () => {
+                  const p = open('Changer le mot de passe', () => newPasswordForm({ title: 'Nouveau mot de passe développeur', text: 'Il remplace l\'ancien pour tous les comptes de l\'appareil.', action: (pw) => dev.replace(pw), onDone: () => { ctx.ui.toast('Mot de passe modifié'); nav.pop(); } }), { back: 'Mode développeur' });
+                  p.developer = true;
+                },
+              }),
+              row({
+                title: 'Supprimer le mot de passe',
+                destructive: true,
+                onClick: async () => {
+                  if (!(await ctx.ui.confirm({ title: 'Supprimer le mot de passe ?', message: 'Le mode développeur et le Terminal ne seront plus accessibles jusqu\'à ce que vous en choisissiez un nouveau.', confirmLabel: 'Supprimer', destructive: true }))) return;
+                  await dev.remove();
+                  refresh();
+                },
+              }),
+            ],
+            footer: 'Commun à tous les comptes de l\'appareil. Seul le propriétaire peut le modifier.',
+          })
+        : null,
       listGroup({
         header: "Échelle d'animation",
         items: [
@@ -1040,8 +1074,7 @@ export function mount(root, ctx) {
           row({ icon: 'list', iconColor: '#636366', title: 'Journal système', chevron: true, onClick: logPage }),
         ],
       }),
-    ]);
-    p.developer = true;
+    ];
   }
 
   function simulate(kind) {
@@ -1058,13 +1091,13 @@ export function mount(root, ctx) {
   }
 
   function logPage() {
-    const p = open('Journal système', () => h('pre.log-view.selectable', k.log.list().slice(-200).map((e) => k.log.format(e)).join('\n')), { back: 'Développeur', large: false });
+    const p = open('Journal système', () => h('pre.log-view.selectable', k.log.list().slice(-200).map((e) => k.log.format(e)).join('\n')), { back: 'Mode développeur', large: false });
     p.developer = true;
   }
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: () => s.get('developer') && openDeveloper() };
+  const PAGES = { camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;
@@ -1082,10 +1115,10 @@ export function mount(root, ctx) {
     }),
   );
   ctx.on('destroy', () => offs.forEach((off) => off()));
-  // Appareil verrouillé : les pages développeur se referment (mot de passe redemandé).
+  // Mode développeur verrouillé : ses sous-pages se ferment, sa page redemande le mot de passe.
   ctx.subscribe('developer:lock', async () => {
     while (nav.top?.developer) await nav.pop({ animated: false });
-    if (nav.depth === 1) nav.top?.onShow?.();
+    nav.top?.onShow?.();
   });
 
   return {
