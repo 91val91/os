@@ -197,6 +197,9 @@ export const MANIFESTS = [
     color: ['#3a3a40', '#121214'],
     category: 'Outils de développement',
     system: true,
+    // Caché : ouvert uniquement depuis les options pour les développeurs (mot de passe).
+    hidden: true,
+    developer: true,
     statusBar: 'light',
     description: 'Shell osh : accès complet au système.',
     size: 1.4,

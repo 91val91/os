@@ -37,6 +37,8 @@ export function mount(root, ctx) {
   const me = () => k.account ?? { id: null, name: s.get('userName'), email: '', color: s.get('accent'), photo: null, owner: !accounts, createdAt: null };
   const accountAvatar = (a, size) => avatar(a.name || '?', { size, color: a.color, photo: a.photo });
   const row = (opts) => listItem(opts);
+  /** Apps listées dans les Réglages : les apps cachées (Terminal) seulement en mode développeur. */
+  const visibleApps = () => k.packages.list().filter((p) => !p.hidden || s.get('developer'));
   const toggleRow = (title, key, { icon: iconName, color, subtitle, invert = false, onChange } = {}) => {
     const sw = toggle(invert ? !s.get(key) : s.get(key), (v) => {
       s.set(key, invert ? !v : v);
@@ -110,9 +112,9 @@ export function mount(root, ctx) {
         }),
         listGroup({
           items: [
-            row({ icon: 'apps', iconColor: '#5856d6', title: 'Applications', detail: String(k.packages.list().length), chevron: true, onClick: appsPage }),
+            row({ icon: 'apps', iconColor: '#5856d6', title: 'Applications', detail: String(visibleApps().length), chevron: true, onClick: appsPage }),
             row({ icon: 'settings', iconColor: '#8e8e93', title: 'Général', chevron: true, onClick: generalPage }),
-            s.get('developer') ? row({ icon: 'code', iconColor: '#636366', title: 'Options pour les développeurs', chevron: true, onClick: developerPage }) : null,
+            s.get('developer') ? row({ icon: 'code', iconColor: '#636366', title: 'Options pour les développeurs', detail: ui.developerUnlocked ? null : icon('lock', { size: 15 }), chevron: true, onClick: openDeveloper }) : null,
             row({ icon: 'info', iconColor: '#8e8e93', title: `À propos de ${k.os.name}`, chevron: true, onClick: aboutPage }),
           ].filter(Boolean),
         }),
@@ -370,7 +372,7 @@ export function mount(root, ctx) {
       listGroup({ items: [toggleRow('Ne pas déranger', 'dnd', { icon: 'moon-fill', color: '#5e5ce6', subtitle: 'Masque les bannières et coupe les sons' })] }),
       listGroup({
         header: 'Applications',
-        items: k.packages.list().map((pkg) => {
+        items: visibleApps().map((pkg) => {
           const key = `notifications.${pkg.id}`;
           const sw = toggle(s.get(key) !== false, (v) => s.set(key, v), { label: pkg.name });
           return row({ leading: appIcon(pkg, { size: 30 }), title: pkg.name, trailing: sw });
@@ -578,7 +580,7 @@ export function mount(root, ctx) {
       listGroup({
         header: 'Autorisations',
         items: Object.entries(PERMISSIONS).map(([perm, info]) => {
-          const apps = k.packages.list().filter((p) => p.permissions.includes(perm));
+          const apps = visibleApps().filter((p) => p.permissions.includes(perm));
           return row({ icon: info.icon, iconColor: '#0a84ff', title: info.label, detail: String(apps.length), chevron: true, onClick: () => permissionPage(perm, info) });
         }),
         footer: 'Les applications doivent déclarer une autorisation puis la demander. Vous pouvez la révoquer à tout moment.',
@@ -588,7 +590,7 @@ export function mount(root, ctx) {
 
   function permissionPage(perm, info) {
     open(info.label, (refresh) => {
-      const apps = k.packages.list().filter((p) => p.permissions.includes(perm));
+      const apps = visibleApps().filter((p) => p.permissions.includes(perm));
       if (!apps.length) return h('p.muted.center', 'Aucune application ne demande cette autorisation.');
       return listGroup({
         items: apps.map((pkg) => permissionRow(pkg, perm, refresh)),
@@ -639,6 +641,99 @@ export function mount(root, ctx) {
     return false;
   }
 
+  // ───────────── Mode développeur (mot de passe) ─────────────
+
+  let developerFailures = 0;
+  let developerBlockedUntil = 0;
+
+  /** Demande un nouveau mot de passe développeur (deux fois) ; renvoie son empreinte. */
+  async function askDeveloperPassword(title = 'Mot de passe développeur') {
+    const first = await ctx.ui.prompt({ title, message: 'Il protège les options pour les développeurs et le Terminal (4 caractères minimum).', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Suivant' });
+    if (first == null) return null;
+    if (first.length < 4) {
+      await ctx.ui.alert({ title: 'Mot de passe trop court', message: 'Choisissez au moins 4 caractères.' });
+      return null;
+    }
+    const second = await ctx.ui.prompt({ title: 'Confirmez le mot de passe', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Valider' });
+    if (second == null) return null;
+    if (second !== first) {
+      await ctx.ui.alert({ title: 'Les mots de passe ne correspondent pas', message: 'Recommencez.' });
+      return null;
+    }
+    return createPasscode(first);
+  }
+
+  /** Vérifie le mot de passe développeur (5 essais, puis 30 secondes d'attente). */
+  async function checkDeveloperPassword() {
+    if (Date.now() < developerBlockedUntil) {
+      await ctx.ui.alert({ title: 'Trop de tentatives', message: 'Réessayez dans 30 secondes.' });
+      return false;
+    }
+    const value = await ctx.ui.prompt({ title: 'Options pour les développeurs', message: 'Saisissez le mot de passe développeur.', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Déverrouiller' });
+    if (value == null) return false;
+    if (await verifyPasscode(s.get('developerPassword'), value)) {
+      developerFailures = 0;
+      return true;
+    }
+    if (++developerFailures >= 5) {
+      developerFailures = 0;
+      developerBlockedUntil = Date.now() + 30_000;
+    }
+    const choice = await ctx.ui.alert({
+      title: 'Mot de passe incorrect',
+      buttons: [{ label: 'Réessayer', value: 'retry', role: 'default' }, { label: 'Mot de passe oublié ?', value: 'forgot' }, { label: 'Annuler', value: null, role: 'cancel' }],
+    });
+    if (choice === 'retry') return checkDeveloperPassword();
+    if (choice === 'forgot') return resetDeveloperPassword();
+    return false;
+  }
+
+  /**
+   * Mot de passe oublié : avec le code de verrouillage, on en choisit un nouveau ;
+   * sans code, le mode développeur est désactivé (il faudra le réactiver).
+   */
+  async function resetDeveloperPassword() {
+    if (s.get('passcode')) {
+      if (!(await checkCurrentCode())) return false;
+      const record = await askDeveloperPassword('Nouveau mot de passe développeur');
+      if (!record) return false;
+      s.set('developerPassword', record);
+      ctx.ui.toast('Mot de passe modifié');
+      return true;
+    }
+    if (!(await ctx.ui.confirm({ title: 'Désactiver le mode développeur ?', message: 'Sans code de verrouillage, le mot de passe ne peut pas être réinitialisé : le mode développeur est désactivé. Réactivez-le depuis le numéro de build pour en choisir un nouveau.', confirmLabel: 'Désactiver', destructive: true }))) return false;
+    s.patch({ developer: false, developerPassword: null });
+    return false;
+  }
+
+  /** Ouvre les options pour les développeurs : mot de passe demandé une fois par déverrouillage. */
+  async function openDeveloper() {
+    if (!ui.developerUnlocked) {
+      if (!s.get('developerPassword')) {
+        // Mode développeur activé avant l'arrivée des mots de passe : on en choisit un.
+        const record = await askDeveloperPassword('Choisissez un mot de passe développeur');
+        if (!record) return;
+        s.set('developerPassword', record);
+      } else if (!(await checkDeveloperPassword())) return;
+      ui.unlockDeveloper();
+    }
+    developerPage();
+  }
+
+  /** Numéro de build touché 7 fois : active le mode développeur (mot de passe à créer ou à saisir). */
+  async function enableDeveloper() {
+    if (s.get('developerPassword')) {
+      if (!(await checkDeveloperPassword())) return;
+    } else {
+      const record = await askDeveloperPassword('Créez un mot de passe développeur');
+      if (!record) return;
+      s.set('developerPassword', record);
+    }
+    s.set('developer', true);
+    ui.unlockDeveloper();
+    ctx.ui.toast('Vous êtes maintenant développeur !');
+  }
+
   function passcodePage() {
     open('Code de verrouillage', (refresh) => {
       const enabled = Boolean(s.get('passcode'));
@@ -663,7 +758,7 @@ export function mount(root, ctx) {
     const p = open('Batterie', () => {
       const b = k.device.battery;
       const pct = Math.round(b.level * 100);
-      const apps = k.packages.list().slice(0, 8);
+      const apps = visibleApps().slice(0, 8);
       const weights = apps.map((pkg, i) => ((pkg.id.charCodeAt(0) * 13 + i * 7) % 30) + 4);
       const total = weights.reduce((a, b2) => a + b2, 0);
       return [
@@ -718,8 +813,8 @@ export function mount(root, ctx) {
   function appsPage() {
     open('Applications', () => [
       listGroup({
-        header: `${k.packages.list().length} applications installées`,
-        items: k.packages.list().map((pkg) => row({ leading: appIcon(pkg, { size: 30 }), title: pkg.name, subtitle: pkg.system ? 'Application système' : `Version ${pkg.version}`, detail: formatBytes(pkg.size * 1_048_576 + (k.fs.exists(`/data/${pkg.id}`) ? k.fs.du(`/data/${pkg.id}`) : 0)), chevron: true, onClick: () => appPage(pkg.id) })),
+        header: `${visibleApps().length} applications installées`,
+        items: visibleApps().map((pkg) => row({ leading: appIcon(pkg, { size: 30 }), title: pkg.name, subtitle: pkg.system ? 'Application système' : `Version ${pkg.version}`, detail: formatBytes(pkg.size * 1_048_576 + (k.fs.exists(`/data/${pkg.id}`) ? k.fs.du(`/data/${pkg.id}`) : 0)), chevron: true, onClick: () => appPage(pkg.id) })),
       }),
       listGroup({ items: [row({ icon: 'bag', iconColor: '#1d5cf0', title: 'Obtenir plus d\'applications', chevron: true, onClick: () => ctx.startActivity({ app: 'store', action: 'main' }) })] }),
     ]);
@@ -831,8 +926,8 @@ export function mount(root, ctx) {
                 if (s.get('developer')) return ctx.ui.toast('Vous êtes déjà développeur');
                 taps++;
                 if (taps >= 7) {
-                  s.set('developer', true);
-                  ctx.ui.toast('Vous êtes maintenant développeur !');
+                  taps = 0;
+                  enableDeveloper();
                 } else if (taps >= 3) ctx.ui.toast(`Plus que ${7 - taps} étape(s) pour devenir développeur`);
               },
             }),
@@ -858,8 +953,17 @@ export function mount(root, ctx) {
   }
 
   function developerPage() {
-    open('Développeur', (refresh) => [
-      listGroup({ items: [toggleRow('Options pour les développeurs', 'developer', { onChange: (v) => !v && nav.pop() })] }),
+    const p = open('Développeur', (refresh) => [
+      listGroup({
+        items: [toggleRow('Options pour les développeurs', 'developer', { onChange: (v) => !v && nav.pop() })],
+        footer: 'Protégées par votre mot de passe développeur, demandé de nouveau après chaque verrouillage de l\'appareil.',
+      }),
+      listGroup({
+        items: [
+          row({ leading: appIcon(k.packages.get('terminal'), { size: 30 }), title: 'Terminal', subtitle: 'Shell osh : accès complet au système', chevron: true, onClick: () => ctx.startActivity({ app: 'terminal', action: 'main' }) }),
+          row({ icon: 'lock', iconColor: '#636366', title: 'Modifier le mot de passe développeur', onClick: async () => { const record = await askDeveloperPassword('Nouveau mot de passe développeur'); if (record) { s.set('developerPassword', record); ctx.ui.toast('Mot de passe modifié'); } } }),
+        ],
+      }),
       listGroup({
         header: "Échelle d'animation",
         items: [
@@ -897,10 +1001,10 @@ export function mount(root, ctx) {
       listGroup({
         items: [
           row({ icon: 'list', iconColor: '#636366', title: 'Journal système', chevron: true, onClick: logPage }),
-          row({ icon: 'terminal', iconColor: '#3a3a40', title: 'Ouvrir le Terminal', chevron: true, onClick: () => ctx.startActivity({ app: 'terminal', action: 'main' }) }),
         ],
       }),
     ]);
+    p.developer = true;
   }
 
   function simulate(kind) {
@@ -917,12 +1021,13 @@ export function mount(root, ctx) {
   }
 
   function logPage() {
-    open('Journal système', () => h('pre.log-view.selectable', k.log.list().slice(-200).map((e) => k.log.format(e)).join('\n')), { back: 'Développeur', large: false });
+    const p = open('Journal système', () => h('pre.log-view.selectable', k.log.list().slice(-200).map((e) => k.log.format(e)).join('\n')), { back: 'Développeur', large: false });
+    p.developer = true;
   }
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: () => s.get('developer') && openDeveloper() };
 
   function handleIntent(intent) {
     const data = intent?.data;
@@ -940,6 +1045,11 @@ export function mount(root, ctx) {
     }),
   );
   ctx.on('destroy', () => offs.forEach((off) => off()));
+  // Appareil verrouillé : les pages développeur se referment (mot de passe redemandé).
+  ctx.subscribe('developer:lock', async () => {
+    while (nav.top?.developer) await nav.pop({ animated: false });
+    if (nav.depth === 1) nav.top?.onShow?.();
+  });
 
   return {
     onIntent: async (intent) => {

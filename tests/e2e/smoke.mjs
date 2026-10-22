@@ -71,10 +71,16 @@ try {
   });
   check(ids.length >= 20, `${ids.length} applications installées`);
 
+  const developerApps = await page.evaluate(() => window.orion.kernel.packages.list().filter((p) => p.developer).map((p) => p.id));
   for (const id of ids) {
     const before = errors.length;
     await page.evaluate((app) => window.orion.ui.launch(app), id);
     await wait(900);
+    if (developerApps.includes(id)) {
+      const blocked = await page.evaluate((app) => window.orion.ui.wm.currentWindow?.appId !== app && !document.querySelector(`.layer-drawer [data-app="${app}"], .layer-home [data-app="${app}"]`), id);
+      check(blocked, `« ${id} » caché et réservé au mode développeur`);
+      continue;
+    }
     const permission = await page.$('.dialog.permission');
     if (permission) {
       await page.click('.dialog.permission .dialog-btn.default');
@@ -141,6 +147,49 @@ try {
   }
   await page.waitForFunction(() => window.orion.ui.state === 'home', null, { timeout: 5000 });
   check(await page.evaluate((n) => window.orion.kernel.account.owner && window.orion.kernel.packages.list().length === n, ids.length), 'Retour au propriétaire avec son code, ses apps intactes');
+
+  // Mode développeur : mot de passe créé à l'activation, demandé après chaque verrouillage.
+  const prompt = async (value) => {
+    await page.waitForSelector('.dialog input', { timeout: 5000 });
+    await page.fill('.dialog input', value);
+    await page.click('.dialog-btn.default');
+    await wait(400);
+  };
+  await page.evaluate(() => window.orion.ui.openIntent({ app: 'settings', action: 'view', data: { page: 'about' } }));
+  await wait(900);
+  for (let i = 0; i < 7; i++) {
+    await page.click('text=Numéro de build');
+    await wait(120);
+  }
+  await prompt('orion-dev');
+  await prompt('orion-dev');
+  check(await page.evaluate(() => window.orion.kernel.settings.get('developer') && window.orion.ui.developerUnlocked), 'Mode développeur activé avec un mot de passe');
+  await page.evaluate(() => window.orion.ui.openIntent({ app: 'settings', action: 'view', data: { page: 'developer' } }));
+  await wait(900);
+  await page.click('.list-item:has-text("Shell osh")');
+  await wait(1200);
+  check(await page.evaluate(() => window.orion.ui.wm.currentWindow?.appId === 'terminal'), 'Terminal ouvert depuis les options pour les développeurs');
+  await page.keyboard.press('Alt+L');
+  await wait(300);
+  await page.keyboard.press('Alt+L');
+  await wait(600);
+  check(await page.evaluate(() => !window.orion.ui.developerUnlocked && !window.orion.kernel.processes.getByApp('terminal')), 'Verrouillage : Terminal fermé, mot de passe redemandé');
+  await drag(0.5, 0.45, 0.5, 0.1);
+  for (const d of '2468') {
+    await page.click(`.pin-key:has(.pin-digit:text-is("${d}"))`);
+    await wait(80);
+  }
+  await page.waitForFunction(() => ['home', 'app'].includes(window.orion.ui.state), null, { timeout: 5000 });
+  await page.evaluate(() => window.orion.ui.openIntent({ app: 'settings', action: 'view', data: { page: 'developer' } }));
+  await wait(900);
+  await prompt('mauvais');
+  check(await page.isVisible('text=Mot de passe incorrect'), 'Mauvais mot de passe refusé');
+  await page.click('.dialog-btn:has-text("Réessayer")');
+  await wait(300);
+  await prompt('orion-dev');
+  check(await page.evaluate(() => window.orion.ui.developerUnlocked) && (await page.isVisible('text=Shell osh')), 'Bon mot de passe : options pour les développeurs ouvertes');
+  await page.evaluate(() => window.orion.ui.goHome());
+  await wait(500);
 
   const shell = await page.evaluate(async () => {
     const { Shell } = await import('./src/kernel/shell.js');

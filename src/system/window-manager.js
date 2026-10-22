@@ -66,6 +66,7 @@ export class WindowManager {
   async launch(appId, intent = { action: 'main' }, { callerPid = null, origin = null } = {}) {
     const pkg = this.k.packages.get(appId);
     if (!pkg || !this.k.packages.isInstalled(appId)) throw new Error(`Application introuvable : ${appId}`);
+    if (pkg.developer && !this.ui.developerUnlocked) throw new Error(`${pkg.name} s'ouvre depuis les options pour les développeurs`);
     let proc = this.k.processes.getByApp(appId);
     if (proc) {
       const win = this.windows.get(proc.pid);
@@ -331,15 +332,17 @@ export class WindowManager {
 
   showRecents() {
     if (this.inRecents) return;
+    // D'abord mettre les apps en arrière-plan : au-delà de la limite, les plus anciennes
+    // sont arrêtées et leurs fenêtres disparaissent avant la construction des cartes.
+    this.k.processes.backgroundAll();
     const order = this.k.processes
       .list()
       .filter((p) => this.windows.has(p.pid))
       .reverse()
       .map((p) => p.pid);
     this.inRecents = true;
-    this.recentsFrom = this.current;
+    this.recentsFrom = this.windows.has(this.current) ? this.current : null;
     this.current = null;
-    this.k.processes.backgroundAll();
     this.recentsOrder = order;
     this.scroll = Math.max(0, order.length - 1);
     if (this.recentsFrom == null && order.length > 1) this.scroll = order.length - 1;

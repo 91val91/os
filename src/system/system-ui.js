@@ -40,6 +40,8 @@ export class SystemUI {
     this.animScale = 1;
     this.screenRadius = 0;
     this.lastActivity = Date.now();
+    // Options pour les développeurs déverrouillées (mot de passe) jusqu'au prochain verrouillage.
+    this.developerUnlocked = false;
     platform.applyClasses();
     this.#buildDom();
   }
@@ -318,6 +320,7 @@ export class SystemUI {
 
   #wireKernelEvents() {
     const k = this.kernel;
+    k.settings.watch('developer', (on) => !on && this.lockDeveloper());
     k.events.on('power:request', ({ action }) => {
       if (action === 'lock') this.lockNow();
       if (action === 'reboot') this.power.reboot();
@@ -452,7 +455,21 @@ export class SystemUI {
     if (account) this.kernel.accounts.update(account.id, { lastLogin: Date.now() });
   }
 
+  /** Mot de passe développeur saisi : options et Terminal accessibles jusqu'au verrouillage. */
+  unlockDeveloper() {
+    this.developerUnlocked = true;
+  }
+
+  /** Referme l'accès développeur : les apps qui en dépendent (Terminal) sont fermées. */
+  lockDeveloper() {
+    if (!this.developerUnlocked) return;
+    this.developerUnlocked = false;
+    for (const [pid, win] of [...this.wm.windows]) if (win.pkg.developer) this.wm.close(pid);
+    this.kernel.events.emit('developer:lock', {});
+  }
+
   lockNow() {
+    this.lockDeveloper();
     this.closeOverlays();
     this.dialogs.closeAll();
     if (this.state === 'recents') this.wm.closeRecents();

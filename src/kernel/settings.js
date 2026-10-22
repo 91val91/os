@@ -40,8 +40,17 @@ export const DEFAULT_SETTINGS = {
   flashlight: false,
   // Lanceur
   homeLayout: null,
+  // Appareil photo
+  'camera.quality': 'standard', // high | standard | compact
+  'camera.format': 'photo', // photo (3:4) | square (1:1) | wide (9:16)
+  'camera.timer': 0, // secondes avant la prise de vue
+  'camera.grid': true,
+  'camera.mirror': true, // selfies enregistrés comme dans le viseur
+  'camera.shutterSound': true,
+  'camera.preserve': false, // garde mode, filtre et caméra d'une ouverture à l'autre
   // Développeur
   developer: false,
+  developerPassword: null, // { salt, hash } : protège les options et le Terminal
   animScale: 1,
   showTouches: false,
 };

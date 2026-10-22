@@ -20,7 +20,7 @@ export function mount(root, ctx) {
   let tab = 'today';
   let query = '';
 
-  const catalog = () => pm.list({ installed: null });
+  const catalog = () => pm.list({ installed: null }).filter((p) => !p.hidden);
   const optional = () => catalog().filter((p) => !p.system);
 
   // ───────────── Bouton Obtenir / Ouvrir ─────────────

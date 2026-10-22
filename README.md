@@ -76,7 +76,8 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Permissions à l'exécution (appareil photo, micro, localisation, contacts) : « Autoriser », « Une seule fois », « Refuser », révocables dans les Réglages.
 - Intents à la Android : « Ouvrir avec », « Partager avec », sélection d'une photo ou d'un contact depuis une autre app (`startActivityForResult`).
 - Alarmes système : réveils, minuteurs et rappels sonnent même si l'app est fermée.
-- Thèmes clair/sombre/automatique, Night Shift, luminosité, économiseur de batterie, options pour les développeurs (appuyez 7 fois sur le numéro de build).
+- Thèmes clair/sombre/automatique, Night Shift, luminosité, économiseur de batterie.
+- **Mode développeur protégé par mot de passe** : touchez 7 fois **Réglages → Général → Informations → Numéro de build** et choisissez un mot de passe. Il est redemandé pour ouvrir les options pour les développeurs après chaque verrouillage de l'appareil (5 essais, puis 30 s d'attente ; « Mot de passe oublié ? » avec le code de verrouillage).
 
 **Applications**
 
@@ -96,7 +97,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 | Navigateur | Barre d'adresse, favoris, historique, partage |
 | Fichiers | Explorateur du système de fichiers, import/export, renommage, déplacement |
 | Réglages | Réseau, notifications, sons, affichage, fonds d'écran, confidentialité, code, batterie, stockage, apps |
-| Terminal | Shell `osh` avec tubes, redirections, complétion et plus de 60 commandes |
+| Terminal | Shell `osh` avec tubes, redirections, complétion et plus de 60 commandes. Caché : il s'ouvre depuis les options pour les développeurs et se ferme au verrouillage |
 | Store | Catalogue, installation et désinstallation d'applications |
 | 2048, Snake, Dessin, Dictaphone | À installer depuis le Store |
 
@@ -172,6 +173,8 @@ Le contexte `ctx` donne accès au système :
 Les apps système reçoivent en plus `ctx.kernel` et `ctx.system`.
 
 ## Le shell `osh`
+
+Accessible depuis le Terminal, en mode développeur (**Réglages → Options pour les développeurs → Terminal**).
 
 ```sh
 $ neofetch
