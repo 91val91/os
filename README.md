@@ -134,14 +134,16 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 {
   id: 'meteo-plus',
   name: 'Météo+',
-  icon: 'cloud-sun',              // nom d'icône de src/lib/icons.js
-  color: ['#5bb8ff', '#1f5fd6'],  // dégradé de l'icône
+  icon: 'cloud-sun',              // pictogramme de l'icône (src/lib/icons.js)
+  color: ['#5bb8ff', '#1f5fd6'],  // dégradé de l'icône et fond de l'écran de lancement
   category: 'Météo',
   permissions: ['location'],
   intents: [{ action: 'view', types: ['text/plain'] }],
   load: () => import('./meteo-plus/index.js'),
 }
 ```
+
+Les applications intégrées ont leur propre illustration (`src/system/app-art.js`) ; les autres affichent ce pictogramme sur leur dégradé.
 
 2. Exportez une fonction `mount` :
 
