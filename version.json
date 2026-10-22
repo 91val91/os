@@ -13,7 +13,7 @@
   "Les applications n'ont plus accès aux données internes du système.",
   "Premier jet d'une image installable pour PC et machine virtuelle (orion-server pilote le Wi‑Fi, le Bluetooth, le modem et le GPS)."
  ],
- "size": 1165060,
+ "size": 1165299,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -180,8 +180,8 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "9d9cc6e69fa19684dfe04041f9ebfbdd4b1dc49d162acb546a391c3baff08434",
-   "size": 77859
+   "hash": "94636edfb7cc31b39878b219bc2211fb3a64eb3daadd4ebe7a2a1663365c0f9d",
+   "size": 78098
   },
   "./src/apps/settings/style.css": {
    "hash": "0cbbe7fb12c0e84d7b39e62e70201d8bf2fffe43a45e598ae163b0be0ca6573a",

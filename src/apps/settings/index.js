@@ -1491,7 +1491,12 @@ export function mount(root, ctx) {
   const isRoot = () => nav.depth === 1;
   for (const type of ['settings:change', 'package:install', 'package:uninstall', 'network:change', 'bluetooth:change']) ctx.subscribe(type, () => redraw(isRoot));
   // Mises à jour : la page suit la vérification et le téléchargement en direct.
-  ctx.subscribe('update:change', () => redraw((top) => top?.updates || isRoot()));
+  ctx.subscribe('update:change', ({ status }) => {
+    const wanted = (top) => top?.updates || isRoot();
+    // Un changement d'état s'affiche tout de suite ; seule la progression du téléchargement est regroupée.
+    if (status !== 'downloading' && wanted(nav.top)) nav.top?.onShow?.();
+    else redraw(wanted);
+  });
   // Mot de passe développeur créé, changé ou supprimé (autre fenêtre) : la page se met à jour.
   // Un simple essai raté (compté dans le registre) ne la redessine pas : le message d'erreur reste.
   ctx.subscribe('account:change', () => redraw((top) => (top?.devRoot && devState() !== devShown) || isRoot()));
