@@ -60,6 +60,20 @@
   aspect-ratio: auto;
 }
 
+/* L'image et la grille occupent un cadre 9:16 centré : l'aperçu est exactement la photo enregistrée. */
+.camera.wide .cam-viewfinder {
+  container-type: size;
+}
+
+.camera.wide .cam-video,
+.camera.wide .cam-sim,
+.camera.wide .cam-grid {
+  inset: 0;
+  margin: auto;
+  width: min(100cqw, 100cqh * 9 / 16);
+  height: min(100cqh, 100cqw * 16 / 9);
+}
+
 .camera.wide .cam-bottom {
   flex: 0 0 auto;
   gap: 16px;

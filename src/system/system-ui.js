@@ -462,6 +462,8 @@ export class SystemUI {
 
   lockNow() {
     this.developer.lock();
+    // Les apps au premier plan restent ouvertes derrière l'écran verrouillé : elles en sont prévenues.
+    this.kernel.events.emit('device:lock', {});
     this.closeOverlays();
     this.dialogs.closeAll();
     if (this.state === 'recents') this.wm.closeRecents();

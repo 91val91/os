@@ -646,7 +646,12 @@ export function mount(root, ctx) {
   // ───────────── Appareil photo ─────────────
 
   function cameraPage() {
-    const choice = (key, options) => h('div.list-item', segmented(options, s.get(key), (v) => s.set(key, v)));
+    const choice = (key, options) => {
+      const control = segmented(options, s.get(key), (v) => s.set(key, v));
+      // Réglage modifié ailleurs (bouton retardateur de l'appareil photo) : le contrôle suit.
+      ctx.on('destroy', s.watch(key, (v) => control.set(v)));
+      return h('div.list-item', control);
+    };
     open('Appareil photo', () => [
       listGroup({
         header: 'Format par défaut',

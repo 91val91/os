@@ -55,7 +55,7 @@ export class HomeScreen {
     k.fs.watch('/data/weather', () => this.#renderWeather());
     setInterval(() => {
       if (this.dateKey !== new Date().toDateString()) {
-        refreshCalendarIcons(this.el);
+        refreshCalendarIcons();
         this.#renderDate();
       }
     }, 30_000);

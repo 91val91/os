@@ -102,9 +102,9 @@ export function mount(root, ctx) {
     remember();
   }
 
-  /** Mémorise format, filtre et caméra pour « Conserver les réglages ». */
+  /** Mémorise la dernière utilisation (appliquée à l'ouverture si « Conserver les réglages »). */
   function remember() {
-    if (setting('preserve')) ctx.storage.set('last', { mode, filter: filter.id, facing });
+    ctx.storage.set('last', { mode, filter: filter.id, facing });
   }
 
   /** Grille, retardateur : suivent les Réglages, même modifiés pendant que l'app est ouverte. */
@@ -129,7 +129,7 @@ export function mount(root, ctx) {
     const tick = () => {
       if (!left) {
         cancelCountdown();
-        capture();
+        if (ctx.foreground) capture();
         return;
       }
       countdownEl.textContent = String(left);
@@ -307,6 +307,12 @@ export function mount(root, ctx) {
   setMode(mode);
   applySettings();
   for (const key of ['grid', 'timer']) ctx.settings.watch(`camera.${key}`, applySettings);
+  // Nouveau format par défaut choisi dans les Réglages : appliqué tout de suite (sauf « Conserver »).
+  ctx.settings.watch('camera.format', (value) => {
+    if (!setting('preserve') && MODES.some((m) => m.id === value)) setMode(value);
+  });
+  // Appareil verrouillé pendant le compte à rebours : pas de photo derrière l'écran verrouillé.
+  ctx.subscribe('device:lock', cancelCountdown);
   renderThumb();
   start();
   ctx.subscribe('fs:change', ({ path }) => {

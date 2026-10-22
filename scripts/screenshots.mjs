@@ -92,10 +92,9 @@ try {
   await wait(500);
 
   // Terminal (mode développeur), Musique, Météo, Store.
-  await run(() => {
-    window.orion.kernel.settings.set('developer', true);
-    window.orion.ui.unlockDeveloper();
-    window.orion.ui.launch('terminal');
+  await run(async () => {
+    await window.orion.ui.developer.create('orion2026');
+    await window.orion.ui.launch('terminal');
   });
   await wait(900);
   for (const command of ['neofetch', 'users']) {
