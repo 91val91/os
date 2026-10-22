@@ -1,17 +1,18 @@
 /**
- * Fichiers : explorateur du système de fichiers virtuel (import, export,
- * renommage, déplacement, suppression, ouverture via les intents).
+ * Fichiers : explorateur de l'espace de l'utilisateur (import, export,
+ * renommage, déplacement, suppression, ouverture via les intents). Les
+ * fichiers système ne sont pas accessibles (bac à sable des applications).
  */
 import { h } from '../../lib/dom.js';
 import { longPress } from '../../lib/gesture.js';
 import { formatBytes, relativeTime } from '../../lib/format.js';
 import { navStack, page, listGroup, listItem, iconTile, iconButton, emptyState } from '../../lib/ui.js';
-import { basename, dirname, isTextMime, mimeFromName } from '../../kernel/vfs.js';
+import { basename, dirname, isTextMime, mimeFromName, inUserSpace } from '../../kernel/vfs.js';
 import { USER_DIRS } from '../../kernel/seed.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
-const ROOT_LABELS = { '/': 'Racine', '/home': 'Mon téléphone', '/data': 'Données des apps', '/system': 'Système', '/tmp': 'Temporaire' };
+const ROOT_LABELS = { '/home': 'Mon téléphone', '/tmp': 'Temporaire' };
 const DIR_ICONS = { Documents: ['file-text', '#5b8def'], Photos: ['image', '#f2437b'], Music: ['music', '#ff4d6d'], Downloads: ['download', '#34c759'], Recordings: ['mic', '#ff9500'] };
 
 function labelFor(path) {
@@ -68,7 +69,6 @@ export function mount(root, ctx) {
           header: 'Emplacements',
           items: [
             listItem({ leading: iconTile('home', '#5856d6'), title: 'Dossier personnel', subtitle: '/home', chevron: true, onClick: () => openDir('/home') }),
-            listItem({ leading: iconTile('storage', '#636366'), title: 'Racine du système', subtitle: '/', chevron: true, onClick: () => openDir('/') }),
           ],
         }),
         listGroup({
@@ -275,7 +275,7 @@ export function mount(root, ctx) {
   nav.push(browsePage());
   const handle = (intent) => {
     const path = intent?.data?.path;
-    if (path && fs.isDir(path)) openDir(path);
+    if (path && inUserSpace(path) && fs.isDir(path)) openDir(path);
   };
   handle(ctx.intent);
   ctx.onBack(async () => (nav.depth > 1 ? nav.pop() : false));

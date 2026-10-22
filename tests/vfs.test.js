@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FileSystem, normalize, resolve, dirname, basename, extname, byteLength, FsError } from '../src/kernel/vfs.js';
+import { FileSystem, normalize, resolve, dirname, basename, extname, byteLength, FsError, sandbox, inUserSpace } from '../src/kernel/vfs.js';
 import { MemoryBackend, Namespace } from '../src/kernel/storage.js';
 
 async function fresh(backend = new MemoryBackend()) {
@@ -110,4 +110,36 @@ test('observateurs de modifications', async () => {
     changes.map((c) => c.path),
     ['/home', '/home/a'],
   );
+});
+
+test('bac à sable des applications : pas d\'accès aux fichiers système', async () => {
+  const fs = await new FileSystem({ store: new Namespace(new MemoryBackend(), 'fs') }).mount();
+  fs.mkdir('/home/Documents', { recursive: true });
+  fs.mkdir('/system', { recursive: true, system: true });
+  fs.writeFile('/system/version', 'Orion', { system: true });
+  fs.mkdir('/data/notes', { recursive: true });
+  fs.mkdir('/data/messages', { recursive: true });
+  fs.writeFile('/data/messages/storage.json', '{}');
+  const app = sandbox(fs, ['/home', '/tmp', '/data/notes']);
+
+  app.writeFile('/home/Documents/a.txt', '/system/version');
+  assert.equal(app.readFile('/home/Documents/a.txt'), '/system/version', 'un contenu qui ressemble à un chemin est permis');
+  app.writeJSON('/data/notes/storage.json', { ok: true });
+  assert.deepEqual(app.readdir('/home').map((e) => e.name), ['Documents']);
+  for (const attempt of [
+    () => app.readFile('/system/version'),
+    () => app.readdir('/'),
+    () => app.exists('/data/messages/storage.json'),
+    () => app.readFile('/home/../system/version'),
+    () => app.rename('/home/Documents/a.txt', '/system/a.txt'),
+    () => app.copy('/system/version', '/home/v.txt'),
+    () => [...app.walk('/data')],
+    () => app.du(),
+  ]) {
+    assert.throws(attempt, (e) => e instanceof FsError && e.code === 'EACCES');
+  }
+  assert.equal(inUserSpace('/home/Photos/a.jpg'), true);
+  assert.equal(inUserSpace('/homework'), false);
+  assert.equal(inUserSpace('/tmp/x'), true);
+  assert.equal(inUserSpace('/data/notes/x'), false);
 });

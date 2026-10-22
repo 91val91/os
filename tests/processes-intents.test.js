@@ -72,8 +72,10 @@ test('intents implicites, sélecteur et intents explicites', async () => {
   const { am, processes } = await setup();
   assert.deepEqual(am.resolve({ action: 'send', type: 'text/plain' }).map((p) => p.id).sort(), ['messages', 'notes']);
   // Sans hôte graphique, le premier candidat est lancé.
-  const pid = await am.start({ action: 'view', type: 'text/plain', data: { path: '/a.txt' } });
+  const pid = await am.start({ action: 'view', type: 'text/plain', data: { path: '/home/Documents/a.txt' } });
   assert.equal(processes.get(pid).appId, 'notes');
+  // Aucune application ne reçoit un fichier système.
+  await assert.rejects(am.start({ action: 'view', type: 'text/plain', data: { path: '/home/../system/version' } }), /fichiers système/);
   // Avec un hôte, le sélecteur choisit.
   am.host = { choose: async (candidates) => candidates.find((p) => p.id === 'messages').id, launch: async (appId, intent) => processes.spawn(appId, { intent }).pid };
   const pid2 = await am.start({ action: 'send', type: 'text/plain' });

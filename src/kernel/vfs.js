@@ -35,6 +35,40 @@ export function normalize(path) {
   return '/' + parts.join('/');
 }
 
+/** Espace de l'utilisateur : ses dossiers et les fichiers temporaires. Le reste est réservé au système. */
+export const USER_SPACE = ['/home', '/tmp'];
+
+const within = (path, roots) => {
+  const p = normalize(path);
+  return roots.some((root) => p === root || p.startsWith(`${root}/`));
+};
+
+export const inUserSpace = (path) => within(path, USER_SPACE);
+
+/** Méthodes dont les deux premiers arguments sont des chemins (les autres n'en ont qu'un). */
+const TWO_PATHS = new Set(['rename', 'copy']);
+
+/**
+ * Vue du système de fichiers limitée à `roots` : c'est celle que reçoivent les
+ * applications (espace de l'utilisateur et leurs propres données). Les
+ * fichiers système (/system, /data des autres apps…) leur sont refusés.
+ */
+export function sandbox(fs, roots) {
+  return new Proxy(fs, {
+    get(target, key) {
+      const value = Reflect.get(target, key, target);
+      if (typeof value !== 'function' || key === 'constructor') return value;
+      return (...args) => {
+        for (let i = 0; i < (TWO_PATHS.has(key) ? 2 : 1); i++) {
+          const path = typeof args[i] === 'string' ? args[i] : '/';
+          if (!within(path, roots)) throw new FsError('EACCES', normalize(path));
+        }
+        return value.apply(target, args);
+      };
+    },
+  });
+}
+
 export function resolve(cwd, path) {
   return normalize(String(path).startsWith('/') ? path : `${cwd}/${path}`);
 }

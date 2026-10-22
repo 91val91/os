@@ -9,6 +9,7 @@
  * `start(intent, { forResult: true })` renvoie une promesse résolue quand
  * l'application cible appelle `finish(result)` (startActivityForResult).
  */
+import { inUserSpace } from './vfs.js';
 
 export function matchType(pattern, type) {
   if (!pattern || pattern === '*/*' || pattern === '*') return true;
@@ -64,6 +65,9 @@ export class ActivityManager {
       if (!appId) return null;
     }
     if (!this.packages.isInstalled(appId)) throw new Error(`Application non installée : ${appId}`);
+    // Les applications n'ont pas accès aux fichiers système (voir sandbox dans vfs.js).
+    const path = intent.data?.path;
+    if (typeof path === 'string' && !inUserSpace(path)) throw new Error(`Les applications n'ont pas accès aux fichiers système : ${path}`);
     this.log?.info('am', `intent ${intent.action ?? 'main'} → ${appId}`);
 
     const pid = this.host

@@ -5,6 +5,7 @@
  * sont libérées automatiquement à la fermeture du processus.
  */
 import { EventBus } from '../kernel/events.js';
+import { sandbox, USER_SPACE } from '../kernel/vfs.js';
 
 export function createAppContext({ ui, proc, pkg }) {
   const kernel = ui.kernel;
@@ -50,7 +51,8 @@ export function createAppContext({ ui, proc, pkg }) {
     },
     kernel: pkg.system ? kernel : null,
     system: pkg.system ? ui : null,
-    fs: kernel.fs,
+    // Fichiers : espace de l'utilisateur et données de l'app, pas les fichiers système.
+    fs: sandbox(kernel.fs, [...USER_SPACE, dataDir]),
     dataDir,
     storage,
     contacts: kernel.contacts,

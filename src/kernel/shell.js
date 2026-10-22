@@ -5,7 +5,7 @@
  * redirections (>, >>) et enchaînements (;, &&, ||). Les commandes
  * agissent directement sur les services du noyau.
  */
-import { resolve, isTextMime, mimeFromName } from './vfs.js';
+import { resolve, isTextMime, mimeFromName, inUserSpace } from './vfs.js';
 import { evaluate, clean } from '../lib/expr.js';
 import { displayName } from './contacts.js';
 
@@ -937,6 +937,7 @@ const COMMANDS = {
         return;
       }
       const path = this.path(target);
+      if (k.fs.exists(path) && !inUserSpace(path)) throw new ShellError(`${target} : les applications n'ont pas accès aux fichiers système (lisez-le avec cat)`);
       if (k.fs.exists(path) && !k.fs.isDir(path)) {
         await k.am.start({ action: 'view', type: k.fs.stat(path).mime ?? mimeFromName(path), data: { path } });
         return;

@@ -95,7 +95,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 | Météo | Prévisions réelles via Open-Meteo, géolocalisation, recherche de villes ; données simulées hors ligne |
 | Musique | Morceaux génératifs synthétisés en temps réel, import de fichiers audio, contrôle système |
 | Navigateur | Barre d'adresse, favoris, historique, partage |
-| Fichiers | Explorateur du système de fichiers, import/export, renommage, déplacement |
+| Fichiers | Explorateur de votre espace personnel (Documents, Photos, Musique…), import/export, renommage, déplacement. Les fichiers système n'y sont pas accessibles |
 | Réglages | Réseau, notifications, sons, affichage, fonds d'écran, confidentialité, code, batterie, stockage, apps |
 | Terminal | Shell `osh` avec tubes, redirections, complétion et plus de 60 commandes. Caché : il s'ouvre depuis les options pour les développeurs et se ferme au verrouillage |
 | Store | Catalogue, installation et désinstallation d'applications |
@@ -124,6 +124,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 - Les services communiquent par un **bus d'événements** (`process:start`, `notification:post`, `alarm:fire`, `call:state`…).
 - Les **comptes** sont listés dans un registre séparé (`orion-accounts`) ; chaque compte a sa propre base (`orion-os` pour le propriétaire, celle d'avant les comptes), ouverte au démarrage : changer d'utilisateur redémarre le système sur ses données.
 - Le **système de fichiers virtuel** est hiérarchique (`/home`, `/data/<app>`, `/system` en lecture seule, `/tmp`), lisible de façon synchrone et persisté de façon asynchrone.
+- Chaque application travaille dans un **bac à sable** : `ctx.fs` ne donne accès qu'à l'espace de l'utilisateur (`/home`, `/tmp`) et à ses propres données (`/data/<app>`) ; les fichiers système et ceux des autres apps lui sont refusés (`EACCES`), et aucun intent ne peut lui en confier un. Seul le Terminal, en mode développeur, voit tout le système.
 - L'**interface système** est l'« hôte » du gestionnaire d'activités : elle crée une fenêtre par processus, charge le module de l'app à la demande et l'anime.
 
 ## Écrire une application
