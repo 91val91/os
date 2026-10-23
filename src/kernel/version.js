@@ -17,6 +17,7 @@ export const RELEASE = Object.freeze({
   notes: Object.freeze([
     'Orion OS passe en 0.1 (alpha) : la numérotation repart de zéro jusqu\'à la première version stable. Vos données, comptes et réglages sont conservés.',
     'Programme développeur du Store : publiez vos propres apps, gratuites ou payantes, et suivez vos ventes dans la console développeur (Store → Compte).',
+    'Exemple pour les développeurs : Courrier, une app d\'e-mail complète (boîtes, brouillons, recherche, balayage), à charger dans la console avec « Modèles » puis à publier.',
     'Le Store affiche les apps des développeurs, avec achat, reçus et remboursement (paiements fictifs pendant l\'alpha : solde de test) ; les apps publiées s\'exécutent isolées du système, sans accès à Internet.',
     'Nouveau : Protection de l\'appareil — bilan de sécurité, vérification de l\'intégrité du système, analyse des apps, protection contre la réinitialisation, effacement après trop d\'échecs du code et verrouillage en cas de vol.',
     'Les erreurs de code de verrouillage sont comptées même après un redémarrage ; achats et réglages sensibles demandent le code.',

@@ -1,0 +1,1309 @@
+<!--
+  Courrier : app d'e-mail pour Orion OS (app du Store, SDK orion).
+
+  Boîtes Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille ;
+  lecture, réponse, réponse à tous, transfert ; brouillons enregistrés
+  pendant la saisie ; recherche ; sélection multiple ; balayage pour
+  supprimer ou archiver, avec annulation ; réglages (signature, aperçu…).
+
+  Les apps du Store s'exécutent isolées, sans accès à Internet : les
+  messages restent sur l'appareil (orion.storage, 1 Mo). Ceux que l'on
+  s'adresse arrivent dans Réception, et demo@courrier.app répond
+  automatiquement, pour montrer l'arrivée d'un message.
+-->
+<style>
+  :root {
+    --bg: #fff;
+    --fg: #000;
+    --muted: #8a8a8e;
+    --line: rgba(60, 60, 67, 0.2);
+    --group: #f2f2f7;
+    --card: #fff;
+    --sheet: rgba(255, 255, 255, 0.97);
+    --bar: rgba(248, 248, 250, 0.94);
+    --field: rgba(118, 118, 128, 0.12);
+    --pressed: #fff;
+    --selected: #e8f1ff;
+    --accent: #007aff;
+    --danger: #ff3b30;
+    --flag: #ff9500;
+    --archive: #af52de;
+    --ok: #34c759;
+    color-scheme: light;
+  }
+  :root[data-theme='dark'] {
+    --bg: #000;
+    --fg: #fff;
+    --muted: #8d8d93;
+    --line: rgba(84, 84, 88, 0.55);
+    --group: #000;
+    --card: #1c1c1e;
+    --sheet: #2c2c2e;
+    --bar: rgba(22, 22, 24, 0.94);
+    --field: rgba(118, 118, 128, 0.24);
+    --pressed: #636366;
+    --selected: #0d2440;
+    --accent: #0a84ff;
+    --danger: #ff453a;
+    --flag: #ff9f0a;
+    --archive: #bf5af2;
+    --ok: #30d158;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font: 16px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { margin: 0; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: default; opacity: 0.35; }
+  svg { display: block; flex: none; }
+
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #app[data-view='boxes'], #app[data-view='settings'], #app[data-view='setup'] { background: var(--group); }
+  .bar { display: flex; flex: none; align-items: center; gap: 2px; min-height: 50px; padding: 4px 6px; }
+  .bar-title { flex: 1; overflow: hidden; font-size: 17px; font-weight: 600; text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+  .spacer { flex: 1; }
+  .link { display: inline-flex; align-items: center; gap: 2px; min-width: 40px; min-height: 40px; padding: 0 8px; border-radius: 10px; color: var(--accent); font-size: 17px; white-space: nowrap; }
+  .link:active:not(:disabled) { opacity: 0.45; }
+  .link.danger { color: var(--danger); }
+  .link[aria-pressed='true'] { background: var(--accent); color: #fff; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .large { margin: 0; padding: 0 16px 10px; font-size: 32px; font-weight: 700; }
+  .toolbar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 4px; min-height: 50px; padding: 4px 8px; border-top: 0.5px solid var(--line); background: var(--bar); }
+  .status { flex: 1; overflow: hidden; color: var(--muted); font-size: 12px; text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+
+  /* Listes groupées (boîtes, réglages, configuration) */
+  .group { margin: 0 16px 24px; overflow: hidden; border-radius: 12px; background: var(--card); }
+  .group-title { margin: 0 32px 6px; color: var(--muted); font-size: 13px; text-transform: uppercase; }
+  .group-foot { margin: -16px 32px 24px; color: var(--muted); font-size: 13px; }
+  .cell { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 0 16px; text-align: left; }
+  .cell + .cell::before { content: ''; position: absolute; top: 0; right: 0; left: 16px; border-top: 0.5px solid var(--line); }
+  .cell.icon + .cell.icon::before { left: 52px; }
+  .cell > span:first-child:not(.box-icon) { flex: none; }
+  .cell .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell input:not(.switch) { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: none; text-align: right; }
+  .cell textarea { flex: 1; min-height: 88px; padding: 12px 0; border: 0; outline: 0; background: none; resize: vertical; }
+  .cell.stack { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; }
+  .cell.danger { justify-content: center; color: var(--danger); }
+  .box-icon { color: var(--accent); }
+  .box-icon.flagged { color: var(--flag); }
+  .count { color: var(--muted); }
+  .chev { color: var(--muted); opacity: 0.6; }
+  .account { display: flex; align-items: center; gap: 12px; margin: 0 16px 20px; padding: 12px 16px; border-radius: 12px; background: var(--card); }
+  .account div { display: grid; min-width: 0; }
+  .account span { overflow: hidden; color: var(--muted); font-size: 14px; text-overflow: ellipsis; }
+  .seg { display: flex; padding: 2px; border-radius: 9px; background: var(--field); }
+  .seg button { flex: 1; padding: 6px 4px; border-radius: 7px; font-size: 13px; }
+  .seg button[aria-pressed='true'] { background: var(--pressed); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); font-weight: 600; }
+  .switch { position: relative; flex: none; width: 51px; height: 31px; margin: 0 0 0 auto; border-radius: 16px; background: var(--field); cursor: pointer; transition: background 0.2s; appearance: none; -webkit-appearance: none; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); transition: transform 0.2s; }
+  .switch:checked { background: var(--ok); }
+  .switch:checked::after { transform: translateX(20px); }
+
+  /* Configuration */
+  .setup { padding: 28px 0 24px; text-align: center; }
+  .setup-logo { display: grid; place-items: center; width: 84px; height: 84px; margin: 12px auto 18px; border-radius: 22px; background: linear-gradient(160deg, #5ac8fa, #007aff); color: #fff; box-shadow: 0 8px 24px rgba(0, 122, 255, 0.35); }
+  .setup h1 { margin: 0 24px 8px; font-size: 28px; }
+  .setup > p { margin: 0 32px 24px; }
+  .setup .cell input { text-align: left; }
+  .setup .cell > span:first-child { width: 72px; }
+  .error { min-height: 20px; margin: -14px 32px 12px; color: var(--danger); font-size: 14px; text-align: left; }
+  .primary { display: block; width: calc(100% - 32px); min-height: 50px; margin: 0 16px; border-radius: 14px; background: var(--accent); color: #fff; font-size: 17px; font-weight: 600; }
+  .note { display: flex; gap: 8px; margin: 16px; padding: 10px 12px; border-radius: 12px; background: var(--field); color: var(--muted); font-size: 13px; text-align: left; }
+
+  /* Liste des messages */
+  .search { display: flex; align-items: center; gap: 6px; height: 36px; margin: 0 16px 8px; padding: 0 8px; border-radius: 10px; background: var(--field); color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--fg); font-size: 17px; }
+  .row { position: relative; overflow: hidden; touch-action: pan-y; }
+  /* Fond révélé par le balayage : seulement pendant le geste. */
+  .row:not(.dragging):not(.settling) .row-behind { visibility: hidden; }
+  .row-behind { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 20px; background: var(--danger); color: #fff; font-weight: 600; }
+  .row-behind.archive { background: var(--archive); }
+  .row-main { position: relative; display: flex; gap: 8px; width: 100%; padding: 10px 0 0 8px; background: var(--bg); text-align: left; transition: transform 0.22s ease; }
+  .row.dragging .row-main { transition: none; }
+  .row.armed .row-behind span { transform: scale(1.08); }
+  .row.selected .row-main { background: var(--selected); }
+  .dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; }
+  .unread .dot { visibility: visible; }
+  .check { display: grid; flex: none; place-items: center; width: 22px; height: 22px; margin: 2px 2px 0 4px; border: 1.5px solid var(--muted); border-radius: 50%; color: #fff; }
+  .selected .check { border-color: var(--accent); background: var(--accent); }
+  .row-body { display: block; flex: 1; min-width: 0; padding: 0 16px 10px 0; border-bottom: 0.5px solid var(--line); }
+  .row-top { display: flex; align-items: center; gap: 6px; }
+  .from { flex: 1; overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+  .from em { color: var(--danger); font-style: normal; font-weight: 500; }
+  .date { flex: none; color: var(--muted); font-size: 14px; }
+  .subject, .preview { display: block; overflow: hidden; font-size: 15px; }
+  .subject { white-space: nowrap; text-overflow: ellipsis; }
+  .preview { display: -webkit-box; color: var(--muted); -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines, 2); }
+  .flag-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--flag); }
+  .replied { color: var(--muted); }
+  .empty { display: grid; place-items: center; gap: 4px; padding: 64px 32px; color: var(--muted); text-align: center; }
+  .avatar { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: #fff; font-size: 15px; font-weight: 600; }
+
+  /* Lecture */
+  .reader { padding: 0 16px 32px; }
+  .msg-head { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0 12px; border-bottom: 0.5px solid var(--line); }
+  .msg-meta { flex: 1; min-width: 0; }
+  .msg-meta > div { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .msg-from { display: flex; align-items: baseline; gap: 8px; }
+  .msg-from strong { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .msg-subject { display: flex; align-items: center; gap: 8px; margin: 14px 0 2px; font-size: 21px; overflow-wrap: anywhere; }
+  .msg-body { margin-top: 16px; font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+  .msg-body blockquote { margin: 4px 0; padding-left: 10px; border-left: 3px solid var(--accent); color: var(--muted); }
+  .toolbar .link[aria-pressed='true'].flag { background: none; color: var(--flag); }
+
+  /* Rédaction */
+  .send { display: grid; place-items: center; width: 36px; height: 36px; margin-right: 4px; border-radius: 50%; background: var(--accent); color: #fff; }
+  .cfield { display: flex; align-items: center; gap: 6px; min-height: 46px; padding: 0 16px; border-bottom: 0.5px solid var(--line); color: var(--muted); }
+  .cfield input { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: none; color: var(--fg); }
+  .cfield.invalid input { color: var(--danger); }
+  .suggest { display: flex; gap: 6px; padding: 8px 16px; overflow-x: auto; border-bottom: 0.5px solid var(--line); }
+  .suggest:empty { display: none; }
+  .chip { display: flex; flex: none; flex-direction: column; padding: 6px 12px; border-radius: 12px; background: var(--field); font-size: 14px; text-align: left; }
+  .chip small { color: var(--muted); font-size: 12px; }
+  .cbody { display: block; width: 100%; min-height: 220px; padding: 14px 16px; border: 0; outline: 0; background: none; color: var(--fg); font-size: 16px; line-height: 1.5; resize: none; }
+
+  /* Feuille d'actions et message temporaire */
+  #sheet { position: fixed; inset: 0; z-index: 20; }
+  #sheet[hidden] { display: none; }
+  .sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); opacity: 0; transition: opacity 0.2s; }
+  .sheet-panel { position: absolute; right: 8px; bottom: 8px; left: 8px; display: grid; gap: 8px; transform: translateY(110%); transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  #sheet.open .sheet-backdrop { opacity: 1; }
+  #sheet.open .sheet-panel { transform: none; }
+  .sheet-group { overflow: hidden; border-radius: 14px; background: var(--sheet); }
+  .sheet-title { padding: 12px 16px; border-bottom: 0.5px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; }
+  .sheet-btn { display: block; width: 100%; min-height: 56px; background: var(--sheet); color: var(--accent); font-size: 19px; }
+  .sheet-btn + .sheet-btn { border-top: 0.5px solid var(--line); }
+  .sheet-btn.danger { color: var(--danger); }
+  .sheet-btn.cancel { border-radius: 14px; font-weight: 600; }
+  #snack { position: fixed; right: 12px; bottom: 62px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: rgba(44, 44, 46, 0.97); color: #fff; font-size: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); opacity: 0; pointer-events: none; transform: translateY(16px); transition: opacity 0.2s, transform 0.2s; }
+  #snack.show { opacity: 1; pointer-events: auto; transform: none; }
+  :root[data-theme='dark'] #snack { background: rgba(72, 72, 74, 0.97); }
+  #snack span { flex: 1; }
+  #snack button { color: #64d2ff; font-weight: 600; }
+</style>
+
+<div id="app"></div>
+<div id="sheet" hidden></div>
+<div id="snack" role="status"></div>
+
+<script>
+'use strict';
+
+const $app = document.getElementById('app');
+const $sheet = document.getElementById('sheet');
+const $snack = document.getElementById('snack');
+
+const MINUTE = 60_000;
+const DAY = 86_400_000;
+const DEMO = 'demo@courrier.app';
+const TRASH_DAYS = 30;
+const MAX_BODY = 50_000;
+const SWIPE = 90; // pixels à balayer pour déclencher l'action
+const EMAIL = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[a-z]{2,}$/i;
+const COLORS = ['#ff9500', '#34c759', '#007aff', '#af52de', '#ff2d55', '#5ac8fa', '#5856d6', '#a2845e'];
+
+const BOXES = [
+  { id: 'inbox', name: 'Réception', icon: 'inbox', empty: 'Aucun message' },
+  { id: 'flagged', name: 'Favoris', icon: 'flag', empty: 'Touchez le drapeau d\'un message pour le retrouver ici.' },
+  { id: 'drafts', name: 'Brouillons', icon: 'draft', empty: 'Aucun brouillon' },
+  { id: 'sent', name: 'Envoyés', icon: 'send', empty: 'Aucun message envoyé' },
+  { id: 'archive', name: 'Archive', icon: 'archive', empty: 'Les messages archivés quittent Réception sans être supprimés.' },
+  { id: 'trash', name: 'Corbeille', icon: 'trash', empty: `La corbeille est vide. Les messages y restent ${TRASH_DAYS} jours.` },
+];
+const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
+
+const ICONS = {
+  back: '<path d="M15 5l-7 7 7 7"/>',
+  chevron: '<path d="M9 5l7 7-7 7"/>',
+  up: '<path d="M6 15l6-6 6 6"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  compose: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  inbox: '<path d="M3 13l2.4-7.2A2.6 2.6 0 0 1 7.9 4h8.2a2.6 2.6 0 0 1 2.5 1.8L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+  draft: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+  send: '<path d="M21 3L10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/>',
+  archive: '<rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>',
+  reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
+  restore: '<path d="M4 4v6h6"/><path d="M5.5 15a7 7 0 1 0 1.6-7.3L4 10"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+  filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+};
+const icon = (name, size = 22) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+// ───────────── État ─────────────
+
+const state = {
+  account: null, // { name, address, signature }
+  settings: { lines: 2, swipe: 'trash', confirmDelete: false },
+  messages: [],
+  view: 'loading',
+  box: 'inbox',
+  openId: null,
+  query: '',
+  unreadOnly: false,
+  selecting: false,
+  selected: new Set(),
+  draft: null, // message en cours de rédaction
+};
+const stack = []; // écrans précédents (bouton Retour)
+let paused = false;
+
+// ───────────── Outils ─────────────
+
+const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const fold = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const find = (id) => state.messages.find((m) => m.id === id) || null;
+const me = () => ({ name: state.account.name, address: state.account.address });
+const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+const isMe = (address) => Boolean(state.account) && same(address, state.account.address);
+const nameOf = (person) => (person ? person.name || person.address : 'Inconnu');
+const firstName = () => state.account.name.split(/\s+/)[0];
+const due = (m) => !m.deliverAt || m.deliverAt <= Date.now();
+
+function fmtDate(ts) {
+  const date = new Date(ts);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (ts >= today) return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  if (ts >= today - DAY) return 'Hier';
+  if (ts >= today - 6 * DAY) return capitalize(date.toLocaleDateString('fr-FR', { weekday: 'long' }));
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+const longDate = (ts) => capitalize(new Date(ts).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+
+function avatar(person, size = 40) {
+  const name = nameOf(person);
+  const initials = name.split(/[\s.@_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  let hash = 0;
+  for (const c of String(person?.address || name)) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  return `<span class="avatar" style="width:${size}px;height:${size}px;background:${COLORS[hash % COLORS.length]}">${esc(initials)}</span>`;
+}
+
+/** « Camille <camille@exemple.fr>, lucas@exemple.fr » → { list, bad } */
+function parseAddresses(text) {
+  const list = [];
+  const bad = [];
+  for (const part of String(text ?? '').split(/[,;]+/).map((s) => s.trim()).filter(Boolean)) {
+    const match = part.match(/^(.*?)\s*<([^<>]+)>$/);
+    const address = (match ? match[2] : part).trim();
+    if (!EMAIL.test(address)) bad.push(part);
+    else if (!list.some((p) => same(p.address, address))) list.push({ name: (match ? match[1].replace(/^"|"$/g, '').trim() : '') || knownName(address), address });
+  }
+  return { list, bad };
+}
+const formatAddresses = (list) => (list || []).map((p) => (p.name ? `${p.name.replace(/[,;<>"]/g, ' ').trim()} <${p.address}>` : p.address)).join(', ');
+
+/** Correspondants connus (tous les messages), sans soi-même. */
+function contacts() {
+  const map = new Map();
+  for (const m of state.messages) {
+    for (const p of [m.from, ...(m.to || []), ...(m.cc || [])]) {
+      if (!p?.address || isMe(p.address)) continue;
+      const key = p.address.toLowerCase();
+      if (!map.has(key) || (!map.get(key).name && p.name)) map.set(key, { name: p.name || '', address: p.address });
+    }
+  }
+  return [...map.values()].sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'fr'));
+}
+const knownName = (address) => contacts().find((p) => same(p.address, address))?.name || '';
+
+/** Texte d'aperçu : sans les citations ni les retours à la ligne. */
+const snippet = (body) => String(body || '').split('\n').filter((line) => !line.startsWith('>')).join(' ').replace(/\s+/g, ' ').trim().slice(0, 240);
+
+/** Corps du message : texte brut, citations (« > ») en retrait. */
+function bodyHtml(text) {
+  const out = [];
+  let quote = [];
+  const flush = () => {
+    if (quote.length) out.push(`<blockquote>${quote.map((line) => esc(line.replace(/^>\s?/, ''))).join('\n')}</blockquote>`);
+    quote = [];
+  };
+  for (const line of String(text || '').split('\n')) {
+    if (line.startsWith('>')) quote.push(line);
+    else {
+      flush();
+      out.push(`${esc(line)}\n`);
+    }
+  }
+  flush();
+  return out.join('');
+}
+
+// ───────────── Données ─────────────
+
+let saving = Promise.resolve();
+/** Enregistre des clés de l'état dans le stockage de l'app (dans l'ordre des appels). */
+function persist(...keys) {
+  for (const key of keys) {
+    saving = saving
+      .then(() => orion.storage.set(key, state[key]))
+      .catch((error) => snack(/plein/.test(error.message) ? 'Stockage plein : videz la corbeille ou supprimez des messages' : error.message));
+  }
+  return saving;
+}
+
+function messagesIn(box) {
+  return state.messages
+    .filter((m) => due(m) && (box === 'flagged' ? m.flagged && m.box !== 'trash' : m.box === box))
+    .sort((a, b) => b.date - a.date);
+}
+
+/** Messages affichés : boîte, recherche et filtre « non lus ». */
+function visibleList() {
+  const query = fold(state.query.trim());
+  return messagesIn(state.box).filter((m) => {
+    if (state.unreadOnly && m.read && m.id !== state.openId) return false;
+    if (!query) return true;
+    const people = [m.from, ...(m.to || []), ...(m.cc || [])].map((p) => `${p?.name || ''} ${p?.address || ''}`);
+    return fold([...people, m.subject, m.body].join(' ')).includes(query);
+  });
+}
+
+const unreadCount = (box) => messagesIn(box).filter((m) => !m.read).length;
+function boxCount(box) {
+  if (box === 'inbox' || box === 'archive') return unreadCount(box);
+  if (box === 'flagged' || box === 'drafts') return messagesIn(box).length;
+  return 0;
+}
+
+function purgeTrash() {
+  const limit = Date.now() - TRASH_DAYS * DAY;
+  const before = state.messages.length;
+  state.messages = state.messages.filter((m) => !(m.box === 'trash' && (m.trashedAt || 0) < limit));
+  return state.messages.length !== before;
+}
+
+/** Messages d'exemple, à la première ouverture. */
+function seed() {
+  const now = Date.now();
+  const at = (ago) => now - ago;
+  const you = [me()];
+  const until = new Date(now + 7 * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const message = (fields) => ({ id: newId(), box: 'inbox', to: you, cc: [], read: false, flagged: false, ...fields });
+  return [
+    message({
+      from: { name: 'Équipe Courrier', address: 'bienvenue@courrier.app' },
+      subject: 'Bienvenue dans Courrier 👋',
+      date: at(4 * MINUTE),
+      body: `Bonjour ${firstName()},\n\nBienvenue dans Courrier ! Quelques astuces pour démarrer :\n\n• Balayez un message vers la gauche pour le mettre à la corbeille (ou l'archiver : à choisir dans les réglages). Un bouton « Annuler » permet de revenir en arrière.\n• « Modifier » sélectionne plusieurs messages pour les marquer comme lus, les archiver ou les supprimer.\n• Le drapeau range un message dans Favoris.\n• Vos brouillons sont enregistrés pendant que vous écrivez.\n• La recherche fouille les expéditeurs, les objets et le texte des messages.\n\nCourrier fonctionne sans accès à Internet (les apps du Store sont isolées) : vos messages restent sur cet appareil. Ceux que vous vous adressez arrivent dans Réception.\n\nBonne lecture !\nL'équipe Courrier`,
+    }),
+    message({
+      from: { name: 'Camille Martin', address: 'camille.martin@exemple.fr' },
+      subject: 'Dîner samedi ?',
+      date: at(2 * 60 * MINUTE),
+      flagged: true,
+      body: 'Salut !\n\nOn organise un dîner samedi soir à la maison, vers 20 h. Tu es partant ? Dis-moi si tu as des allergies, je m\'occupe du dessert.\n\nBises,\nCamille',
+    }),
+    message({
+      from: { name: 'Démo Courrier', address: DEMO },
+      subject: 'Essayez de me répondre',
+      date: at(3 * 60 * MINUTE),
+      body: `Répondez à ce message (ou écrivez à ${DEMO}) : une réponse automatique arrivera dans votre boîte de réception quelques secondes plus tard, avec une notification si Courrier est en arrière-plan.\n\nC'est une démonstration : tout se passe sur cet appareil.`,
+    }),
+    message({
+      from: { name: 'Médiathèque des Tilleuls', address: 'mediatheque@exemple.fr' },
+      subject: 'Votre réservation est disponible',
+      date: at(DAY + 3 * 60 * MINUTE),
+      read: true,
+      body: `Bonjour,\n\nLe livre que vous avez réservé, « Le Petit Prince », vous attend à l'accueil de la médiathèque jusqu'au ${until}.\n\nHoraires : du mardi au samedi, de 10 h à 18 h.\n\nÀ bientôt,\nLa médiathèque des Tilleuls`,
+    }),
+    message({
+      from: { name: 'Lucas Bernard', address: 'lucas.bernard@exemple.fr' },
+      subject: 'Photos des vacances',
+      date: at(2 * DAY + 5 * 60 * MINUTE),
+      read: true,
+      answered: true,
+      body: 'Coucou,\n\nJ\'ai enfin trié les photos de la Bretagne ! Il y en a plus de 200, je prépare un album avec les meilleures. La vue depuis la pointe du Raz est incroyable.\n\nOn s\'appelle ce week-end pour les regarder ensemble ?\n\nLucas',
+    }),
+    message({
+      from: { name: 'La Lettre du quartier', address: 'lettre@exemple.fr' },
+      subject: 'Fête des voisins, marché de printemps et travaux rue des Lilas',
+      date: at(4 * DAY),
+      read: true,
+      body: 'Au sommaire cette semaine :\n\n1. La fête des voisins aura lieu le dernier vendredi du mois, dans le jardin partagé. Apportez un plat à partager !\n2. Le marché de printemps revient sur la place de la Mairie, dimanche de 8 h à 13 h.\n3. Travaux rue des Lilas : la circulation sera alternée pendant deux semaines.\n\nBonne semaine à tous,\nL\'association du quartier',
+    }),
+    message({
+      box: 'sent',
+      from: me(),
+      to: [{ name: 'Lucas Bernard', address: 'lucas.bernard@exemple.fr' }],
+      subject: 'Re: Photos des vacances',
+      date: at(2 * DAY + 4 * 60 * MINUTE),
+      read: true,
+      body: 'Avec plaisir ! Dimanche après-midi, ça te va ?\n\n> J\'ai enfin trié les photos de la Bretagne !',
+    }),
+    message({
+      box: 'archive',
+      from: { name: 'Sophie Lefèvre', address: 'sophie.lefevre@exemple.fr' },
+      subject: 'Compte rendu de la réunion',
+      date: at(12 * DAY),
+      read: true,
+      body: 'Bonjour à tous,\n\nVoici les points principaux de la réunion de lundi :\n\n- Le nouveau planning est validé à partir du mois prochain.\n- Chacun envoie ses disponibilités avant vendredi.\n- Prochaine réunion dans deux semaines, même heure.\n\nMerci à tous,\nSophie',
+    }),
+  ];
+}
+
+// ───────────── Navigation ─────────────
+
+const currentScroll = () => $app.querySelector('.scroll')?.scrollTop || 0;
+
+function go(view, params = {}) {
+  stack.push({ view: state.view, box: state.box, openId: state.openId, scroll: currentScroll() });
+  Object.assign(state, { view, selecting: false }, params);
+  state.selected.clear();
+  render();
+}
+
+function back() {
+  const previous = stack.pop() || (state.view === 'boxes' ? null : { view: 'boxes', box: state.box, openId: null, scroll: 0 });
+  if (!previous) return false;
+  Object.assign(state, { view: previous.view, box: previous.box, openId: previous.openId, selecting: false });
+  state.selected.clear();
+  render();
+  const scroll = $app.querySelector('.scroll');
+  if (scroll) scroll.scrollTop = previous.scroll;
+  return true;
+}
+
+/** Met l'écran à jour après un changement des messages (sans perdre la saisie en cours). */
+function refresh() {
+  if (state.view === 'list') fillList();
+  else if (state.view === 'boxes') render();
+  else if (state.view === 'read' && !find(state.openId)) back();
+}
+
+// ───────────── Écrans ─────────────
+
+const VIEWS = {
+  loading: () => '',
+  setup: () => `
+    <div class="scroll setup">
+      <div class="setup-logo">${icon('mail', 44)}</div>
+      <h1>Bienvenue dans Courrier</h1>
+      <p class="muted">Indiquez le nom et l'adresse qui apparaîtront sur vos messages.</p>
+      <div class="group">
+        <label class="cell"><span>Nom</span><input id="setup-name" maxlength="60" autocomplete="name" placeholder="Camille Martin"></label>
+        <label class="cell"><span>Adresse</span><input id="setup-address" type="email" maxlength="120" autocomplete="email" autocapitalize="off" placeholder="vous@exemple.fr"></label>
+      </div>
+      <p class="error" id="setup-error"></p>
+      <button class="primary" data-act="setup">Commencer</button>
+      <p class="note">${icon('info', 18)}<span>Les apps du Store n'ont pas accès à Internet : Courrier garde vos messages sur cet appareil.</span></p>
+    </div>`,
+
+  boxes: () => `
+    <header class="bar"><span class="spacer"></span><button class="link" data-act="settings" aria-label="Réglages">${icon('gear')}</button></header>
+    <div class="scroll">
+      <h1 class="large">Boîtes</h1>
+      <div class="account">${avatar(me(), 44)}<div><strong>${esc(state.account.name)}</strong><span>${esc(state.account.address)}</span></div></div>
+      <div class="group">
+        ${BOXES.map((b) => `<button class="cell icon" data-act="box" data-box="${b.id}"><span class="box-icon ${b.id}">${icon(b.icon)}</span><span class="grow">${b.name}</span><span class="count">${boxCount(b.id) || ''}</span><span class="chev">${icon('chevron', 16)}</span></button>`).join('')}
+      </div>
+    </div>
+    <footer class="toolbar"><span style="width:40px"></span><span class="status">${unreadStatus()}</span><button class="link" data-act="compose" aria-label="Nouveau message">${icon('compose')}</button></footer>`,
+
+  list: () => `
+    <header class="bar">
+      <button class="link" data-act="back">${icon('back')}Boîtes</button>
+      <span class="spacer"></span>
+      <button class="link" data-act="select" id="select-btn">${state.selecting ? 'OK' : 'Modifier'}</button>
+    </header>
+    <div class="scroll" style="--lines:${state.settings.lines}">
+      <h1 class="large">${BOX[state.box].name}</h1>
+      <label class="search">${icon('search', 18)}<input id="search" type="search" placeholder="Rechercher" autocomplete="off" value="${esc(state.query)}" aria-label="Rechercher"></label>
+      <div id="rows"></div>
+    </div>
+    <footer class="toolbar" id="list-toolbar"></footer>`,
+
+  read: () => {
+    const m = find(state.openId);
+    if (!m) return '';
+    const list = visibleList();
+    const index = list.findIndex((x) => x.id === m.id);
+    const recipients = [...(m.to || [])].map(nameOf).join(', ') || '—';
+    const trash = m.box === 'trash';
+    return `
+      <header class="bar">
+        <button class="link" data-act="back">${icon('back')}${esc(BOX[state.box].name)}</button>
+        <span class="spacer"></span>
+        <button class="link" data-act="prev" aria-label="Message précédent" ${index <= 0 ? 'disabled' : ''}>${icon('up')}</button>
+        <button class="link" data-act="next" aria-label="Message suivant" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>${icon('down')}</button>
+      </header>
+      <div class="scroll reader">
+        <div class="msg-head">
+          ${avatar(m.from)}
+          <div class="msg-meta">
+            <div class="msg-from"><strong>${esc(nameOf(m.from))}</strong><span class="date">${fmtDate(m.date)}</span></div>
+            <div class="muted small">${esc(m.from?.address)}</div>
+            <div class="muted small">À : ${esc(recipients)}${m.cc?.length ? ` · Cc : ${esc(m.cc.map(nameOf).join(', '))}` : ''}</div>
+          </div>
+        </div>
+        <h2 class="msg-subject">${m.flagged ? '<span class="flag-dot"></span>' : ''}<span>${esc(m.subject || '(Sans objet)')}</span></h2>
+        <div class="muted small">${esc(longDate(m.date))}</div>
+        <div class="msg-body">${bodyHtml(m.body)}</div>
+      </div>
+      <footer class="toolbar">
+        <button class="link flag" data-act="flag" aria-pressed="${Boolean(m.flagged)}" aria-label="${m.flagged ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${icon('flag')}</button>
+        <button class="link" data-act="unread" aria-label="Marquer comme non lu">${icon('mail')}</button>
+        ${trash
+          ? `<button class="link" data-act="restore" aria-label="Restaurer">${icon('restore')}</button>`
+          : `<button class="link" data-act="archive" aria-label="${m.box === 'archive' ? 'Remettre dans Réception' : 'Archiver'}">${icon(m.box === 'archive' ? 'inbox' : 'archive')}</button>`}
+        <button class="link${trash ? ' danger' : ''}" data-act="delete" aria-label="${trash ? 'Effacer définitivement' : 'Supprimer'}">${icon('trash')}</button>
+        <button class="link" data-act="reply-menu" aria-label="Répondre ou transférer">${icon('reply')}</button>
+      </footer>`;
+  },
+
+  compose: () => {
+    const d = state.draft;
+    const title = { new: 'Nouveau message', reply: 'Réponse', all: 'Réponse à tous', forward: 'Transfert' }[d.kind] || 'Nouveau message';
+    return `
+      <header class="bar">
+        <button class="link" data-act="cancel-compose">Annuler</button>
+        <span class="bar-title">${title}</span>
+        <button class="send" data-act="send" id="send-btn" aria-label="Envoyer">${icon('send', 20)}</button>
+      </header>
+      <div class="scroll">
+        <label class="cfield"><span>À :</span><input id="c-to" type="text" inputmode="email" autocapitalize="off" autocomplete="off" spellcheck="false" value="${esc(d.to)}" aria-label="Destinataires">${d.showCc ? '' : '<button class="link" data-act="show-cc">Cc</button>'}</label>
+        <div class="suggest" id="suggest-to" data-field="c-to"></div>
+        ${d.showCc ? `<label class="cfield"><span>Cc :</span><input id="c-cc" type="text" inputmode="email" autocapitalize="off" autocomplete="off" spellcheck="false" value="${esc(d.cc)}" aria-label="Copie à"></label><div class="suggest" id="suggest-cc" data-field="c-cc"></div>` : ''}
+        <label class="cfield"><span>Objet :</span><input id="c-subject" type="text" maxlength="200" value="${esc(d.subject)}" aria-label="Objet"></label>
+        <textarea class="cbody" id="c-body" aria-label="Message">${esc(d.body)}</textarea>
+        <p class="note">${icon('info', 18)}<span>Courrier n'a pas accès à Internet : vos messages sont enregistrés dans Envoyés, sur cet appareil. Ceux qui vous sont adressés (ou à ${DEMO}) arrivent dans Réception.</span></p>
+      </div>`;
+  },
+
+  settings: () => {
+    const s = state.settings;
+    const seg = (key, options) => `<div class="seg" role="group">${options.map(([value, label]) => `<button data-act="setting" data-key="${key}" data-value="${value}" aria-pressed="${String(s[key]) === String(value)}">${label}</button>`).join('')}</div>`;
+    const trash = messagesIn('trash').length;
+    return `
+      <header class="bar"><button class="link" data-act="back">${icon('back')}Boîtes</button><span class="bar-title">Réglages</span><span style="width:84px"></span></header>
+      <div class="scroll">
+        <p class="group-title">Compte</p>
+        <div class="group">
+          <label class="cell"><span>Nom</span><input id="s-name" maxlength="60" value="${esc(state.account.name)}"></label>
+          <label class="cell"><span>Adresse</span><input id="s-address" type="email" maxlength="120" autocapitalize="off" value="${esc(state.account.address)}"></label>
+        </div>
+        <p class="group-title">Signature</p>
+        <div class="group"><label class="cell"><textarea id="s-signature" maxlength="500" placeholder="Aucune signature" aria-label="Signature">${esc(state.account.signature)}</textarea></label></div>
+        <p class="group-title">Liste des messages</p>
+        <div class="group">
+          <div class="cell stack"><span>Aperçu</span>${seg('lines', [[0, 'Aucun'], [1, '1 ligne'], [2, '2 lignes'], [3, '3 lignes']])}</div>
+          <div class="cell stack"><span>Balayer vers la gauche</span>${seg('swipe', [['trash', 'Corbeille'], ['archive', 'Archive']])}</div>
+          <label class="cell"><span class="grow">Demander avant de supprimer</span><input type="checkbox" class="switch" id="s-confirm" ${s.confirmDelete ? 'checked' : ''}></label>
+        </div>
+        <div class="group"><button class="cell danger" data-act="empty-trash" ${trash ? '' : 'disabled'}>Vider la corbeille${trash ? ` (${trash})` : ''}</button></div>
+        <div class="group"><button class="cell danger" data-act="reset">Réinitialiser Courrier</button></div>
+        <p class="group-foot">Courrier ${esc(orion.app.version || '')} · ${plural(state.messages.length, 'message')} sur cet appareil. Les apps du Store n'ont pas accès à Internet : vos messages ne quittent pas l'appareil.</p>
+      </div>`;
+  },
+};
+
+function render() {
+  $app.dataset.view = state.view;
+  $app.innerHTML = VIEWS[state.view]();
+  if (state.view === 'list') fillList();
+  if (state.view === 'compose') {
+    autosize(document.getElementById('c-body'));
+    updateSend();
+  }
+}
+
+/** Redessine l'écran sans perdre la position de défilement. */
+function rerender() {
+  const scroll = currentScroll();
+  render();
+  const el = $app.querySelector('.scroll');
+  if (el) el.scrollTop = scroll;
+}
+
+function unreadStatus() {
+  const n = unreadCount('inbox');
+  return n ? `${n} non lu${n > 1 ? 's' : ''}` : 'Tout est lu';
+}
+
+/** Lignes et barre d'outils de la liste (la recherche garde le focus). */
+function fillList() {
+  const rows = document.getElementById('rows');
+  if (!rows) return;
+  const list = visibleList();
+  for (const id of state.selected) if (!list.some((m) => m.id === id)) state.selected.delete(id);
+  rows.innerHTML = list.length
+    ? list.map(rowHtml).join('')
+    : `<div class="empty">${icon(BOX[state.box].icon, 40)}<p>${state.query ? 'Aucun résultat' : state.unreadOnly ? 'Aucun message non lu' : esc(BOX[state.box].empty)}</p></div>`;
+  document.getElementById('select-btn').hidden = !list.length && !state.selecting;
+  document.getElementById('list-toolbar').innerHTML = state.selecting ? selectionToolbar(list) : listToolbar(list);
+}
+
+function swipeKind(m) {
+  if (m.box === 'trash') return { css: '', icon: 'trash', label: 'Effacer' };
+  if (state.settings.swipe === 'archive' && (m.box === 'inbox' || m.box === 'sent')) return { css: ' archive', icon: 'archive', label: 'Archiver' };
+  return { css: '', icon: 'trash', label: 'Corbeille' };
+}
+
+function rowHtml(m) {
+  const outgoing = m.box === 'sent' || m.box === 'drafts';
+  const who = outgoing ? (m.to?.length ? `À : ${m.to.map(nameOf).join(', ')}` : 'Aucun destinataire') : nameOf(m.from);
+  const selected = state.selected.has(m.id);
+  const swipe = swipeKind(m);
+  return `
+    <div class="row${m.read ? '' : ' unread'}${selected ? ' selected' : ''}" data-id="${m.id}">
+      <div class="row-behind${swipe.css}" aria-hidden="true"><span>${icon(swipe.icon)}</span>${swipe.label}</div>
+      <button class="row-main" data-act="open" data-id="${m.id}">
+        ${state.selecting ? `<span class="check">${selected ? icon('check', 14) : ''}</span>` : '<span class="dot"></span>'}
+        <span class="row-body">
+          <span class="row-top">
+            <span class="from">${m.box === 'drafts' ? '<em>Brouillon</em> ' : ''}${esc(who)}</span>
+            ${m.answered ? `<span class="replied" title="Répondu">${icon('reply', 14)}</span>` : ''}
+            ${m.flagged ? '<span class="flag-dot"></span>' : ''}
+            <span class="date">${fmtDate(m.date)}</span>
+            <span class="chev">${icon('chevron', 14)}</span>
+          </span>
+          <span class="subject">${esc(m.subject || '(Sans objet)')}</span>
+          ${state.settings.lines ? `<span class="preview">${esc(snippet(m.body)) || '&nbsp;'}</span>` : ''}
+        </span>
+      </button>
+    </div>`;
+}
+
+function listToolbar(list) {
+  const unread = list.filter((m) => !m.read).length;
+  const status = state.query
+    ? plural(list.length, 'résultat')
+    : state.box === 'inbox' || state.box === 'archive' ? (unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu') : plural(list.length, 'message');
+  return `
+    <button class="link" data-act="filter" aria-pressed="${state.unreadOnly}" aria-label="Non lus seulement">${icon('filter')}</button>
+    <span class="status">${status}</span>
+    ${state.box === 'trash'
+      ? `<button class="link danger" data-act="empty-trash" ${list.length ? '' : 'disabled'}>Vider</button>`
+      : `<button class="link" data-act="compose" aria-label="Nouveau message">${icon('compose')}</button>`}`;
+}
+
+function selectionToolbar(list) {
+  const chosen = list.filter((m) => state.selected.has(m.id));
+  const off = chosen.length ? '' : 'disabled';
+  const all = list.length > 0 && chosen.length === list.length;
+  let middle = '';
+  if (state.box === 'trash') middle = `<button class="link" data-act="restore-selected" ${off}>Restaurer</button>`;
+  else if (state.box !== 'drafts') {
+    middle = `<button class="link" data-act="mark-selected" ${off}>${chosen.some((m) => !m.read) ? 'Lu' : 'Non lu'}</button>`;
+    if (state.box !== 'flagged') middle += `<button class="link" data-act="archive-selected" ${off}>${state.box === 'archive' ? 'Réception' : 'Archiver'}</button>`;
+  }
+  return `
+    <button class="link" data-act="select-all">${all ? 'Aucun' : 'Tout'}</button>
+    ${middle}
+    <button class="link danger" data-act="delete-selected" ${off}>${state.box === 'trash' ? 'Effacer' : 'Supprimer'}</button>`;
+}
+
+// ───────────── Actions sur les messages ─────────────
+
+const undoAction = (saved) => ({
+  label: 'Annuler',
+  run: () => {
+    for (const { m, ...fields } of saved) Object.assign(m, fields);
+    persist('messages');
+    refresh();
+  },
+});
+const remember = (items) => items.map((m) => ({ m, box: m.box, prevBox: m.prevBox, trashedAt: m.trashedAt }));
+
+/** Met à la corbeille (ou efface définitivement ce qui y est déjà). */
+async function remove(ids) {
+  const items = ids.map(find).filter(Boolean);
+  const n = items.length;
+  if (!n) return false;
+  if (items.every((m) => m.box === 'trash')) {
+    const ok = await orion.ui.confirm({ title: n > 1 ? `Effacer ${n} messages ?` : 'Effacer ce message ?', message: 'Ils seront supprimés définitivement.', confirmLabel: 'Effacer' });
+    if (!ok) return false;
+    const gone = new Set(items.map((m) => m.id));
+    state.messages = state.messages.filter((m) => !gone.has(m.id));
+    persist('messages');
+    snack(n > 1 ? `${n} messages effacés` : 'Message effacé');
+    return true;
+  }
+  if (state.settings.confirmDelete) {
+    const ok = await orion.ui.confirm({ title: n > 1 ? `Supprimer ${n} messages ?` : 'Supprimer ce message ?', message: `Ils iront dans la corbeille et y resteront ${TRASH_DAYS} jours.`, confirmLabel: 'Supprimer' });
+    if (!ok) return false;
+  }
+  const saved = remember(items);
+  const now = Date.now();
+  for (const m of items) Object.assign(m, { prevBox: m.box, box: 'trash', trashedAt: now });
+  persist('messages');
+  snack(n > 1 ? `${n} messages mis à la corbeille` : 'Message mis à la corbeille', undoAction(saved));
+  return true;
+}
+
+/** Déplace vers une boîte ('restore' : la boîte d'avant la corbeille). */
+function move(ids, box) {
+  const items = ids.map(find).filter(Boolean);
+  if (!items.length) return false;
+  const saved = remember(items);
+  for (const m of items) {
+    m.box = box === 'restore' ? (m.prevBox && m.prevBox !== 'trash' ? m.prevBox : 'inbox') : box;
+    delete m.trashedAt;
+  }
+  persist('messages');
+  const n = items.length;
+  const what = n > 1 ? `${n} messages` : 'Message';
+  const where = { archive: n > 1 ? 'archivés' : 'archivé', inbox: 'remis dans Réception', restore: n > 1 ? 'restaurés' : 'restauré' }[box];
+  snack(`${what} ${where}`, undoAction(saved));
+  return true;
+}
+
+function swipeAction(id) {
+  const m = find(id);
+  if (!m) return Promise.resolve(false);
+  return swipeKind(m).label === 'Archiver' ? Promise.resolve(move([id], 'archive')) : remove([id]);
+}
+
+function markRead(ids, read) {
+  for (const m of ids.map(find).filter(Boolean)) m.read = read;
+  persist('messages');
+}
+
+// ───────────── Rédaction ─────────────
+
+const signatureBlock = () => (state.account.signature ? `\n\n${state.account.signature}` : '');
+const quoteHeader = (m) => `Le ${longDate(m.date)}, ${nameOf(m.from)} <${m.from.address}> a écrit :`;
+const quoteLines = (text) => String(text || '').split('\n').map((line) => `> ${line}`).join('\n');
+
+function startCompose(kind = 'new', m = null) {
+  const signature = signatureBlock();
+  const draft = { id: null, kind, to: '', cc: '', subject: '', body: signature, replyTo: null, showCc: false, dirty: false };
+  if (m && (kind === 'reply' || kind === 'all')) {
+    const mine = isMe(m.from.address);
+    const target = mine ? m.to || [] : [m.from];
+    draft.to = formatAddresses(target);
+    if (kind === 'all') {
+      const others = [...(m.to || []), ...(m.cc || [])].filter((p) => !isMe(p.address) && !target.some((t) => same(t.address, p.address)));
+      draft.cc = formatAddresses(others);
+      draft.showCc = others.length > 0;
+    }
+    draft.subject = /^re\s*:/i.test(m.subject) ? m.subject : `Re: ${m.subject || ''}`.trim();
+    draft.body = `${signature}\n\n${quoteHeader(m)}\n${quoteLines(m.body)}`;
+    draft.replyTo = m.id;
+  } else if (m && kind === 'forward') {
+    draft.subject = /^(fwd?|tr)\s*:/i.test(m.subject) ? m.subject : `Fwd: ${m.subject || ''}`.trim();
+    draft.body = `${signature}\n\n---------- Message transféré ----------\nDe : ${formatAddresses([m.from])}\nDate : ${longDate(m.date)}\nObjet : ${m.subject || '(Sans objet)'}\nÀ : ${formatAddresses(m.to)}\n\n${m.body}`;
+  }
+  draft.initial = { to: draft.to, cc: draft.cc, subject: draft.subject, body: draft.body };
+  openCompose(draft);
+}
+
+function openDraft(m) {
+  openCompose({ id: m.id, kind: m.kind || 'new', to: m.rawTo ?? formatAddresses(m.to), cc: m.rawCc ?? formatAddresses(m.cc), subject: m.subject || '', body: m.body || '', replyTo: m.inReplyTo || null, showCc: Boolean(m.rawCc ?? m.cc?.length), dirty: false, initial: null });
+}
+
+function openCompose(draft) {
+  go('compose', { draft });
+  const target = draft.to ? document.getElementById('c-body') : document.getElementById('c-to');
+  target.focus();
+  if (target.id === 'c-body') target.setSelectionRange(0, 0);
+}
+
+function readCompose() {
+  const d = state.draft;
+  if (!d) return null;
+  const value = (id, fallback) => document.getElementById(id)?.value ?? fallback;
+  Object.assign(d, { to: value('c-to', d.to), cc: value('c-cc', d.cc), subject: value('c-subject', d.subject), body: value('c-body', d.body) });
+  return d;
+}
+
+/** Rien d'écrit par l'utilisateur (le modèle de départ n'a pas changé). */
+function untouched(d) {
+  const start = d.initial || { to: '', cc: '', subject: '', body: '' };
+  return d.to.trim() === start.to.trim() && d.cc.trim() === start.cc.trim() && d.subject.trim() === start.subject.trim() && d.body.trim() === start.body.trim();
+}
+
+let draftTimer = 0;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  const d = state.draft;
+  if (!d || !d.dirty || (untouched(d) && !d.id)) return null;
+  let m = d.id ? find(d.id) : null;
+  if (!m) {
+    m = { id: newId(), read: true, flagged: false };
+    d.id = m.id;
+    state.messages.push(m);
+  }
+  Object.assign(m, { box: 'drafts', from: me(), to: parseAddresses(d.to).list, cc: parseAddresses(d.cc).list, rawTo: d.to, rawCc: d.cc, subject: d.subject.trim(), body: d.body.slice(0, MAX_BODY), date: Date.now(), inReplyTo: d.replyTo, kind: d.kind });
+  persist('messages');
+  return m;
+}
+
+function updateSend() {
+  const d = state.draft;
+  const button = document.getElementById('send-btn');
+  if (!d || !button) return;
+  const to = parseAddresses(d.to);
+  const cc = parseAddresses(d.cc);
+  button.disabled = !to.list.length || to.bad.length > 0 || cc.bad.length > 0;
+}
+
+function autosize(textarea) {
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${textarea.scrollHeight + 2}px`;
+}
+
+function suggest(input) {
+  const box = document.getElementById(input.id === 'c-cc' ? 'suggest-cc' : 'suggest-to');
+  if (!box) return;
+  const token = fold(input.value.split(/[,;]/).at(-1).trim());
+  const present = new Set(parseAddresses(input.value).list.map((p) => p.address.toLowerCase()));
+  const hits = token ? contacts().filter((p) => !present.has(p.address.toLowerCase()) && fold(`${p.name} ${p.address}`).includes(token)).slice(0, 6) : [];
+  box.innerHTML = hits.map((p) => `<button class="chip" data-act="suggest" data-address="${esc(p.address)}">${esc(p.name || p.address)}<small>${esc(p.address)}</small></button>`).join('');
+}
+
+async function leaveCompose() {
+  const d = readCompose();
+  clearTimeout(draftTimer);
+  if (!d.dirty || (untouched(d) && !d.id)) return closeCompose();
+  const choice = await sheet({ actions: [{ label: 'Enregistrer le brouillon', value: 'save' }, { label: 'Supprimer le brouillon', value: 'delete', danger: true }] });
+  if (choice === 'save') {
+    saveDraft();
+    snack('Brouillon enregistré');
+    closeCompose();
+  } else if (choice === 'delete') {
+    if (d.id) {
+      state.messages = state.messages.filter((m) => m.id !== d.id);
+      persist('messages');
+    }
+    closeCompose();
+  }
+}
+
+function closeCompose() {
+  state.draft = null;
+  back();
+}
+
+async function send() {
+  const d = readCompose();
+  const to = parseAddresses(d.to);
+  const cc = parseAddresses(d.cc);
+  const bad = [...to.bad, ...cc.bad];
+  if (bad.length) return orion.ui.alert({ title: 'Adresse non valide', message: bad.join(', ') });
+  if (!to.list.length) return orion.ui.alert({ title: 'Aucun destinataire', message: 'Indiquez au moins une adresse dans le champ « À ».' });
+  if (!d.subject.trim() && !(await orion.ui.confirm({ title: 'Message sans objet', message: 'Envoyer ce message sans objet ?', confirmLabel: 'Envoyer' }))) return;
+  clearTimeout(draftTimer);
+  const now = Date.now();
+  const message = { id: d.id || newId(), box: 'sent', from: me(), to: to.list, cc: cc.list, subject: d.subject.trim(), body: d.body.slice(0, MAX_BODY), date: now, read: true, flagged: false, inReplyTo: d.replyTo || null };
+  const existing = d.id ? find(d.id) : null;
+  if (existing) {
+    for (const key of Object.keys(existing)) delete existing[key];
+    Object.assign(existing, message);
+  } else state.messages.push(message);
+  const original = d.replyTo && find(d.replyTo);
+  if (original && d.kind !== 'forward') original.answered = true;
+
+  // Distribution sur l'appareil : à soi-même, et la réponse automatique de démonstration.
+  const recipients = [...to.list, ...cc.list];
+  const local = recipients.filter((p) => isMe(p.address) || same(p.address, DEMO));
+  if (recipients.some((p) => isMe(p.address))) state.messages.push({ ...message, id: newId(), box: 'inbox', read: false, date: now + 1500, deliverAt: now + 1500 });
+  if (recipients.some((p) => same(p.address, DEMO))) state.messages.push(autoReply(message, now + 5000));
+  persist('messages');
+  orion.device.vibrate(15);
+  state.draft = null;
+  back();
+  snack(local.length === recipients.length ? 'Message envoyé' : 'Message enregistré dans Envoyés (sans accès à Internet)');
+}
+
+function autoReply(sent, at) {
+  return {
+    id: newId(),
+    box: 'inbox',
+    from: { name: 'Démo Courrier', address: DEMO },
+    to: [me()],
+    cc: [],
+    subject: /^re\s*:/i.test(sent.subject) ? sent.subject : `Re: ${sent.subject || '(Sans objet)'}`,
+    body: `Bonjour ${firstName()},\n\nMerci pour votre message ! Je suis la réponse automatique de démonstration de Courrier : elle a été écrite sur cet appareil, pour vous montrer l'arrivée d'un nouveau message (avec une notification si Courrier est en arrière-plan).\n\nÀ bientôt !\n\n${quoteHeader(sent)}\n${quoteLines(sent.body)}`,
+    date: at,
+    deliverAt: at,
+    read: false,
+    flagged: false,
+  };
+}
+
+/** Messages arrivés (distribution différée) : affichage et notification. */
+function deliver() {
+  const arrived = state.messages.filter((m) => m.deliverAt && m.deliverAt <= Date.now());
+  if (!arrived.length) return;
+  for (const m of arrived) delete m.deliverAt;
+  persist('messages');
+  const last = arrived.at(-1);
+  if (paused) orion.notify({ title: nameOf(last.from), body: last.subject || '(Sans objet)' }).catch(() => {});
+  else {
+    orion.device.vibrate([15, 60, 15]);
+    // Pas de raccourci pendant la rédaction : le brouillon reste à l'écran.
+    snack(`Nouveau message de ${nameOf(last.from)}`, state.view === 'compose' ? null : { label: 'Lire', run: () => openMessage(last.id, 'inbox') });
+  }
+  refresh();
+}
+
+function openMessage(id, box = state.box) {
+  const m = find(id);
+  if (!m) return;
+  if (m.box === 'drafts') return openDraft(m);
+  if (!m.read) {
+    m.read = true;
+    persist('messages');
+  }
+  if (state.view === 'read') {
+    Object.assign(state, { box, openId: id });
+    render();
+  } else go('read', { box, openId: id });
+}
+
+// ───────────── Feuille d'actions et message temporaire ─────────────
+
+let sheetDone = null;
+let sheetActions = [];
+function sheet({ title = '', actions }) {
+  closeSheet(null);
+  sheetActions = actions;
+  $sheet.innerHTML = `
+    <div class="sheet-backdrop" data-sheet="-1"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true">
+      <div class="sheet-group">${title ? `<div class="sheet-title">${esc(title)}</div>` : ''}${actions.map((a, i) => `<button class="sheet-btn${a.danger ? ' danger' : ''}" data-sheet="${i}">${esc(a.label)}</button>`).join('')}</div>
+      <button class="sheet-btn cancel" data-sheet="-1">Annuler</button>
+    </div>`;
+  $sheet.hidden = false;
+  requestAnimationFrame(() => $sheet.classList.add('open'));
+  return new Promise((resolve) => (sheetDone = resolve));
+}
+function closeSheet(value) {
+  if (!sheetDone) return;
+  const done = sheetDone;
+  sheetDone = null;
+  $sheet.classList.remove('open');
+  $sheet.hidden = true;
+  done(value);
+}
+$sheet.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-sheet]');
+  if (!button) return;
+  const index = Number(button.dataset.sheet);
+  closeSheet(index >= 0 ? sheetActions[index].value : null);
+});
+
+let snackTimer = 0;
+let snackAction = null;
+function snack(text, action = null) {
+  clearTimeout(snackTimer);
+  snackAction = action;
+  $snack.innerHTML = `<span>${esc(text)}</span>${action ? `<button type="button">${esc(action.label)}</button>` : ''}`;
+  $snack.classList.add('show');
+  snackTimer = setTimeout(() => {
+    $snack.classList.remove('show');
+    snackAction = null;
+  }, action ? 5000 : 2500);
+}
+$snack.addEventListener('click', (event) => {
+  if (!event.target.closest('button') || !snackAction) return;
+  const action = snackAction;
+  snackAction = null;
+  clearTimeout(snackTimer);
+  $snack.classList.remove('show');
+  action.run();
+});
+
+// ───────────── Événements ─────────────
+
+const ACTIONS = {
+  setup() {
+    const name = document.getElementById('setup-name').value.trim();
+    const address = document.getElementById('setup-address').value.trim();
+    const error = document.getElementById('setup-error');
+    if (!name) return void (error.textContent = 'Indiquez votre nom.');
+    if (!EMAIL.test(address)) return void (error.textContent = 'Cette adresse e-mail n\'est pas valide.');
+    state.account = { name, address, signature: 'Envoyé depuis Courrier' };
+    if (!state.messages.length) state.messages = seed();
+    persist('account', 'messages');
+    stack.length = 0;
+    stack.push({ view: 'boxes', box: 'inbox', openId: null, scroll: 0 });
+    Object.assign(state, { view: 'list', box: 'inbox' });
+    render();
+  },
+  back: () => back(),
+  settings: () => go('settings'),
+  box: (el) => go('list', { box: el.dataset.box, query: '', unreadOnly: false }),
+  compose: () => startCompose(),
+  open(el) {
+    if (!state.selecting) return openMessage(el.dataset.id);
+    const id = el.dataset.id;
+    if (state.selected.has(id)) state.selected.delete(id);
+    else state.selected.add(id);
+    fillList();
+  },
+  select() {
+    state.selecting = !state.selecting;
+    state.selected.clear();
+    document.getElementById('select-btn').textContent = state.selecting ? 'OK' : 'Modifier';
+    fillList();
+  },
+  'select-all'() {
+    const list = visibleList();
+    if (list.every((m) => state.selected.has(m.id))) state.selected.clear();
+    else list.forEach((m) => state.selected.add(m.id));
+    fillList();
+  },
+  'mark-selected'() {
+    const chosen = [...state.selected].map(find).filter(Boolean);
+    markRead([...state.selected], chosen.some((m) => !m.read));
+    ACTIONS.select();
+  },
+  'archive-selected'() {
+    move([...state.selected], state.box === 'archive' ? 'inbox' : 'archive');
+    ACTIONS.select();
+  },
+  'restore-selected'() {
+    move([...state.selected], 'restore');
+    ACTIONS.select();
+  },
+  async 'delete-selected'() {
+    if (await remove([...state.selected])) ACTIONS.select();
+  },
+  filter() {
+    state.unreadOnly = !state.unreadOnly;
+    fillList();
+  },
+  async 'empty-trash'() {
+    const trash = messagesIn('trash');
+    if (!trash.length || !(await orion.ui.confirm({ title: 'Vider la corbeille ?', message: `${plural(trash.length, 'message')} seront supprimés définitivement.`, confirmLabel: 'Vider' }))) return;
+    state.messages = state.messages.filter((m) => m.box !== 'trash');
+    persist('messages');
+    snack('Corbeille vidée');
+    if (state.view === 'settings') rerender();
+    else refresh();
+  },
+  prev: () => step(-1),
+  next: () => step(1),
+  flag() {
+    const m = find(state.openId);
+    m.flagged = !m.flagged;
+    persist('messages');
+    rerender();
+  },
+  unread() {
+    markRead([state.openId], false);
+    back();
+  },
+  archive() {
+    const m = find(state.openId);
+    if (move([m.id], m.box === 'archive' ? 'inbox' : 'archive')) back();
+  },
+  restore() {
+    if (move([state.openId], 'restore')) back();
+  },
+  async delete() {
+    if (await remove([state.openId])) back();
+  },
+  async 'reply-menu'() {
+    const m = find(state.openId);
+    const others = [...(m.to || []), ...(m.cc || [])].filter((p) => !isMe(p.address));
+    const actions = [{ label: 'Répondre', value: 'reply' }];
+    if (others.length > (isMe(m.from.address) ? 1 : 0)) actions.push({ label: 'Répondre à tous', value: 'all' });
+    actions.push({ label: 'Transférer', value: 'forward' });
+    const kind = await sheet({ title: m.subject || '(Sans objet)', actions });
+    if (kind) startCompose(kind, m);
+  },
+  'cancel-compose': () => leaveCompose(),
+  send: () => send(),
+  'show-cc'() {
+    readCompose();
+    state.draft.showCc = true;
+    rerender();
+    document.getElementById('c-cc').focus();
+  },
+  suggest(el) {
+    const box = el.closest('.suggest');
+    const input = document.getElementById(box.dataset.field);
+    const parts = input.value.split(/[,;]/).map((s) => s.trim());
+    parts.pop();
+    const person = contacts().find((p) => same(p.address, el.dataset.address)) || { name: '', address: el.dataset.address };
+    input.value = `${[...parts.filter(Boolean), formatAddresses([person])].join(', ')}, `;
+    box.innerHTML = '';
+    input.focus();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  setting(el) {
+    const { key, value } = el.dataset;
+    state.settings[key] = key === 'lines' ? Number(value) : value;
+    persist('settings');
+    rerender();
+  },
+  async reset() {
+    const ok = await orion.ui.confirm({ title: 'Réinitialiser Courrier ?', message: 'Tous les messages, brouillons et réglages de Courrier seront effacés de cet appareil.', confirmLabel: 'Réinitialiser' });
+    if (!ok) return;
+    await saving;
+    await orion.storage.clear();
+    Object.assign(state, { account: null, messages: [], settings: { lines: 2, swipe: 'trash', confirmDelete: false }, view: 'setup', box: 'inbox', query: '', unreadOnly: false });
+    stack.length = 0;
+    render();
+  },
+};
+
+function step(delta) {
+  const list = visibleList();
+  const next = list[list.findIndex((m) => m.id === state.openId) + delta];
+  if (next) openMessage(next.id);
+}
+
+// Balayage d'un message vers la gauche.
+let swipe = null;
+let swipedAt = 0;
+$app.addEventListener('pointerdown', (event) => {
+  const row = event.target.closest('.row');
+  if (!row || state.selecting || event.button > 0) return;
+  swipe = { row, id: row.dataset.id, x: event.clientX, y: event.clientY, dx: 0, active: false, pointer: event.pointerId };
+});
+$app.addEventListener('pointermove', (event) => {
+  if (!swipe || event.pointerId !== swipe.pointer) return;
+  const dx = event.clientX - swipe.x;
+  if (!swipe.active) {
+    if (Math.abs(event.clientY - swipe.y) > 12) return void (swipe = null);
+    if (dx > -12) return;
+    swipe.active = true;
+    swipe.row.classList.add('dragging');
+    try {
+      swipe.row.setPointerCapture(event.pointerId);
+    } catch {
+      // Le pointeur a déjà été relâché.
+    }
+  }
+  swipe.dx = Math.min(0, dx);
+  swipe.row.querySelector('.row-main').style.transform = `translateX(${swipe.dx}px)`;
+  swipe.row.classList.toggle('armed', swipe.dx < -SWIPE);
+});
+function endSwipe(event) {
+  if (!swipe || event.pointerId !== swipe.pointer) return;
+  const done = swipe;
+  swipe = null;
+  if (!done.active) return;
+  swipedAt = Date.now();
+  const { row } = done;
+  const main = row.querySelector('.row-main');
+  // Le fond reste visible le temps que la ligne glisse jusqu'au bout ou revienne en place.
+  const settle = () => {
+    main.style.transform = '';
+    setTimeout(() => row.classList.remove('settling'), 250);
+  };
+  row.classList.remove('dragging', 'armed');
+  row.classList.add('settling');
+  if (event.type === 'pointerup' && done.dx < -SWIPE) {
+    main.style.transform = 'translateX(-100%)';
+    swipeAction(done.id).then((ok) => (ok ? fillList() : settle()));
+  } else settle();
+}
+$app.addEventListener('pointerup', endSwipe);
+$app.addEventListener('pointercancel', endSwipe);
+
+$app.addEventListener('click', (event) => {
+  const el = event.target.closest('[data-act]');
+  if (!el || el.disabled || Date.now() - swipedAt < 350) return;
+  ACTIONS[el.dataset.act]?.(el, event);
+});
+
+$app.addEventListener('input', (event) => {
+  const t = event.target;
+  if (t.id === 'search') {
+    state.query = t.value;
+    fillList();
+  } else if (state.view === 'compose' && state.draft) {
+    readCompose();
+    state.draft.dirty = true;
+    if (t.id === 'c-to' || t.id === 'c-cc') {
+      suggest(t);
+      t.closest('.cfield').classList.remove('invalid');
+    }
+    if (t.id === 'c-body') autosize(t);
+    updateSend();
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 1000);
+  }
+});
+
+$app.addEventListener('focusout', (event) => {
+  const t = event.target;
+  if (t.id === 'c-to' || t.id === 'c-cc') t.closest('.cfield').classList.toggle('invalid', parseAddresses(t.value).bad.length > 0);
+});
+
+// Réglages : enregistrés quand le champ est quitté.
+$app.addEventListener('change', (event) => {
+  const t = event.target;
+  if (t.id === 's-name') {
+    const name = t.value.trim();
+    if (name) state.account.name = name;
+    else t.value = state.account.name;
+  } else if (t.id === 's-address') {
+    const address = t.value.trim();
+    if (EMAIL.test(address)) state.account.address = address;
+    else {
+      t.value = state.account.address;
+      return void snack('Cette adresse e-mail n\'est pas valide');
+    }
+  } else if (t.id === 's-signature') state.account.signature = t.value.trim();
+  else if (t.id === 's-confirm') {
+    state.settings.confirmDelete = t.checked;
+    return void persist('settings');
+  } else return;
+  persist('account');
+});
+
+$app.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  if (state.view === 'setup') ACTIONS.setup();
+  else if (state.view === 'compose' && (event.ctrlKey || event.metaKey) && !document.getElementById('send-btn').disabled) send();
+});
+
+orion.onBack(() => {
+  if (sheetDone) closeSheet(null);
+  else if (state.view === 'list' && state.selecting) ACTIONS.select();
+  else if (state.view === 'compose') leaveCompose();
+  else return back();
+  return true;
+});
+orion.on('pause', () => {
+  paused = true;
+  if (state.view === 'compose') {
+    readCompose();
+    saveDraft();
+  }
+});
+orion.on('resume', () => {
+  paused = false;
+  deliver();
+  refresh();
+});
+
+// ───────────── Démarrage ─────────────
+
+async function start() {
+  const [account, settings, messages] = await Promise.all([orion.storage.get('account'), orion.storage.get('settings'), orion.storage.get('messages')]);
+  state.account = account || null;
+  Object.assign(state.settings, settings || {});
+  state.messages = Array.isArray(messages) ? messages : [];
+  if (purgeTrash()) persist('messages');
+  if (state.account) {
+    stack.push({ view: 'boxes', box: 'inbox', openId: null, scroll: 0 });
+    state.view = 'list';
+  } else state.view = 'setup';
+  render();
+  setInterval(deliver, 1000);
+}
+
+start().catch((error) => {
+  $app.innerHTML = `<div class="empty">${icon('mail', 40)}<p>Courrier n'a pas pu démarrer : ${esc(error.message)}</p></div>`;
+});
+</script>

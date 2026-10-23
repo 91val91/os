@@ -13,6 +13,30 @@ import { CATEGORIES, COMMISSION, DEVELOPER_FEE, GLYPHS, PALETTES, PRICES, STARTE
 
 const STATUS = { draft: 'Brouillon', published: 'En vente', unlisted: 'Retirée de la vente' };
 
+/**
+ * Modèles de code proposés dans l'éditeur. Un exemple peut aussi compléter la
+ * fiche du Store (seulement les champs que le développeur n'a pas remplis).
+ */
+const TEMPLATES = [
+  { label: 'Modèle de départ (compteur)', code: async () => STARTER_CODE },
+  {
+    label: 'Exemple : Courrier (e-mail)',
+    code: async () => {
+      const response = await fetch(new URL('./examples/courrier.html', import.meta.url));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    },
+    listing: {
+      subtitle: 'Vos e-mails, simples et rangés',
+      description: 'Courrier range vos messages dans Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille. Répondez, transférez, recherchez, balayez pour supprimer ou archiver (avec annulation) ; vos brouillons sont enregistrés pendant la saisie. Les messages restent sur l\'appareil.',
+      category: 'Productivité',
+      icon: 'mail',
+    },
+  },
+];
+/** Valeurs d'une app qui vient d'être créée (store.createApp) : un exemple peut les remplacer. */
+const UNSET = { subtitle: '', description: '', category: 'Utilitaires', icon: GLYPHS[0] };
+
 const TERMS = [
   'Vous publiez des apps dont vous détenez les droits, sans contenu illégal, trompeur ou dangereux.',
   'Chaque version est examinée automatiquement avant sa publication ; une app qui tente de sortir de son environnement isolé, de miner de la cryptomonnaie ou de voler des identifiants est refusée.',
@@ -264,12 +288,7 @@ export function developerConsole({ ctx, nav, store, verify, topUp, openListing }
         h(
           'div.devc-actions',
           button('Essayer', { variant: 'tinted', icon: 'play', onClick: () => testRun() }),
-          button('Modèle', { variant: 'gray', icon: 'undo', onClick: async () => {
-            if (await ctx.ui.confirm({ title: 'Remplacer le code ?', message: 'Le code actuel est remplacé par le modèle de départ.', confirmLabel: 'Remplacer', destructive: true })) {
-              save({ code: STARTER_CODE });
-              render();
-            }
-          } }),
+          button('Modèles', { variant: 'gray', icon: 'notes', onClick: pickTemplate }),
         ),
         button(app.live ? 'Examiner et publier la mise à jour' : 'Examiner et publier', { block: true, icon: 'upload', onClick: reviewAndPublish }),
         app.live
@@ -292,6 +311,27 @@ export function developerConsole({ ctx, nav, store, verify, topUp, openListing }
         } }),
       );
     };
+
+    async function pickTemplate() {
+      const index = await ctx.ui.actionSheet({ title: 'Partir d\'un modèle', actions: TEMPLATES.map((t, i) => ({ label: t.label, value: i })) });
+      const template = TEMPLATES[index];
+      if (!template) return;
+      if (!(await ctx.ui.confirm({ title: 'Remplacer le code ?', message: `Le code actuel est remplacé par « ${template.label} ».`, confirmLabel: 'Remplacer', destructive: true }))) return;
+      let code;
+      try {
+        code = await template.code();
+      } catch (error) {
+        ctx.ui.alert({ title: 'Modèle indisponible', message: `Le modèle n'a pas pu être chargé (${error.message}).` });
+        return;
+      }
+      const draft = save()?.draft;
+      if (!draft) return;
+      const patch = { code };
+      for (const [key, value] of Object.entries(template.listing ?? {})) if (draft[key] === UNSET[key]) patch[key] = value;
+      save(patch);
+      render();
+      if (template.listing) ctx.ui.toast('Exemple chargé : essayez-le, puis publiez-le');
+    }
 
     async function reviewAndPublish() {
       save();

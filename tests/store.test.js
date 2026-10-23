@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryBackend, Namespace } from '../src/kernel/storage.js';
 import { PackageManager } from '../src/kernel/packages.js';
 import { EventBus } from '../src/kernel/events.js';
-import { StoreService, DEVELOPER_FEE, netRevenue, formatPrice, REFUND_WINDOW } from '../src/kernel/store.js';
+import { StoreService, DEVELOPER_FEE, MAX_CODE, netRevenue, formatPrice, REFUND_WINDOW } from '../src/kernel/store.js';
 import { scanApp } from '../src/kernel/app-scan.js';
 import { bootKernel } from '../src/kernel/kernel.js';
 import { fakeClock } from './helpers.js';
@@ -178,4 +178,20 @@ test('analyse des apps', () => {
   assert.deepEqual(scanApp('<script>fetch("https://exemple.invalid")</script>').findings.map((f) => f.id), ['network']);
   assert.deepEqual(scanApp('<script>eval("1+1")</script>').findings.map((f) => f.id), ['dynamic']);
   assert.equal(scanApp(`<script>var s = "${'\\x41'.repeat(60)}"</script>`).findings[0].id, 'obfuscated');
+});
+
+test('l\'exemple Courrier (e-mail) passe l\'examen du Store', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const code = await readFile(new URL('../src/apps/store/examples/courrier.html', import.meta.url), 'utf8');
+  assert.deepEqual(scanApp(code), { level: 'safe', findings: [] });
+  assert.ok(new Blob([code]).size <= MAX_CODE);
+  const { session } = device();
+  const { store } = await session('camille');
+  store.topUp(DEVELOPER_FEE);
+  store.registerDeveloper({ name: 'Studio Camille', email: 'camille@exemple.fr', accepted: true });
+  const app = store.createApp({ name: 'Courrier' });
+  store.updateDraft(app.id, { code, description: 'Vos e-mails, rangés et consultables sans Internet.', category: 'Productivité', icon: 'mail' });
+  const review = store.review(app.id);
+  assert.ok(review.ok, JSON.stringify(review.checks.filter((c) => !c.ok)));
+  assert.equal(store.publish(app.id).live.size, new Blob([code]).size);
 });

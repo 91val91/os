@@ -29,7 +29,7 @@ export const MAX_BALANCE = 50_000;
 export const TOP_UPS = [1000, 2500, 5000];
 export const CATEGORIES = ['Divertissement', 'Éducation', 'Jeux', 'Productivité', 'Santé et forme', 'Utilitaires'];
 /** Pictogrammes proposés pour l'icône d'une app. */
-export const GLYPHS = ['sparkles', 'star', 'heart', 'gamepad', 'music-note', 'book', 'brush', 'calculator', 'clock', 'globe', 'leaf', 'bolt', 'compass', 'notes', 'list', 'chip'];
+export const GLYPHS = ['sparkles', 'star', 'heart', 'gamepad', 'music-note', 'book', 'brush', 'calculator', 'clock', 'globe', 'leaf', 'bolt', 'compass', 'notes', 'list', 'chip', 'mail'];
 export const PALETTES = [
   ['#5ac8fa', '#007aff'],
   ['#ff9f0a', '#ff375f'],

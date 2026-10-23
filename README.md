@@ -214,6 +214,16 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
 </script>
 ```
 
+**Exemple complet : Courrier**, une app d'e-mail ([`src/apps/store/examples/courrier.html`](src/apps/store/examples/courrier.html), environ 65 Ko). Dans l'éditeur d'une app, **Modèles → Exemple : Courrier** remplace le code et complète la fiche (sous-titre, description, catégorie Productivité, icône) ; il ne reste qu'à l'essayer et le publier. Elle montre l'usage du SDK dans une vraie app :
+
+- boîtes Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille (vidée au bout de 30 jours), avec les non lus ;
+- lecture (message précédent ou suivant, citations en retrait), réponse, réponse à tous, transfert ;
+- rédaction avec suggestions de destinataires, Cc, signature et **brouillon enregistré pendant la saisie** (aussi quand l'app passe en arrière-plan) ;
+- recherche sans tenir compte des accents, filtre « non lus », sélection multiple, **balayage vers la gauche** (corbeille ou archive) avec « Annuler » ;
+- réglages (nom, adresse, signature, lignes d'aperçu, confirmation avant suppression), thème clair ou sombre d'Orion, bouton Retour d'Orion (`orion.onBack`).
+
+Comme toute app du Store, Courrier n'a pas accès à Internet : elle ne relève ni n'envoie de vrais e-mails, les messages restent sur l'appareil (`orion.storage`). Ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message (notification si l'app est en arrière-plan). Relever une vraie boîte demandera un service de messagerie dans `orion-server`.
+
 ## Protection de l'appareil
 
 **Réglages → Protection de l'appareil** fait le **bilan de sécurité** de l'appareil et regroupe ses protections :
@@ -295,7 +305,7 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 ## Tests
 
 ```bash
-npm test            # 112 tests unitaires (noyau, Store, protection, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 113 tests unitaires (noyau, Store, protection, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint

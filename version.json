@@ -8,12 +8,13 @@
  "notes": [
   "Orion OS passe en 0.1 (alpha) : la numérotation repart de zéro jusqu'à la première version stable. Vos données, comptes et réglages sont conservés.",
   "Programme développeur du Store : publiez vos propres apps, gratuites ou payantes, et suivez vos ventes dans la console développeur (Store → Compte).",
+  "Exemple pour les développeurs : Courrier, une app d'e-mail complète (boîtes, brouillons, recherche, balayage), à charger dans la console avec « Modèles » puis à publier.",
   "Le Store affiche les apps des développeurs, avec achat, reçus et remboursement (paiements fictifs pendant l'alpha : solde de test) ; les apps publiées s'exécutent isolées du système, sans accès à Internet.",
   "Nouveau : Protection de l'appareil — bilan de sécurité, vérification de l'intégrité du système, analyse des apps, protection contre la réinitialisation, effacement après trop d'échecs du code et verrouillage en cas de vol.",
   "Les erreurs de code de verrouillage sont comptées même après un redémarrage ; achats et réglages sensibles demandent le code.",
   "Image installable : orion-server garde la protection contre la réinitialisation et vérifie les fichiers servis ; le mode sans échec démarre aussi Orion."
  ],
- "size": 1304829,
+ "size": 1373062,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -196,8 +197,12 @@
    "size": 1368
   },
   "./src/apps/store/console.js": {
-   "hash": "6934369bdc9538343886d45699d8788abe83d9ddafc5c184c5ad6b7715433ff8",
-   "size": 18962
+   "hash": "b91a7607ed543e30da32a31b0fd2444f115510c5839e62545197bae994f96a0e",
+   "size": 20875
+  },
+  "./src/apps/store/examples/courrier.html": {
+   "hash": "211848f59c0151505dbeeba02af03efae3021449546d33404edf17043355f0cb",
+   "size": 66126
   },
   "./src/apps/store/index.js": {
    "hash": "b791da9e04fb795c3e1ff59693d5f006217a043f28786f28476fced42a824629",
@@ -320,16 +325,16 @@
    "size": 5861
   },
   "./src/kernel/store.js": {
-   "hash": "e5bb73cde139b137fae30f90e67eb10b68e7ccedc901f87c0224279aabddf161",
-   "size": 22265
+   "hash": "513b3ebd3e7a84a3f125e57bf25b6f542bebe8031c8de3f162320b19625b3d9e",
+   "size": 22273
   },
   "./src/kernel/telephony.js": {
    "hash": "131bbba14cecea607ad625b48a4b01172c8e977b6a90867bfce8fc546c1e5518",
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "333ecbcfae387622d04502512d170e3a379058ff706639c36f284f9f8614223b",
-   "size": 1994
+   "hash": "936ccbb16ada3aeb4d970762657b0baa4f399f4ab9c30a5691b60dee19e78f02",
+   "size": 2180
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
