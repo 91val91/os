@@ -4,6 +4,10 @@
 # Interface : compositeur Wayland « kiosque » + Chromium plein écran
 cage
 chromium
+# Affichage de secours (cartes sans « PRIME import », refusées par cage) : Xorg + modesetting
+xserver-xorg-core
+xserver-xorg-input-libinput
+xinit
 chromium-l10n
 libgl1-mesa-dri
 fonts-noto-core

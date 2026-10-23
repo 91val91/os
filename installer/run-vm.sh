@@ -27,7 +27,7 @@ Usage : $0 [options]
   --uefi | --bios    micrologiciel (défaut : UEFI si OVMF est installé, sinon BIOS)
   --memory Mo        mémoire (défaut : $MEMORY, entre 2048 et 4096 conseillé)
   --cpus N           processeurs (défaut : $CPUS)
-  --gpu virtio|std   carte graphique (défaut : virtio ; std si l'écran reste noir)
+  --gpu virtio|std   carte graphique (défaut : virtio ; std : carte standard, affichage X11 de secours)
 EOF
 }
 

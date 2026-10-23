@@ -153,7 +153,7 @@ Deux mécanismes complémentaires :
 
 ## Dépannage
 
-- **Écran noir ou interface qui ne s'affiche pas** : **Ctrl+Alt+F2** ouvre une console (en démarrage sur clé, déjà connectée ; sur un système installé, utilisateur `orion` et son mot de passe ; le mot de passe du système live est `live`). **Ctrl+Alt+F1** revient à l'interface. Après trois échecs de démarrage, l'interface passe d'elle‑même au rendu logiciel. En machine virtuelle, essayez `run-vm.sh --gpu std` ou, dans VirtualBox, le contrôleur graphique *VMSVGA*.
+- **Écran noir ou interface qui ne s'affiche pas** : **Ctrl+Alt+F2** ouvre une console (en démarrage sur clé, déjà connectée ; sur un système installé, utilisateur `orion` et son mot de passe ; le mot de passe du système live est `live`). **Ctrl+Alt+F1** revient à l'interface. Après trois échecs de démarrage, l'interface passe d'elle‑même au rendu logiciel, puis, si la carte graphique n'est pas prise en charge par le compositeur Wayland (carte standard de QEMU, Hyper‑V, affichage UEFI générique sans pilote), à un affichage X11 de secours (`journalctl -t orion-kiosk` dit lequel est utilisé). En machine virtuelle, préférez une carte *virtio* (`run-vm.sh`, GNOME Boxes, virt-manager) ou, dans VirtualBox, le contrôleur graphique *VMSVGA*.
 - **Journaux** :
   ```bash
   journalctl -b -u orion-server      # serveur et pont matériel
@@ -177,7 +177,7 @@ Deux mécanismes complémentaires :
 | `build.sh` | Construit l'ISO avec live-build (Debian 12) |
 | `build-in-docker.sh`, `Dockerfile` | Même chose dans un conteneur Debian 12 |
 | `run-vm.sh` | Démarre l'ISO (ou un disque installé) dans QEMU |
-| `boot-test.sh` | Démarre l'ISO dans QEMU sans écran et vérifie qu'orion-server répond et que l'interface s'affiche (capture d'écran) ; lancé par l'action GitHub après chaque construction |
+| `boot-test.sh` | Démarre l'ISO dans QEMU sans écran et vérifie qu'orion-server démarre et que l'interface s'affiche (capture d'écran), avec une carte graphique virtio (Wayland) puis la carte standard de QEMU (secours X11) ; lancé par l'action GitHub après chaque construction |
 | `config/package-lists/orion.list.chroot` | Paquets de l'image |
 | `config/hooks/normal/9000-orion.hook.chroot` | Réglages appliqués dans l'image (langue, services…) |
 | `config/includes.chroot/` | Fichiers copiés tels quels dans l'image (services, polkit, Chromium, kiosque…) |

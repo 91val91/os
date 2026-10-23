@@ -12,12 +12,21 @@
 #
 #   installer/boot-test.sh installer/out/orion-os-0.1-amd64.iso [dossier-de-sortie]
 #
+# BOOT_TEST_GPU=virtio (défaut, interface Wayland avec cage) ou std (carte
+# standard de QEMU, refusée par cage : l'interface doit passer à X11).
+#
 # Sortie : serial.log (journal du démarrage), screen.png (capture), orion.log (lignes d'Orion).
 set -euo pipefail
 
 ISO="${1:?usage : $0 image.iso [dossier-de-sortie]}"
 OUT="${2:-boot-test}"
 DEADLINE="${BOOT_TEST_TIMEOUT:-1500}" # secondes (sans KVM, tout est émulé et lent)
+GPU="${BOOT_TEST_GPU:-virtio}"
+case "$GPU" in
+	virtio) VGA=(-vga none -device virtio-vga) ;;
+	std) VGA=(-vga std) ;;
+	*) echo "Erreur : BOOT_TEST_GPU=virtio ou std" >&2; exit 2 ;;
+esac
 
 for tool in qemu-system-x86_64 xorriso convert; do
 	command -v "$tool" >/dev/null 2>&1 || { echo "Erreur : $tool est introuvable" >&2; exit 2; }
@@ -58,13 +67,13 @@ echo "==> Ligne de commande : $APPEND"
 
 ACCEL="tcg"
 if [ -w /dev/kvm ]; then ACCEL="kvm"; fi
-echo "==> Accélération : $ACCEL"
+echo "==> Accélération : $ACCEL · carte graphique : $GPU"
 
 qemu-system-x86_64 \
 	-machine "q35,accel=$ACCEL" -cpu max -m 3072 -smp 2 \
 	-cdrom "$ISO" -kernel "$WORK/vmlinuz" -initrd "$WORK/initrd.img" -append "$APPEND" \
 	-netdev "user,id=net0" -device virtio-net-pci,netdev=net0 \
-	-vga std -display none \
+	"${VGA[@]}" -display none \
 	-serial "file:$OUT/serial.log" \
 	-monitor "unix:$WORK/monitor.sock,server,nowait" &
 QEMU_PID=$!
@@ -113,15 +122,20 @@ echo "==> Interface lancée après $(elapsed) s"
 if grep -q "orion-server ne répond pas" "$OUT/serial.log"; then
 	failed "orion-server ne répond pas dans la machine"
 fi
-# Chromium charge Orion puis l'assistant de configuration s'affiche (lent sans KVM).
-sleep "${BOOT_TEST_SETTLE:-90}"
-monitor "screendump $WORK/screen.ppm"
-sleep 2
-convert "$WORK/screen.ppm" "$OUT/screen.png"
-
-# 4. Écran : part des pixels non noirs.
-lit="$(convert "$OUT/screen.png" -colorspace Gray -threshold 8% -format '%[fx:mean]' info:)"
-echo "==> Part de l'écran allumée : $lit"
+# Chromium charge Orion puis l'assistant de configuration s'affiche : captures successives
+# jusqu'à un écran clair (l'assistant), BOOT_TEST_SETTLE secondes au plus.
+settle_until=$(( $(elapsed) + ${BOOT_TEST_SETTLE:-180} ))
+lit=0
+while :; do
+	sleep 10
+	monitor "screendump $WORK/screen.ppm"
+	sleep 1
+	convert "$WORK/screen.ppm" "$OUT/screen.png"
+	# 4. Écran : part des pixels non noirs.
+	lit="$(convert "$OUT/screen.png" -colorspace Gray -threshold 8% -format '%[fx:mean]' info:)"
+	if awk "BEGIN { exit !($lit >= 0.3) }" || [ "$(elapsed)" -ge "$settle_until" ]; then break; fi
+done
+echo "==> Part de l'écran allumée : $lit (après $(elapsed) s)"
 grep -E "orion-kiosk|orion-server|orion_server" "$OUT/serial.log" | tee "$OUT/orion.log" | tail -20 || true
 # Aperçu réduit dans le journal de l'action (les artefacts ne sont pas toujours accessibles).
 echo "==> Aperçu (JPEG 320 px, base64) :"
@@ -129,7 +143,10 @@ echo "----- APERÇU -----"
 convert "$OUT/screen.png" -resize 320x -quality 70 jpg:- | base64 -w 0
 echo
 echo "----- FIN APERÇU -----"
+mode="$(grep -o "Lancement de l'interface ([^)]*)" "$OUT/serial.log" | tail -n 1)"
+echo "==> Affichage : ${mode:-inconnu}"
 if awk "BEGIN { exit !($lit < 0.02) }"; then
-	echo "::warning::L'écran est resté (presque) noir : l'interface ne s'affiche peut-être pas."
+	echo "Erreur : l'écran est resté noir, l'interface ne s'affiche pas (carte $GPU)" >&2
+	exit 1
 fi
 echo "==> Démarrage vérifié en $(elapsed) s"

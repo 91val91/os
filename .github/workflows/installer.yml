@@ -112,8 +112,11 @@ jobs:
             sudo udevadm trigger --name-match=kvm
           fi
 
-      - name: Démarrage et vérifications
-        run: installer/boot-test.sh "$(ls installer/out/*.iso | head -n 1)" boot-test
+      - name: Démarrage et vérifications (carte virtio, Wayland)
+        run: BOOT_TEST_GPU=virtio installer/boot-test.sh "$(ls installer/out/*.iso | head -n 1)" boot-test/virtio
+
+      - name: Démarrage et vérifications (carte standard de QEMU, secours X11)
+        run: BOOT_TEST_GPU=std installer/boot-test.sh "$(ls installer/out/*.iso | head -n 1)" boot-test/std
 
       - name: Journal et capture d'écran
         if: always()
