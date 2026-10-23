@@ -10,12 +10,15 @@
 set -u
 
 ORION_PORT=8080
+ORION_DISPLAY=plein-ecran
 ORION_KIOSK_FLAGS=""
 if [ -r /etc/default/orion ]; then
 	# shellcheck disable=SC1091
 	. /etc/default/orion
 fi
 ORION_URL="http://127.0.0.1:${ORION_PORT}/"
+# Plein écran : Orion se dessine sur tout l'écran au lieu d'un cadre de téléphone.
+[ "$ORION_DISPLAY" = telephone ] || ORION_URL="${ORION_URL}?fullscreen"
 PROFILE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/orion/chromium"
 mkdir -p "$PROFILE_DIR"
 

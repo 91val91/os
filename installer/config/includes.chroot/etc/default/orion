@@ -8,5 +8,9 @@ ORION_PORT=8080
 # Adresse de publication des mises à jour (doit contenir version.json).
 ORION_UPDATE_SOURCE=https://91val91.github.io/os/
 
+# Affichage : « plein-ecran » (l'interface occupe tout l'écran, comme sur une
+# tablette) ou « telephone » (cadre de téléphone au milieu de l'écran).
+ORION_DISPLAY=plein-ecran
+
 # Options supplémentaires de Chromium, séparées par des espaces (ex. --force-device-scale-factor=1.5).
 ORION_KIOSK_FLAGS=

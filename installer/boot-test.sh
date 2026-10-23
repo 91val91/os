@@ -178,4 +178,13 @@ if awk "BEGIN { exit !($lit < 0.02) }"; then
 	echo "Erreur : l'écran est resté noir, l'interface ne s'affiche pas (carte $GPU)" >&2
 	exit 1
 fi
+# Carte virtio : le compositeur Wayland (cage) doit fonctionner ; X11 n'est qu'un secours.
+if [ "$GPU" = virtio ] && [[ "$mode" == *X11* ]]; then
+	echo "Erreur : cage n'a pas pu démarrer avec la carte virtio (affichage de secours X11 utilisé)" >&2
+	grep -E "orion-kiosk.*(ERROR|Error|error)" "$OUT/serial.log" | head -10 >&2 || true
+	exit 1
+fi
+if awk "BEGIN { exit !($lit < 0.5) }"; then
+	echo "::warning::Moins de la moitié de l'écran est allumée : l'interface n'occupe peut-être pas tout l'écran."
+fi
 echo "==> Démarrage vérifié en $(elapsed) s"

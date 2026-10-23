@@ -3,6 +3,8 @@
 
 # Interface : compositeur Wayland « kiosque » + Chromium plein écran
 cage
+# cage lance XWayland au démarrage : sans lui, il s'arrête aussitôt.
+xwayland
 chromium
 # Affichage de secours (cartes sans « PRIME import », refusées par cage) : Xorg + modesetting
 xserver-xorg-core
