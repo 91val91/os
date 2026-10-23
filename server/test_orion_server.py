@@ -635,6 +635,23 @@ class RealHardwareTest(unittest.TestCase):
         hardware.status()
         self.assertEqual(len(runner.calls), calls)  # résultat gardé quelques secondes
 
+    def test_stale_capabilities_returned_at_once_and_refreshed(self):
+        runner = mm_runner()
+        runner.add(("bluetoothctl", "show"), ok("No default controller available\n"))
+        hardware = osv.RealHardware(runner, gps=osv.GpsdClient(port=free_port(), timeout=0.5))
+        first = hardware.capabilities()
+        hardware._caps = (time.monotonic() - 60, first)  # périmé
+        calls = len(runner.calls)
+        started = time.monotonic()
+        self.assertEqual(hardware.capabilities(), first)  # tout de suite, sans attendre les outils
+        self.assertLess(time.monotonic() - started, 0.5)
+        for _ in range(50):  # recalcul en arrière-plan
+            if hardware._caps[0] > started:
+                break
+            time.sleep(0.05)
+        self.assertGreater(hardware._caps[0], started)
+        self.assertGreater(len(runner.calls), calls)
+
     def test_power_runs_after_delay(self):
         runner = FakeRunner()
         runner.add(("systemctl", "reboot"), ok())

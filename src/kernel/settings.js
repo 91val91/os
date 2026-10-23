@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = {
   airplane: false,
   cellular: true, // réseau mobile simulé (mode démonstration)
   'telephony.mode': 'auto', // auto | handoff (apps du téléphone) | simulated
+  'telephony.voicemail': null, // numéro de la messagerie vocale de l'opérateur
   location: true,
   // Sons
   volume: 0.6,

@@ -8,6 +8,7 @@ import { relativeTime, formatDuration } from '../../lib/format.js';
 import { tabBar, appBar, avatar, listItem, segmented, emptyState, searchField, collapseOnScroll } from '../../lib/ui.js';
 import { longPress } from '../../lib/gesture.js';
 import { displayName } from '../../kernel/contacts.js';
+import { VOICEMAIL } from '../../kernel/telephony.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
@@ -38,6 +39,18 @@ export function mount(root, ctx) {
       ctx.ui.alert({ title: 'Appel impossible', message: error.message });
     }
   };
+
+  /** Messagerie vocale : son numéro dépend de l'opérateur (demandé une fois, modifiable dans Réglages › Réseau mobile). */
+  async function callVoicemail() {
+    if (tel.mode === 'simulated') return call(VOICEMAIL);
+    let number = ctx.settings.get('telephony.voicemail');
+    if (!number) {
+      number = (await ctx.ui.prompt({ title: 'Messagerie vocale', message: 'Numéro de votre messagerie : 888 chez Orange, 123 chez SFR, 660 chez Bouygues Telecom, 666 chez Free…', placeholder: 'Numéro', type: 'tel', confirmLabel: 'Appeler' }))?.trim();
+      if (!number) return;
+      ctx.settings.set?.('telephony.voicemail', number);
+    }
+    call(number);
+  }
 
   // ───────────── Clavier ─────────────
   const display = h('div.dial-number');
@@ -167,7 +180,7 @@ export function mount(root, ctx) {
       h(
         'div.app-content',
         emptyState({ icon: 'voicemail', title: 'Aucun message vocal', message: 'Les messages laissés par vos correspondants apparaîtront ici.' }),
-        h('button.btn.btn-tinted.block.vm-call', { type: 'button', onclick: () => call('888') }, icon('voicemail', { size: 20 }), 'Appeler la messagerie'),
+        h('button.btn.btn-tinted.block.vm-call', { type: 'button', onclick: () => callVoicemail() }, icon('voicemail', { size: 20 }), 'Appeler la messagerie'),
       ),
     ),
   );

@@ -427,7 +427,7 @@ export function mount(root, ctx) {
       p.onShow();
     }
 
-    async function join(n, { ssid = n?.ssid, password = null } = {}) {
+    async function join(n, { ssid = n?.ssid, password = null, hidden = false } = {}) {
       if (joining) return;
       if (n?.security && !n.known && password == null) {
         password = await ctx.ui.prompt({ title: `Mot de passe pour « ${ssid} »`, type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
@@ -435,15 +435,33 @@ export function mount(root, ctx) {
       }
       joining = ssid;
       p.onShow();
+      let failure = null;
       try {
-        await net.connect(ssid, password || null);
+        await net.connect(ssid, password || null, { hidden });
         ctx.ui.toast(`Connecté à ${ssid}`);
       } catch (error) {
-        ctx.ui.alert({ title: `Impossible de rejoindre « ${ssid} »`, message: n?.known ? `${error.message}\nSi le mot de passe a changé, oubliez ce réseau puis rejoignez-le à nouveau.` : error.message });
+        failure = error;
       } finally {
         joining = null;
         p.onShow();
       }
+      if (!failure) return;
+      if (n?.known && password == null) {
+        // Réseau enregistré : son mot de passe a peut-être changé.
+        const choice = await ctx.ui.actionSheet({
+          title: `Impossible de rejoindre « ${ssid} »`,
+          message: failure.message,
+          actions: [{ label: 'Saisir le mot de passe', value: 'password' }, { label: 'Oublier ce réseau', value: 'forget', destructive: true }],
+        });
+        if (choice === 'password') {
+          const pw = await ctx.ui.prompt({ title: `Mot de passe pour « ${ssid} »`, type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
+          if (pw != null) join(n, { ssid, password: pw });
+        } else if (choice === 'forget') {
+          net.forget(ssid).then(() => ctx.ui.toast(`« ${ssid} » oublié`), failed('Impossible d\'oublier ce réseau'));
+        }
+        return;
+      }
+      ctx.ui.alert({ title: `Impossible de rejoindre « ${ssid} »`, message: failure.message });
     }
 
     async function joinHidden() {
@@ -451,7 +469,7 @@ export function mount(root, ctx) {
       if (!ssid) return;
       const password = await ctx.ui.prompt({ title: `Mot de passe pour « ${ssid} »`, message: 'Laissez vide pour un réseau ouvert.', type: 'password', placeholder: 'Mot de passe', confirmLabel: 'Rejoindre' });
       if (password == null) return;
-      join(null, { ssid, password });
+      join(null, { ssid, password, hidden: true });
     }
 
     function wifiDetails(c) {
@@ -602,6 +620,27 @@ export function mount(root, ctx) {
         );
         if (n.mode === 'simulated') groups.push(listGroup({ header: 'Réseau simulé', items: [toggleRow('Réseau mobile simulé', 'cellular', { onChange: refresh }), row({ title: 'Opérateur', detail: n.operator })] }));
         groups.push(listGroup({ header: 'Connexion du navigateur', items: connectionRows(k.network.state) }));
+      }
+      if (n.mode !== 'simulated') {
+        groups.push(
+          listGroup({
+            items: [
+              row({
+                icon: 'voicemail',
+                iconColor: '#30d158',
+                title: 'Messagerie vocale',
+                detail: s.get('telephony.voicemail') || 'À définir',
+                onClick: async () => {
+                  const number = await ctx.ui.prompt({ title: 'Messagerie vocale', message: 'Orange 888, SFR 123, Bouygues Telecom 660, Free 666…', value: s.get('telephony.voicemail') ?? '', placeholder: 'Numéro', type: 'tel', confirmLabel: 'Enregistrer' });
+                  if (number == null) return;
+                  if (number.trim()) s.set('telephony.voicemail', number.trim());
+                  else s.reset('telephony.voicemail');
+                  refresh();
+                },
+              }),
+            ],
+          }),
+        );
       }
       return groups;
     });

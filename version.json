@@ -13,7 +13,7 @@
   "Les applications n'ont plus accès aux données internes du système.",
   "Premier jet d'une image installable pour PC et machine virtuelle (orion-server pilote le Wi‑Fi, le Bluetooth, le modem et le GPS)."
  ],
- "size": 1165299,
+ "size": 1176502,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -116,8 +116,8 @@
    "size": 7943
   },
   "./src/apps/messages/index.js": {
-   "hash": "1a4187d5f666b2a2af25ccc2ea3e6ae7cba794e24fce52dfefc4cf0d832cdb5c",
-   "size": 11567
+   "hash": "ed6e86ab4410ba37d492dfb30f8f394d5ec70b6756a84aa7d9c7666a958c506b",
+   "size": 11616
   },
   "./src/apps/messages/style.css": {
    "hash": "8bc2239b35761be47f0d2560c365404a064db588412cb7b42e2b560c32d0be6b",
@@ -152,8 +152,8 @@
    "size": 1233
   },
   "./src/apps/phone/index.js": {
-   "hash": "06da1d44c56595be4b03ec856d3dced42064e2f37f30dd9bd0b00e8a1f45a050",
-   "size": 10441
+   "hash": "1c1a2e387108feeeb820a74098ebea9e715b48c4cb079343020f339eaa811827",
+   "size": 11172
   },
   "./src/apps/phone/style.css": {
    "hash": "7196ffcd12234d97cb32cd3dcec062a069eb0829bb20396f639e94aff3212d19",
@@ -180,8 +180,8 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "94636edfb7cc31b39878b219bc2211fb3a64eb3daadd4ebe7a2a1663365c0f9d",
-   "size": 78098
+   "hash": "ac56b6a9be1f30453146f99d1838bd05c6002e581abf766ead6f1a8b6b90c687",
+   "size": 79885
   },
   "./src/apps/settings/style.css": {
    "hash": "0cbbe7fb12c0e84d7b39e62e70201d8bf2fffe43a45e598ae163b0be0ca6573a",
@@ -228,12 +228,12 @@
    "size": 5628
   },
   "./src/kernel/bluetooth.js": {
-   "hash": "547f1e9c49d4fe77350c895296832eed903ca2736e6ec73e48c9d8f3bf6ee5c1",
-   "size": 11200
+   "hash": "3981693df8bde9b8ce751a6183be07836c051d9ac8435c5372fb7ec5635c7209",
+   "size": 11745
   },
   "./src/kernel/bridge.js": {
-   "hash": "b93eda2ae3ae1f8d74c3d3bd73899624a65670e807beb2edc8da4397872bbe84",
-   "size": 4838
+   "hash": "4f5fbc1f3a6eacb2e9fab57a53e7d4594b16df3e4e1b139197932299cb20b27a",
+   "size": 6696
   },
   "./src/kernel/chatbot.js": {
    "hash": "4cbefe1f50a940bc5f4c91e9c7f5a22bd38fa28e2bd54057730555b95e17bc43",
@@ -256,12 +256,12 @@
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "7caebe13372aba01b17941e35aeeb4546dc98e9ebe2665a8da82fe404663d21f",
-   "size": 8063
+   "hash": "167d07a9ff8fd93ecd5ecfaab1dbaa661b8781f0a267d07e530e5e6f2aa37666",
+   "size": 8150
   },
   "./src/kernel/location.js": {
-   "hash": "be1a8d06cfb39dd10633f384969531c2e565a96b01e347fe47761196b90c63ba",
-   "size": 8051
+   "hash": "abcca202a3bb8459dd36456b469ebf2cfbbc8c54e791fc680ae64b8d6114e730",
+   "size": 8080
   },
   "./src/kernel/log.js": {
    "hash": "e4944db860b8fd5be6a1c7eb729f6894d2f825d42c1ec6bd6e7b6a1fb20dd4c9",
@@ -272,8 +272,8 @@
    "size": 1381
   },
   "./src/kernel/network.js": {
-   "hash": "12c7d14aea507e2a520abbfd5b6fdcb84ae7c058bca5b8f14c3238f4ac5913aa",
-   "size": 9117
+   "hash": "e8aeba01ddaf878316e4d725c330117f37466e595f3581f233a64c66c67dce48",
+   "size": 10786
   },
   "./src/kernel/notifications.js": {
    "hash": "b5e2a6ef3556a360b07ca347164413c5af32de02b3a8763ab93a118ae2ee8a92",
@@ -296,8 +296,8 @@
    "size": 3209
   },
   "./src/kernel/settings.js": {
-   "hash": "3e39af154cc94e88cd8369d5317236db0dd2837510c89aabef737d2933dc5a7a",
-   "size": 4713
+   "hash": "80b9355486f8dc33069520a985835787ec957006870738a6cac14025d25264f3",
+   "size": 4795
   },
   "./src/kernel/shell.js": {
    "hash": "8a2f3f56d9e566c8edfda9dbada1cdcb510adcd6e36a14f9cc735a32f2046cb4",
@@ -308,8 +308,8 @@
    "size": 5861
   },
   "./src/kernel/telephony.js": {
-   "hash": "03f02c9a76a9f6c15da1bdc00fcbdf6127d4f73c94be92b24276c93b8db711e4",
-   "size": 21690
+   "hash": "131bbba14cecea607ad625b48a4b01172c8e977b6a90867bfce8fc546c1e5518",
+   "size": 25085
   },
   "./src/kernel/version.js": {
    "hash": "b9cf0d6f78a508e2fd7f371c60b8f17fb3ecd7432883c0ed54ee64033f045808",
@@ -380,8 +380,8 @@
    "size": 19754
   },
   "./src/system/app-context.js": {
-   "hash": "fcbb6470532824ab0a55054eb58f06932ce6a2ac8452fae9089ad71613dfa9c8",
-   "size": 8127
+   "hash": "f70bafcd1bea4659049f79210b482ca50bcbbe830ba2b211b07198c975386dc2",
+   "size": 8506
   },
   "./src/system/app-icon.js": {
    "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
@@ -392,8 +392,8 @@
    "size": 2962
   },
   "./src/system/call-screen.js": {
-   "hash": "fb75c9d9d84ae0b346109bdeac44f9270fcb9805cd72816ad13a0b03eb57a68d",
-   "size": 6540
+   "hash": "002310c9751aadcb1e3b8b23ce40b350ac953be10450b16789916384df6d6968",
+   "size": 6839
   },
   "./src/system/control-center.js": {
    "hash": "2fe9624fde21f2797eb5e2d12494c8aa474ebd9d25aee1bb86d2dfd72f0f8ae1",
@@ -436,8 +436,8 @@
    "size": 2427
   },
   "./src/system/quick-settings.js": {
-   "hash": "07d063cacb1b9d2744fc960b3b8b9b2d455ad9c9a1775e65106c9a9af4271f99",
-   "size": 4677
+   "hash": "ef07b6f760007b60291ed5e5d419841ff97b54d506d1fe7424f93e6c362bdbe6",
+   "size": 4970
   },
   "./src/system/setup.js": {
    "hash": "95929a85679e4099bdd4a0a2f6a6e18b1e8d1a42703f0bef46ad572648fd0b31",

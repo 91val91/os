@@ -176,6 +176,7 @@ Deux mécanismes complémentaires :
 | `build.sh` | Construit l'ISO avec live-build (Debian 12) |
 | `build-in-docker.sh`, `Dockerfile` | Même chose dans un conteneur Debian 12 |
 | `run-vm.sh` | Démarre l'ISO (ou un disque installé) dans QEMU |
+| `boot-test.sh` | Démarre l'ISO dans QEMU sans écran et vérifie qu'orion-server répond et que l'interface s'affiche (capture d'écran) ; lancé par l'action GitHub après chaque construction |
 | `config/package-lists/orion.list.chroot` | Paquets de l'image |
 | `config/hooks/normal/9000-orion.hook.chroot` | Réglages appliqués dans l'image (langue, services…) |
 | `config/includes.chroot/` | Fichiers copiés tels quels dans l'image (services, polkit, Chromium, kiosque…) |

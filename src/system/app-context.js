@@ -19,8 +19,9 @@ function expose(service, methods, getters = []) {
 }
 
 const CONTACTS_API = ['list', 'get', 'findByPhone', 'search', 'add', 'update', 'remove', 'nameFor'];
-const TELEPHONY_API = ['threads', 'thread', 'unreadCount', 'sendSms', 'setActiveThread', 'markRead', 'deleteThread', 'callLog', 'clearCallLog', 'dial', 'answer', 'hangup', 'setCallOption', 'nameFor', 'setMobileData', 'setModemEnabled'];
+const TELEPHONY_API = ['threads', 'thread', 'unreadCount', 'sendSms', 'setActiveThread', 'markRead', 'deleteThread', 'callLog', 'clearCallLog', 'dial', 'answer', 'hangup', 'setCallOption', 'nameFor'];
 const DEVICE_API = ['vibrate', 'info', 'uptime'];
+const SOUND_API = ['click', 'notify', 'sent', 'shutter', 'dtmf', 'charge', 'volumeTick', 'startLoop', 'stopLoop', 'setPlaybackSession'];
 
 export function createAppContext({ ui, proc, pkg }) {
   const kernel = ui.kernel;
@@ -98,11 +99,13 @@ export function createAppContext({ ui, proc, pkg }) {
     fs: sandbox(kernel.fs, [...USER_SPACE, dataDir]),
     dataDir,
     storage,
-    contacts: expose(kernel.contacts, CONTACTS_API),
-    telephony: expose(kernel.telephony, TELEPHONY_API, ['call', 'network', 'mode']),
+    // Appels et SMS réels (modem, apps du téléphone) et carnet d'adresses : réservés aux apps système.
+    // Les façades protègent des erreurs, pas d'un code hostile : toutes les apps partagent la même page.
+    contacts: pkg.system ? expose(kernel.contacts, CONTACTS_API) : null,
+    telephony: pkg.system ? expose(kernel.telephony, TELEPHONY_API, ['call', 'network', 'mode']) : null,
     device: expose(kernel.device, DEVICE_API, ['battery', 'connectivity']),
     location,
-    sound: ui.sound,
+    sound: expose(ui.sound, SOUND_API),
     now: () => kernel.now(),
     log: (message) => kernel.log.info(appId, message),
 

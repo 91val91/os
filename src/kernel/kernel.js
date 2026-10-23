@@ -107,7 +107,8 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
 
   const contacts = new ContactsProvider({ fs, events }).load();
-  const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers, env, bridge }).load().start();
+  const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);
+  const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers, env, bridge, isOwner }).load().start();
   // Le mode avion coupe aussi les radios pilotées par le pont.
   if (bluetooth.mode === 'bridge') network.radios.push({ name: 'bluetooth', get: () => bluetooth.enabled, set: (on) => bluetooth.setPowered(on) });
   if (bridge.has('modem')) network.radios.push({ name: 'modem', get: () => telephony.modem?.enabled !== false, set: (on) => telephony.setModemEnabled(on) });

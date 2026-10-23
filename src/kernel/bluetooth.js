@@ -60,14 +60,18 @@ export class BluetoothService {
       // Bluetooth d'Orion coupé (ou mode avion) : les appareils Web Bluetooth sont déconnectés.
       const off = () => !this.enabled && this.#disconnectWeb();
       this.settings?.watch('bluetooth', off);
-      this.settings?.watch('airplane', off);
+      this.settings?.watch('airplane', (on) => {
+        // Nouveau vol : le Bluetooth est de nouveau coupé jusqu'à ce qu'on le rallume.
+        if (!on && this.settings.get('bluetooth.inAirplane')) this.settings.reset('bluetooth.inAirplane');
+        off();
+      });
       this.#restoreWeb();
     }
     return this;
   }
 
   shutdown() {
-    this.#poller?.stop();
+    this.#poller?.dispose();
     this.timers.clearTimeout(this.#scanTimer);
     this.#disconnectWeb();
   }
@@ -76,10 +80,13 @@ export class BluetoothService {
     this.events?.emit('bluetooth:change', this.state);
   }
 
-  /** Bluetooth activé : adaptateur réel (pont) ou réglage d'Orion (navigateur). */
+  /**
+   * Bluetooth activé : adaptateur réel (pont) ou réglage d'Orion (navigateur). Comme sur
+   * un téléphone, le mode avion le coupe mais on peut le rallumer pendant le vol.
+   */
   get enabled() {
-    if (this.settings?.get('airplane') && this.mode !== 'bridge') return false;
     if (this.mode === 'bridge') return Boolean(this.#bridgeState?.powered);
+    if (this.settings?.get('airplane') && !this.settings?.get('bluetooth.inAirplane')) return false;
     return Boolean(this.settings?.get('bluetooth'));
   }
 
@@ -110,8 +117,12 @@ export class BluetoothService {
 
   async refresh() {
     if (this.mode !== 'bridge') return this.state;
-    this.#bridgeState = await this.bridge.get('bluetooth');
-    this.#emit();
+    const state = await this.bridge.get('bluetooth');
+    if (this.#poller) this.#poller.push(state);
+    else {
+      this.#bridgeState = state;
+      this.#emit();
+    }
     return this.state;
   }
 
@@ -127,6 +138,7 @@ export class BluetoothService {
       await this.refresh().catch(() => {});
     } else {
       this.settings?.set('bluetooth', Boolean(on));
+      if (this.settings?.get('airplane')) this.settings.set('bluetooth.inAirplane', Boolean(on));
       this.#emit();
     }
   }

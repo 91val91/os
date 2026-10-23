@@ -1341,11 +1341,30 @@ class RealHardware:
         self.power = PowerBackend(self.runner)
         self._lock = threading.Lock()
         self._caps: tuple[float, dict] | None = None
+        self._refreshing = False
 
     def capabilities(self) -> dict:
+        """Capacités du matériel. Une valeur périmée est rendue tout de suite et recalculée en
+        arrière-plan : certaines détections (bluetoothctl sans adaptateur) prennent plusieurs secondes."""
         with self._lock:
-            if self._caps and time.monotonic() - self._caps[0] < self.STATUS_TTL:
-                return dict(self._caps[1])
+            cached = self._caps
+            if cached and time.monotonic() - cached[0] < self.STATUS_TTL:
+                return dict(cached[1])
+            if cached:
+                if not self._refreshing:
+                    self._refreshing = True
+                    threading.Thread(target=self._refresh_capabilities, daemon=True).start()
+                return dict(cached[1])
+        return self._compute_capabilities()
+
+    def _refresh_capabilities(self) -> None:
+        try:
+            self._compute_capabilities()
+        finally:
+            with self._lock:
+                self._refreshing = False
+
+    def _compute_capabilities(self) -> dict:
         checks: dict[str, Callable[[], bool]] = {
             "wifi": self.nm.wifi_available,
             "bluetooth": self.bt.available,
@@ -2539,6 +2558,8 @@ def main(argv: list[str] | None = None) -> int:
     mode = "matériel simulé" if args.simulate else "matériel réel"
     shown = f"[{args.host}]" if ":" in args.host else args.host
     LOG.info("Orion OS servi sur http://%s:%s/ (%s, racine %s)", shown, server.server_address[1], mode, args.root)
+    # Détection du matériel dès maintenant : l'interface la demande au démarrage et n'attend pas longtemps.
+    threading.Thread(target=hardware.status, daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

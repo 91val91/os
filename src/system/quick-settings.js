@@ -29,12 +29,17 @@ export function quickTiles(ui) {
     wifi: {
       label: 'Wi‑Fi',
       icon: 'wifi',
-      iconOff: 'wifi-off',
+      // Navigateur qui ne dit pas le type de connexion (iPhone, ordinateur) : icône neutre, pas « coupé ».
+      get iconOff() {
+        return !net().wifi.controllable && net().type === 'unknown' ? 'wifi' : 'wifi-off';
+      },
       active: () => (net().wifi.controllable ? net().wifi.enabled : net().type === 'wifi'),
       detail: () => {
         const { wifi, type, online } = net();
         if (wifi.controllable) return wifi.enabled ? wifi.connected?.ssid ?? 'Non connecté' : 'Désactivé';
-        return type === 'wifi' ? 'Connecté' : online ? 'Non utilisé' : 'Hors ligne';
+        if (type === 'wifi') return 'Connecté';
+        if (!online) return 'Hors ligne';
+        return type === 'unknown' ? 'Géré par le téléphone' : 'Non utilisé';
       },
       toggle: () => (net().wifi.controllable ? k.network.setWifiEnabled(!net().wifi.enabled).catch(failed) : openPage('wifi')),
       settings: 'wifi',

@@ -30,7 +30,11 @@ export class HardwareBridge {
     return !where.pathname || /^\/(index\.html)?$/.test(where.pathname);
   }
 
-  async detect({ timeout = 1500 } = {}) {
+  /**
+   * Cherche orion-server (une seule fois, au démarrage). Le délai est large : sur une
+   * machine Orion le serveur est toujours là, mais certaines détections du matériel sont lentes.
+   */
+  async detect({ timeout = 10_000 } = {}) {
     if (!this.#reachable) return this;
     try {
       const status = await this.get('status', { timeout });
@@ -92,18 +96,29 @@ export class HardwareBridge {
 /**
  * Interroge régulièrement le pont tant que quelqu'un écoute.
  * `fetch` renvoie l'état ; `onState` le reçoit (pas d'appel si inchangé).
+ *
+ * - start(ms) démarre, ou change seulement la cadence (sans requête immédiate) ;
+ * - restart() interroge tout de suite (après une action) : une réponse plus
+ *   ancienne arrivée ensuite est ignorée ;
+ * - push(état) transmet un état obtenu ailleurs (refresh) sans fausser la
+ *   comparaison suivante ;
+ * - dispose() arrête pour de bon (extinction) : rien ne peut le relancer.
  */
 export class Poller {
   #timer = null;
   #running = false;
+  #disposed = false;
+  #generation = 0;
   #last = '';
 
-  constructor({ fetch, onState, onError = null, interval = 5000, timers = globalThis }) {
+  constructor({ fetch, onState, onError = null, interval = 5000, timers = globalThis, always = null }) {
     this.fetch = fetch;
     this.onState = onState;
     this.onError = onError;
     this.interval = interval;
     this.timers = timers;
+    /** Si vrai, chaque relevé est transmis même inchangé (suivi d'un appel en cours). */
+    this.always = always;
   }
 
   get running() {
@@ -111,39 +126,71 @@ export class Poller {
   }
 
   start(interval = this.interval) {
+    if (this.#disposed) return this;
+    const changed = interval !== this.interval;
     this.interval = interval;
-    if (this.#running) return this.restart();
-    this.#running = true;
-    this.#loop();
+    if (!this.#running) {
+      this.#running = true;
+      this.#loop(this.#generation);
+    } else if (changed && this.#timer !== null) {
+      // Nouvelle cadence : la prochaine interrogation est reprogrammée, sans requête de plus.
+      this.timers.clearTimeout(this.#timer);
+      this.#schedule(this.#generation);
+    }
     return this;
   }
 
-  /** Relance tout de suite (après une action) en conservant la cadence. */
+  /** Interroge tout de suite (après une action) en conservant la cadence. */
   restart() {
-    if (!this.#running) return this;
+    if (!this.#running || this.#disposed) return this;
     this.timers.clearTimeout(this.#timer);
-    this.#loop();
+    this.#timer = null;
+    this.#loop(++this.#generation);
     return this;
+  }
+
+  /** État obtenu hors du poller (refresh) : transmis et retenu pour la comparaison suivante. */
+  push(state) {
+    if (this.#disposed) return;
+    this.#last = JSON.stringify(state);
+    this.onState(state);
   }
 
   stop() {
     this.#running = false;
+    this.#generation++;
     this.timers.clearTimeout(this.#timer);
     this.#timer = null;
   }
 
-  async #loop() {
+  dispose() {
+    this.stop();
+    this.#disposed = true;
+  }
+
+  #schedule(generation) {
+    this.#timer = this.timers.setTimeout(() => this.#loop(generation), this.interval);
+  }
+
+  async #loop(generation) {
     this.#timer = null;
+    let state;
+    let failed = null;
     try {
-      const state = await this.fetch();
+      state = await this.fetch();
+    } catch (error) {
+      failed = error;
+    }
+    // Arrêté, ou une interrogation plus récente a été lancée entre-temps : cette réponse est périmée.
+    if (generation !== this.#generation || !this.#running) return;
+    if (failed) this.onError?.(failed);
+    else {
       const key = JSON.stringify(state);
-      if (key !== this.#last) {
+      if (key !== this.#last || this.always?.()) {
         this.#last = key;
         this.onState(state);
       }
-    } catch (error) {
-      this.onError?.(error);
     }
-    if (this.#running && this.#timer === null) this.#timer = this.timers.setTimeout(() => this.#loop(), this.interval);
+    if (generation === this.#generation && this.#running && this.#timer === null) this.#schedule(generation);
   }
 }

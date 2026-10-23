@@ -21,6 +21,7 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
   };
   const requests = [];
   let nextCall = 1;
+  let nextSms = 1;
 
   const ok = (body = { ok: true }) => ({ status: 200, body });
   const fail = (status, error) => ({ status, body: { error } });
@@ -110,10 +111,14 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       return ok();
     },
     'POST modem/sms': ({ number, text }) => {
-      state.sms.push({ id: String(state.sms.length + 1), number, text, timestamp: new Date(0).toISOString(), state: 'sent' });
+      state.sms.push({ id: String(nextSms++), number, text, timestamp: null, state: 'sent' });
       return ok();
     },
     'GET modem/sms': () => ok({ messages: state.sms.map((m) => ({ ...m })) }),
+    'POST modem/sms/delete': ({ id }) => {
+      state.sms = state.sms.filter((m) => m.id !== id);
+      return ok();
+    },
     'GET gps': () => ok({ ...state.gps }),
   };
 
@@ -140,7 +145,7 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       return id;
     },
     receive(number, text, timestamp = new Date().toISOString()) {
-      state.sms.push({ id: String(state.sms.length + 1), number, text, timestamp, state: 'received' });
+      state.sms.push({ id: String(nextSms++), number, text, timestamp, state: 'received' });
     },
   };
 }

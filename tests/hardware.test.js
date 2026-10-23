@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bootKernel } from '../src/kernel/kernel.js';
-import { HardwareBridge } from '../src/kernel/bridge.js';
+import { HardwareBridge, Poller } from '../src/kernel/bridge.js';
+import { MemoryBackend } from '../src/kernel/storage.js';
+import { SMS_FILE, threadKey } from '../src/kernel/telephony.js';
 import { NetworkService, signalBars } from '../src/kernel/network.js';
 import { BluetoothService, unsupportedReason } from '../src/kernel/bluetooth.js';
 import { LocationService, distance, formatCoordinates, toGpx } from '../src/kernel/location.js';
@@ -340,6 +342,9 @@ test('téléphonie (modem) : appel sortant, décroché, raccroché par le corres
   fake.state.calls = [];
   timers.advance(1000);
   await settle();
+  assert.equal(tel.call.state, 'active', 'une liste sans l\'appel ne suffit pas (elle peut être incomplète)');
+  timers.advance(1000);
+  await settle();
   assert.equal(tel.call, null);
   assert.equal(tel.callLog()[0].direction, 'out');
   kernel.shutdown();
@@ -366,8 +371,10 @@ test('téléphonie (modem) : appel entrant décroché, et appel manqué', async 
   await settle();
   assert.equal(tel.call.state, 'incoming');
   fake.state.calls = [];
-  timers.advance(1000);
-  await settle();
+  for (let i = 0; i < 2; i++) {
+    timers.advance(1000);
+    await settle();
+  }
   assert.equal(tel.call, null);
   assert.equal(tel.callLog()[0].missed, true);
   assert.ok(kernel.notifications.list({ appId: 'phone' }).some((n) => n.title === 'Appel manqué'));
@@ -407,4 +414,157 @@ test('téléphonie (modem) : données mobiles', async () => {
   assert.equal(fake.state.modem.data, true);
   assert.equal(kernel.telephony.network.data, true);
   kernel.shutdown();
+});
+
+// ───────────── Corrections de la relecture ─────────────
+
+
+test('poller : changer la cadence ne relance pas de requête ; arrêt définitif ; réponses périmées ignorées', async () => {
+  const now = fakeClock();
+  const timers = fakeTimers(now);
+  let fetches = 0;
+  const seen = [];
+  let release;
+  const poller = new Poller({ timers, interval: 3000, fetch: () => (fetches++ === 1 ? new Promise((r) => (release = r)) : Promise.resolve(fetches)), onState: (s) => seen.push(s) }).start();
+  await settle();
+  assert.equal(fetches, 1);
+  poller.start(1000);
+  poller.start(3000);
+  await settle();
+  assert.equal(fetches, 1, 'aucune requête de plus pour une nouvelle cadence');
+  timers.advance(3000); // 2e requête, qui traîne
+  poller.restart(); // 3e requête, plus récente
+  await settle();
+  release('ancien');
+  await settle();
+  assert.ok(!seen.includes('ancien'), 'la réponse d\'avant le restart est ignorée');
+  poller.dispose();
+  poller.start(1000);
+  poller.restart();
+  timers.advance(60_000);
+  await settle();
+  assert.equal(fetches, 3, 'rien ne relance un poller arrêté');
+});
+
+test('mode avion : réglages réinitialisés sans effet sur les radios ; bascules rapides cohérentes ; redémarrage en vol', async () => {
+  const fake = fakeBridge();
+  const backend = new MemoryBackend();
+  const now = fakeClock();
+  const timers = fakeTimers(now);
+  let kernel = await bootKernel({ backend, manifests: MANIFESTS, env: fake.env(), now, timers });
+  await settle();
+  fake.state.bt.powered = false;
+  await kernel.bluetooth.refresh();
+  // « Réinitialiser les réglages » : airplane notifié sans changer → rien n'est rallumé.
+  kernel.settings.reset('airplane');
+  await settle(20);
+  assert.equal(fake.state.bt.powered, false);
+  // Bascules rapides : la dernière valeur l'emporte, l'état d'avant est respecté.
+  kernel.settings.set('airplane', true);
+  kernel.settings.set('airplane', false);
+  kernel.settings.set('airplane', true);
+  await settle(40);
+  assert.deepEqual([fake.state.wifi.enabled, fake.state.modem.enabled, fake.state.bt.powered], [false, false, false]);
+  // Redémarrage en plein vol : l'état d'avant le vol n'est pas écrasé.
+  kernel.shutdown();
+  kernel = await bootKernel({ backend, manifests: MANIFESTS, env: fake.env(), now, timers });
+  await settle(20);
+  kernel.settings.set('airplane', false);
+  await settle(40);
+  assert.deepEqual([fake.state.wifi.enabled, fake.state.modem.enabled, fake.state.bt.powered], [true, true, false]);
+  assert.equal(kernel.settings.get('airplane.radios'), undefined);
+  kernel.shutdown();
+});
+
+test('Wi‑Fi : un réseau masqué est demandé comme tel', async () => {
+  const fake = fakeBridge();
+  const { kernel } = await boot(fake.env());
+  await kernel.network.connect('Caché', 'secret123', { hidden: true }).catch(() => {});
+  assert.deepEqual(fake.requests.find((r) => r.path === 'wifi/connect').body, { ssid: 'Caché', password: 'secret123', hidden: true });
+  kernel.shutdown();
+});
+
+test('téléphonie (modem) : double appel présenté à la fin du premier, identifiants réutilisés', async () => {
+  const fake = fakeBridge();
+  const { kernel, timers } = await boot(fake.env());
+  const tel = kernel.telephony;
+  fake.ring('+33611111111');
+  timers.advance(3000);
+  await settle();
+  tel.answer();
+  await settle();
+  fake.ring('+33622222222'); // double appel
+  timers.advance(1000);
+  await settle();
+  assert.equal(tel.call.number, '+33611111111');
+  assert.equal(tel.callLog().some((c) => c.missed), false, 'pas « manqué » tant qu\'il sonne');
+  tel.hangup();
+  await settle();
+  timers.advance(3000);
+  await settle();
+  assert.equal(tel.call?.number, '+33622222222', 'présenté une fois le premier appel terminé');
+  tel.hangup();
+  await settle();
+  // ModemManager redémarré : les numéros d'appel repartent de 1.
+  fake.state.calls = [];
+  timers.advance(3000);
+  await settle();
+  fake.state.calls.push({ id: '1', number: '+33633333333', direction: 'incoming', state: 'ringing' });
+  timers.advance(3000);
+  await settle();
+  assert.equal(tel.call?.number, '+33633333333');
+  kernel.shutdown();
+});
+
+test('téléphonie (modem) : urgence en mode avion, SMS alphanumériques, effacés du modem, réservés au propriétaire', async () => {
+  const fake = fakeBridge();
+  fake.receive('AMELI', 'Votre remboursement', '2026-01-10T09:00:00Z');
+  const { kernel, timers } = await boot(fake.env());
+  const tel = kernel.telephony;
+  await settle(20);
+  assert.equal(tel.thread('AMELI').messages[0].text, 'Votre remboursement');
+  tel.markRead('AMELI');
+  assert.equal(tel.unreadCount(), 0);
+  assert.equal(fake.state.sms.length, 0, 'effacé du modem une fois enregistré');
+  tel.deleteThread('AMELI');
+  assert.equal(tel.threads().length, 0);
+  kernel.settings.set('airplane', true);
+  await settle(20);
+  assert.equal(fake.state.modem.enabled, false);
+  tel.dial('112');
+  await settle(20);
+  assert.equal(fake.state.modem.enabled, true, 'le modem est rallumé pour l\'appel d\'urgence');
+  assert.equal(fake.state.calls[0].number, '112');
+  void timers;
+  kernel.shutdown();
+});
+
+test('téléphonie : un autre compte ne reçoit pas les SMS du modem ; « envoi » interrompu marqué non confirmé', async () => {
+  const fake = fakeBridge();
+  fake.receive('+33644444444', 'Code : 123456');
+  const now = fakeClock();
+  const timers = fakeTimers(now);
+  const accounts = { get: () => ({ id: 'b', owner: false, name: 'Léa' }), list: () => [] };
+  const backend = new MemoryBackend();
+  const kernel = await bootKernel({ backend, accounts, accountId: 'b', manifests: MANIFESTS, env: fake.env(), now, timers });
+  await settle(20);
+  assert.equal(kernel.telephony.threads().length, 0);
+  assert.equal(fake.state.sms.length, 1, 'laissé sur le modem pour le propriétaire');
+  kernel.fs.writeJSON(SMS_FILE, { [threadKey('0611223344')]: { address: '0611223344', messages: [{ id: 1, from: 'me', text: 'Salut', time: 1, read: true, status: 'sending' }] } }, { system: true });
+  kernel.telephony.load();
+  assert.equal(kernel.telephony.thread('0611223344').messages[0].status, 'unknown');
+  kernel.shutdown();
+});
+
+test('Bluetooth (navigateur) : rallumé pendant un vol comme sur un téléphone', async () => {
+  const settings = new Settings();
+  const bt = new BluetoothService({ settings, env: { navigator: { bluetooth: { requestDevice: async () => null } } } }).init();
+  await bt.setPowered(true);
+  settings.set('airplane', true);
+  assert.equal(bt.enabled, false, 'coupé par le mode avion');
+  await bt.setPowered(true);
+  assert.equal(bt.enabled, true, 'rallumé pendant le vol');
+  settings.set('airplane', false);
+  settings.set('airplane', true);
+  assert.equal(bt.enabled, false, 'coupé de nouveau au vol suivant');
 });

@@ -147,8 +147,15 @@ export class CallScreen {
         h('div.call-bottom', h('button.call-text', { type: 'button', onclick: () => { this.keypad = false; this.render(); } }, 'Masquer'), h('button.call-btn.decline', { type: 'button', 'aria-label': 'Raccrocher', onclick: () => t.hangup() }, icon('hang-up', { size: 34 })), h('span')),
       );
     } else {
+      // Appel du modem : silence, clavier (DTMF), haut-parleur et attente ne sont pas encore reliés au matériel.
+      const modem = Boolean(call.modemId);
       const option = (name, label, key, active) =>
-        h(`button.call-option${active ? '.active' : ''}`, { type: 'button', disabled: call.state === 'ended', onclick: () => (key === 'keypad' ? ((this.keypad = true), this.render()) : t.setCallOption(key)) }, h('span.call-option-icon', icon(name, { size: 26 })), h('span', label));
+        h(
+          `button.call-option${active && !modem ? '.active' : ''}`,
+          { type: 'button', disabled: call.state === 'ended' || modem, title: modem ? 'Pas encore disponible pour un appel du modem' : null, onclick: () => (key === 'keypad' ? ((this.keypad = true), this.render()) : t.setCallOption(key)) },
+          h('span.call-option-icon', icon(name, { size: 26 })),
+          h('span', label),
+        );
       body = h(
         'div.call-active',
         h(

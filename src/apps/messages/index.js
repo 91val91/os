@@ -6,7 +6,8 @@ import { h } from '../../lib/dom.js';
 import { icon } from '../../lib/icons.js';
 import { relativeTime, formatTime, isSameDay, formatDate } from '../../lib/format.js';
 import { navStack, page, searchField, avatar, iconButton, swipeToDelete, emptyState, listItem } from '../../lib/ui.js';
-import { displayName, phoneKey } from '../../kernel/contacts.js';
+import { displayName } from '../../kernel/contacts.js';
+import { threadKey } from '../../kernel/telephony.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
@@ -222,7 +223,7 @@ export function mount(root, ctx) {
 
   // ───────────── Événements ─────────────
   const refresh = (address) => {
-    if (openThread && address && phoneKey(openThread.address) === phoneKey(address)) openThread.render();
+    if (openThread && address && threadKey(openThread.address) === threadKey(address)) openThread.render();
     if (nav.depth === 1) renderList();
   };
   ctx.subscribe('sms:received', ({ address }) => refresh(address));
@@ -230,7 +231,7 @@ export function mount(root, ctx) {
   ctx.subscribe('sms:status', ({ address }) => refresh(address));
   ctx.subscribe('sms:read', () => nav.depth === 1 && renderList());
   ctx.subscribe('sms:typing', ({ address, typing }) => {
-    if (openThread && phoneKey(openThread.address) === phoneKey(address)) {
+    if (openThread && threadKey(openThread.address) === threadKey(address)) {
       openThread.typing = typing;
       openThread.render();
     }

@@ -60,6 +60,7 @@ export class LocationService {
   shutdown() {
     this.#watchers.clear();
     this.#stop();
+    this.#poller?.dispose();
   }
 
   #emit() {

@@ -46,16 +46,20 @@ export function isMobileDevice(env = globalThis) {
 
 const isApple = (env) => /iPhone|iPad|iPod|Macintosh/.test(env.navigator?.userAgent ?? '');
 
+/** Clé d'une conversation : numéro normalisé, ou nom d'expéditeur (« AMELI ») pour les SMS alphanumériques. */
+export const threadKey = (address) => phoneKey(address) || String(address ?? '').trim().toLowerCase();
+
 export class TelephonyService {
-  #threads = {}; // phoneKey → { address, messages: [] }
+  #threads = {}; // threadKey → { address, messages: [] }
   #calls = [];
   #timers = new Set();
   #nextId = 1;
   #modemPoller = null;
   #smsPoller = null;
-  #handledCalls = new Set(); // appels du modem déjà présentés
+  #handledCalls = new Set(); // appels du modem déjà présentés (tant que le modem les liste)
+  #waiting = new Map(); // appels du modem en attente pendant un autre appel : id → numéro
 
-  constructor({ fs, events = null, contacts = null, notifications = null, settings = null, log = null, now = Date.now, timers = globalThis, random = Math.random, env = globalThis, bridge = null, openExternal = null }) {
+  constructor({ fs, events = null, contacts = null, notifications = null, settings = null, log = null, now = Date.now, timers = globalThis, random = Math.random, env = globalThis, bridge = null, openExternal = null, isOwner = () => true }) {
     this.fs = fs;
     this.events = events;
     this.contacts = contacts;
@@ -73,6 +77,8 @@ export class TelephonyService {
     this.activeThread = null;
     /** Dernier état du modem (GET api/modem). */
     this.modem = null;
+    /** Les SMS du modem vont au propriétaire de l'appareil (les autres comptes ont leurs propres conversations). */
+    this.isOwner = isOwner;
   }
 
   /** 'modem' | 'handoff' | 'simulated' */
@@ -94,10 +100,13 @@ export class TelephonyService {
         const [modem, calls] = await Promise.all([this.bridge.get('modem'), this.bridge.get('modem/calls').catch(() => null)]);
         return { modem, calls: calls?.calls ?? null };
       },
+      // Pendant un appel, chaque relevé compte (fin d'appel confirmée par deux relevés).
+      always: () => Boolean(this.call?.modemId),
       onState: ({ modem, calls }) => {
+        const changed = JSON.stringify(modem) !== JSON.stringify(this.modem);
         this.modem = modem;
         if (this.mode === 'modem' && calls) this.#syncCalls(calls);
-        this.events?.emit('network:change', {});
+        if (changed) this.events?.emit('network:change', {});
       },
       onError: (error) => this.log?.warn('tel', error.message),
     }).start();
@@ -113,6 +122,8 @@ export class TelephonyService {
 
   load() {
     this.#threads = this.fs.exists(SMS_FILE) ? this.fs.readJSON(SMS_FILE, {}) : {};
+    // Envoi par le modem interrompu (redémarrage) : on ne sait pas s'il est parti.
+    for (const th of Object.values(this.#threads)) for (const m of th.messages) if (m.status === 'sending') m.status = 'unknown';
     this.#calls = this.fs.exists(CALLS_FILE) ? this.fs.readJSON(CALLS_FILE, []) : [];
     const ids = Object.values(this.#threads).flatMap((th) => th.messages.map((m) => m.id ?? 0));
     this.#nextId = Math.max(this.#nextId, ...ids, ...this.#calls.map((c) => c.id)) + 1;
@@ -156,8 +167,8 @@ export class TelephonyService {
   shutdown() {
     for (const handle of this.#timers) this.timers.clearTimeout(handle);
     this.#timers.clear();
-    this.#modemPoller?.stop();
-    this.#smsPoller?.stop();
+    this.#modemPoller?.dispose();
+    this.#smsPoller?.dispose();
   }
 
   // ───────────── Réseau ─────────────
@@ -207,7 +218,7 @@ export class TelephonyService {
   }
 
   nameFor(number) {
-    if (number === VOICEMAIL) return 'Messagerie vocale';
+    if ((number === VOICEMAIL && this.mode === 'simulated') || (number && number === this.settings?.get('telephony.voicemail'))) return 'Messagerie vocale';
     if (EMERGENCY_NUMBERS.includes(String(number).replace(/\s/g, ''))) return "Appel d'urgence";
     return this.contacts?.nameFor(number) ?? number;
   }
@@ -222,7 +233,7 @@ export class TelephonyService {
   }
 
   thread(address) {
-    const th = this.#threads[phoneKey(address)];
+    const th = this.#threads[threadKey(address)];
     return th ? this.#describe(th) : { address, name: this.nameFor(address), contact: this.contacts?.findByPhone(address) ?? null, messages: [], unread: 0, last: null };
   }
 
@@ -238,7 +249,7 @@ export class TelephonyService {
   }
 
   #append(address, message) {
-    const key = phoneKey(address) || address;
+    const key = threadKey(address);
     const th = (this.#threads[key] ??= { address, messages: [] });
     th.messages.push(message);
     this.#saveThreads();
@@ -292,7 +303,7 @@ export class TelephonyService {
   }
 
   #setStatus(address, id, status) {
-    const message = this.#threads[phoneKey(address) || address]?.messages.find((m) => m.id === id);
+    const message = this.#threads[threadKey(address)]?.messages.find((m) => m.id === id);
     if (!message) return;
     message.status = status;
     this.#saveThreads();
@@ -300,17 +311,26 @@ export class TelephonyService {
   }
 
   /**
-   * SMS reçus par le modem. Au tout premier passage, ceux déjà présents sur la
-   * carte SIM sont importés sans notification.
+   * SMS du modem. Au tout premier passage, ceux déjà présents sur la carte SIM sont
+   * importés sans notification. Une fois enregistrés dans Orion, ils sont effacés du
+   * modem (sa mémoire est petite : pleine, il ne recevrait plus rien). Seule la session
+   * du propriétaire les reçoit : un autre compte ne voit pas ses conversations.
    */
   #syncSms(messages) {
+    if (!this.isOwner()) return;
     const seenList = this.settings?.get('telephony.seenSms');
     const seen = new Set(seenList ?? []);
     const first = !seenList;
     let changed = false;
+    const done = [];
     for (const m of messages) {
+      if (m.state === 'sent') {
+        done.push(m.id);
+        continue;
+      }
       if (m.state !== 'received' || !m.number) continue;
       const key = `${m.number}|${m.timestamp ?? ''}|${m.text ?? ''}`;
+      done.push(m.id);
       if (seen.has(key)) continue;
       seen.add(key);
       changed = true;
@@ -320,10 +340,18 @@ export class TelephonyService {
     }
     if (changed || first) this.settings?.set('telephony.seenSms', [...seen].slice(-300));
     if (first && changed) this.events?.emit('sms:received', { address: null });
+    this.#deleteFromModem(done);
+  }
+
+  async #deleteFromModem(ids) {
+    for (const id of ids) {
+      if (id == null) continue;
+      await this.bridge.post('modem/sms/delete', { id: String(id) }).catch((error) => this.log?.warn('sms', `effacement du SMS ${id} : ${error.message}`));
+    }
   }
 
   receiveSms(address, text, { image = null, time = this.now() } = {}) {
-    const active = this.activeThread && phoneKey(this.activeThread) === phoneKey(address);
+    const active = this.activeThread && threadKey(this.activeThread) === threadKey(address);
     const message = this.#append(address, {
       id: this.#nextId++,
       from: 'them',
@@ -340,7 +368,7 @@ export class TelephonyService {
         appId: 'messages',
         title: this.nameFor(address),
         body: text || '📷 Photo',
-        tag: `sms:${phoneKey(address)}`,
+        tag: `sms:${threadKey(address)}`,
         intent: { app: 'messages', action: 'view', data: { address } },
       });
     }
@@ -353,7 +381,7 @@ export class TelephonyService {
   }
 
   markRead(address) {
-    const th = this.#threads[phoneKey(address)];
+    const th = this.#threads[threadKey(address)];
     if (!th) return;
     let changed = false;
     for (const m of th.messages) {
@@ -366,11 +394,11 @@ export class TelephonyService {
       this.#saveThreads();
       this.events?.emit('sms:read', { address });
     }
-    this.notifications?.clear({ appId: 'messages', tag: `sms:${phoneKey(address)}` });
+    this.notifications?.clear({ appId: 'messages', tag: `sms:${threadKey(address)}` });
   }
 
   deleteThread(address) {
-    delete this.#threads[phoneKey(address)];
+    delete this.#threads[threadKey(address)];
     this.#saveThreads();
     this.events?.emit('sms:deleted', { address });
   }
@@ -430,15 +458,20 @@ export class TelephonyService {
     this.#emitCall();
     const id = this.call.id;
     if (mode === 'modem') {
-      this.bridge
-        .post('modem/call', { number: clean.replace(/[^\d+*#]/g, '') }, { timeout: 30_000 })
+      // Appel d'urgence en mode avion : le modem éteint est d'abord rallumé.
+      const ready = emergency && this.modem?.enabled === false ? this.setModemEnabled(true) : Promise.resolve();
+      ready
+        .then(() => this.bridge.post('modem/call', { number: clean.replace(/[^\d+*#]/g, '') }, { timeout: 30_000 }))
         .then(({ id: modemId }) => {
           if (this.call?.id !== id) return void this.bridge.post('modem/hangup', { id: String(modemId) }).catch(() => {});
           this.call.modemId = String(modemId);
-          this.#handledCalls.add(this.call.modemId);
           this.#modemPoller?.start(1000);
+          // Nouvel état tout de suite ; une réponse plus ancienne (sans cet appel) sera ignorée.
+          this.#modemPoller?.restart();
         })
         .catch((error) => {
+          // Par prudence : un appel a pu être créé malgré l'erreur (délai dépassé).
+          this.bridge.post('modem/hangup', {}).catch(() => {});
           if (this.call?.id !== id) return;
           this.log?.warn('tel', `échec de l'appel : ${error.message}`);
           this.events?.emit('call:error', { message: `Appel impossible : ${error.message}` });
@@ -500,34 +533,57 @@ export class TelephonyService {
   /** Rapproche l'appel en cours de la liste des appels du modem. */
   #syncCalls(calls) {
     const live = calls.filter((c) => c.state !== 'terminated');
+    const listed = new Set(calls.map((c) => String(c.id)));
+    // Un identifiant n'est ignoré que tant que le modem liste le même appel (ils sont réutilisés).
+    for (const key of [...this.#handledCalls]) if (!listed.has(key)) this.#handledCalls.delete(key);
     const call = this.call;
     if (call?.modemId) {
       const remote = live.find((c) => String(c.id) === call.modemId);
       if (!remote) {
-        // Le correspondant a raccroché (ou n'a jamais décroché).
-        if (call.state === 'incoming') {
-          this.#cancel(call.timer);
-          this.call = null;
-          this.#missed(call.number);
-          this.#emitCall();
-        } else {
-          this.hangup({ remote: true });
+        // Absent deux fois de suite (une liste peut être incomplète) : le correspondant a raccroché.
+        call.absent = (call.absent ?? 0) + 1;
+        if (call.absent >= 2) {
+          if (call.state === 'incoming') {
+            this.#cancel(call.timer);
+            this.call = null;
+            this.#missed(call.number);
+            this.#emitCall();
+          } else {
+            this.hangup({ remote: true });
+          }
+          // Sans effet si l'appel est fini ; sinon, il ne reste pas ouvert sans écran pour le raccrocher.
+          this.bridge.post('modem/hangup', { id: call.modemId }).catch(() => {});
         }
-      } else if (remote.state === 'active' && call.state !== 'active') {
-        call.state = 'active';
-        call.connectedAt ??= this.now();
-        call.held = false;
-        this.#emitCall();
-      } else if (remote.state === 'held' && !call.held) {
-        call.held = true;
-        this.#emitCall();
+      } else {
+        call.absent = 0;
+        if (remote.state === 'active' && call.state !== 'active') {
+          call.state = 'active';
+          call.connectedAt ??= this.now();
+          call.held = false;
+          this.#emitCall();
+        } else if (remote.state === 'held' && !call.held) {
+          call.held = true;
+          this.#emitCall();
+        }
       }
     }
     for (const c of live) {
       const key = String(c.id);
-      if (c.direction !== 'incoming' || c.state !== 'ringing' || this.#handledCalls.has(key)) continue;
+      if (c.direction !== 'incoming' || c.state !== 'ringing' || this.#handledCalls.has(key) || key === this.call?.modemId) continue;
+      if (this.call) {
+        // Double appel : il sera présenté à la fin de l'appel en cours s'il sonne encore.
+        this.#waiting.set(key, c.number || 'Numéro masqué');
+        continue;
+      }
       this.#handledCalls.add(key);
+      this.#waiting.delete(key);
       this.incoming(c.number || 'Numéro masqué', { modemId: key });
+    }
+    // Appel en attente qui a cessé de sonner sans être présenté : appel manqué.
+    for (const [key, number] of [...this.#waiting]) {
+      if (live.some((c) => String(c.id) === key && c.state === 'ringing')) continue;
+      this.#waiting.delete(key);
+      this.#missed(number);
     }
     this.#modemPoller?.start(this.call ? 1000 : 3000);
   }

@@ -25,7 +25,9 @@ export class NetworkService {
   #wifi = null; // état Wi‑Fi du pont
   #link = null; // connexion principale vue par le pont (GET api/network)
   #poller = null;
-  #radios = null; // états des radios avant le mode avion
+  #airplane = Promise.resolve(); // applications successives du mode avion (jamais en parallèle)
+  #airplaneWanted = false;
+  #airplaneApplied = null; // null : pas encore réconcilié avec le matériel
 
   constructor({ events = null, settings = null, env = globalThis, bridge = null, log = null, timers = globalThis } = {}) {
     this.events = events;
@@ -61,12 +63,21 @@ export class NetworkService {
         onError: (error) => this.log?.warn('net', error.message),
       }).start();
     }
-    this.settings?.watch('airplane', (on) => this.#applyAirplane(Boolean(on)));
+    this.#airplaneWanted = Boolean(this.settings?.get('airplane'));
+    this.settings?.watch('airplane', (on) => {
+      // « Réinitialiser les réglages » notifie même sans changement : ignoré.
+      if (Boolean(on) === this.#airplaneWanted) return;
+      this.#airplaneWanted = Boolean(on);
+      this.#emit();
+      this.#queueAirplane();
+    });
+    // Au démarrage (les radios du Bluetooth et du modem sont déclarées juste après) : matériel aligné sur le réglage.
+    if (this.bridge?.available) Promise.resolve().then(() => this.#queueAirplane());
     return this;
   }
 
   shutdown() {
-    this.#poller?.stop();
+    this.#poller?.dispose();
   }
 
   async #fetchBridge({ rescan = false } = {}) {
@@ -141,10 +152,13 @@ export class NetworkService {
   /** Relit l'état (avec une nouvelle recherche des réseaux si demandé). */
   async refresh({ rescan = false } = {}) {
     if (!this.bridge?.available) return this.state;
-    const { wifi, link } = await this.#fetchBridge({ rescan });
-    this.#wifi = wifi;
-    this.#link = link;
-    this.#emit();
+    const state = await this.#fetchBridge({ rescan });
+    if (this.#poller) this.#poller.push(state);
+    else {
+      this.#wifi = state.wifi;
+      this.#link = state.link;
+      this.#emit();
+    }
     return this.state;
   }
 
@@ -166,9 +180,10 @@ export class NetworkService {
     return this.#act('wifi/power', { enabled: Boolean(enabled) }, `Wi‑Fi ${enabled ? 'activé' : 'désactivé'}`);
   }
 
-  connect(ssid, password) {
+  connect(ssid, password, { hidden = false } = {}) {
     const body = { ssid };
     if (password) body.password = password;
+    if (hidden) body.hidden = true;
     return this.#act('wifi/connect', body, `connexion à « ${ssid} »`);
   }
 
@@ -182,27 +197,42 @@ export class NetworkService {
 
   // ───────────── Mode avion ─────────────
 
-  async #applyAirplane(on) {
-    this.#emit();
-    if (!this.bridge?.available) return;
+  #queueAirplane() {
+    this.#airplane = this.#airplane.then(() => this.#syncAirplane()).catch((error) => this.log?.warn('net', `mode avion : ${error.message}`));
+    return this.#airplane;
+  }
+
+  /**
+   * Aligne les radios pilotées par le pont sur le réglage (une seule application à la
+   * fois, toujours vers la dernière valeur). L'état des radios avant le mode avion est
+   * gardé dans « airplane.radios » pour les rallumer comme avant, même après un redémarrage.
+   */
+  async #syncAirplane() {
+    const target = Boolean(this.settings?.get('airplane'));
+    if (target === this.#airplaneApplied) return;
+    if (!this.bridge?.available) {
+      this.#airplaneApplied = target;
+      return;
+    }
     const radios = [];
     if (this.controllable) radios.push({ name: 'wifi', get: () => this.#wifi?.enabled ?? true, set: (v) => this.setWifiEnabled(v) });
     radios.push(...this.radios);
-    if (on) {
-      this.#radios = {};
-      for (const radio of radios) {
-        this.#radios[radio.name] = radio.get();
-        await radio.set(false).catch((error) => this.log?.warn('net', `mode avion (${radio.name}) : ${error.message}`));
-      }
-      this.settings?.set('airplane.radios', this.#radios);
+    const warn = (radio) => (error) => this.log?.warn('net', `mode avion (${radio.name}) : ${error.message}`);
+    if (target) {
+      // Après un redémarrage en mode avion, l'état d'avant (déjà enregistré) est conservé.
+      const before = this.settings?.get('airplane.radios') ?? Object.fromEntries(radios.map((radio) => [radio.name, radio.get()]));
+      this.settings?.set('airplane.radios', before);
+      for (const radio of radios) await radio.set(false).catch(warn(radio));
     } else {
-      const saved = this.#radios ?? this.settings?.get('airplane.radios') ?? {};
-      for (const radio of radios) {
-        if (saved[radio.name] === false) continue;
-        await radio.set(true).catch((error) => this.log?.warn('net', `mode avion (${radio.name}) : ${error.message}`));
+      const before = this.settings?.get('airplane.radios');
+      // Pas de mode avion en cours (réglage remis à zéro, autre compte) : les radios ne sont pas touchées.
+      if (before) {
+        for (const radio of radios) if (before[radio.name] !== false) await radio.set(true).catch(warn(radio));
+        this.settings?.reset('airplane.radios');
       }
-      this.#radios = null;
     }
+    this.#airplaneApplied = target;
+    this.#emit();
   }
 
   // ───────────── Test de connexion ─────────────
