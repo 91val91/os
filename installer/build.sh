@@ -66,6 +66,9 @@ fi
 rm -rf config auto
 
 info "Configuration de live-build"
+# Paramètres du système live (y compris en mode sans échec) : sans username=orion,
+# live-config créerait l'utilisateur « user » et orion-server ne démarrerait pas.
+LIVE_OPTIONS="locales=fr_FR.UTF-8 keyboard-layouts=fr timezone=Europe/Paris hostname=orion username=orion user-fullname=Orion user-default-groups=audio,cdrom,dip,video,render,input,plugdev,netdev,bluetooth,dialout,systemd-journal"
 lb config \
 	--mode debian \
 	--distribution bookworm \
@@ -93,7 +96,8 @@ lb config \
 	--iso-application "Orion OS" \
 	--iso-publisher "Orion OS" \
 	--iso-volume "Orion OS $VERSION" \
-	--bootappend-live "boot=live components quiet splash locales=fr_FR.UTF-8 keyboard-layouts=fr timezone=Europe/Paris hostname=orion username=orion user-fullname=Orion user-default-groups=audio,cdrom,dip,video,render,input,plugdev,netdev,bluetooth,dialout,systemd-journal"
+	--bootappend-live "boot=live components quiet splash $LIVE_OPTIONS" \
+	--bootappend-live-failsafe "boot=live components noapic noapm nodma nomce nolapic nosmp nomodeset vga=normal $LIVE_OPTIONS"
 
 info "Ajout de la configuration d'Orion"
 cp -a "$HERE/config/." "$WORK/config/"

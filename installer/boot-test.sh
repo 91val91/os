@@ -7,7 +7,7 @@
 #      capture de l'écran ;
 #   4. vérifie que l'écran n'est pas resté noir.
 #
-#   installer/boot-test.sh installer/out/orion-os-1.2.0-amd64.iso [dossier-de-sortie]
+#   installer/boot-test.sh installer/out/orion-os-0.1-amd64.iso [dossier-de-sortie]
 #
 # Sortie : serial.log (journal du démarrage), screen.png (capture), status.json.
 set -euo pipefail
@@ -32,11 +32,17 @@ trap cleanup EXIT
 # Noyau, initrd et ligne de commande de la première entrée du menu (système live) ;
 # la console série y est ajoutée.
 xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$WORK/grub.cfg" >/dev/null 2>&1
-# Entrée du système live sur le CD (pas celle de l'ISO lancée depuis un fichier : findiso=…).
-LINUX_LINE="$(grep -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg" | grep -v 'findiso' | head -n 1)"
+# Entrée normale du système live : celle qui porte les paramètres d'Orion
+# (username=orion…), pas le « mode sans échec » de live-build. Le paramètre
+# findiso=${iso_path} de GRUB est retiré plus bas.
+LINUX_LINE="$(grep -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg" | grep -m1 'username=orion' || true)"
 [ -n "$LINUX_LINE" ] || LINUX_LINE="$(grep -m1 -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg")"
 KERNEL="$(echo "$LINUX_LINE" | awk '{print $2}')"
 INITRD="$(grep -m1 -E '^\s*initrd\s+\S*/live/' "$WORK/grub.cfg" | awk '{print $2}')"
+case "$LINUX_LINE" in
+	*username=orion*) ;;
+	*) echo "::warning::Paramètres d'Orion absents de l'entrée de démarrage : $LINUX_LINE" ;;
+esac
 if [ -z "$KERNEL" ] || [ -z "$INITRD" ]; then
 	echo "Erreur : entrée live introuvable dans grub.cfg" >&2
 	cat "$WORK/grub.cfg" >&2
@@ -80,7 +86,7 @@ elapsed() { echo $(( $(date +%s) - start )); }
 status=""
 until status="$(curl -fsS --max-time 5 "http://127.0.0.1:$PORT/api/status" 2>/dev/null)"; do
 	kill -0 "$QEMU_PID" 2>/dev/null || { echo "Erreur : QEMU s'est arrêté" >&2; tail -50 "$OUT/serial.log" >&2; exit 1; }
-	if grep -qE "BOOT FAILED|Kernel panic|emergency mode" "$OUT/serial.log" 2>/dev/null; then
+	if grep -qE "BOOT FAILED|Kernel panic|emergency mode|orion-server.service: Failed at step" "$OUT/serial.log" 2>/dev/null; then
 		echo "Erreur : le démarrage a échoué" >&2
 		tail -80 "$OUT/serial.log" >&2
 		exit 1
