@@ -93,8 +93,16 @@ PY
 start=$(date +%s)
 elapsed() { echo $(( $(date +%s) - start )); }
 
-# Aperçu réduit d'une capture dans le journal de l'action (les artefacts ne sont pas toujours accessibles).
+# Aperçu réduit d'une capture dans le journal de l'action (les artefacts ne sont pas toujours
+# accessibles) : en caractères (lisible tel quel), puis en JPEG base64.
 preview() {
+	echo "----- ÉCRAN EN CARACTÈRES (clair = « @ », noir = « ␠ ») -----"
+	convert "$OUT/screen.png" -resize '96x32!' -colorspace Gray -depth 8 txt:- |
+		awk -F'[ ,:]+' 'NR > 1 {
+			v = $0; sub(/.*gray\(/, "", v); sub(/[%)].*/, "", v); if ($0 ~ /%\)/) v = v * 2.55
+			c = substr(" .:-=+*#%@", int(v / 25.6) + 1, 1)
+			row[$2] = row[$2] c
+		} END { for (y = 0; y in row; y++) print "|" row[y] "|" }'
 	echo "----- APERÇU -----"
 	convert "$OUT/screen.png" -resize 320x -quality 70 jpg:- | base64 -w 0
 	echo
@@ -154,6 +162,12 @@ while :; do
 	lit="$(convert "$OUT/screen.png" -colorspace Gray -threshold 8% -format '%[fx:mean]' info:)"
 	if awk "BEGIN { exit !($lit >= 0.3) }" || [ "$(elapsed)" -ge "$settle_until" ]; then break; fi
 done
+# Encore un peu de temps : l'écran affiché a pu être une transition (fondu du démarrage).
+sleep 10
+monitor "screendump $WORK/screen.ppm"
+sleep 1
+convert "$WORK/screen.ppm" "$OUT/screen.png"
+lit="$(convert "$OUT/screen.png" -colorspace Gray -threshold 8% -format '%[fx:mean]' info:)"
 echo "==> Part de l'écran allumée : $lit (après $(elapsed) s)"
 grep -E "orion-kiosk|orion-server|orion_server" "$OUT/serial.log" | tee "$OUT/orion.log" | tail -20 || true
 echo "==> Aperçu (JPEG 320 px, base64) :"

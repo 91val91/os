@@ -93,10 +93,26 @@ mark_clean_exit() {
 	fi
 }
 
+# Taille de l'écran branché (mode préféré, lu dans /sys) : sans gestionnaire de fenêtres,
+# Chromium ne se met pas de lui-même en plein écran sous X11.
+screen_size() {
+	local connector mode
+	for connector in /sys/class/drm/card*-*; do
+		[ "$(cat "$connector/status" 2>/dev/null)" = connected ] || continue
+		mode="$(head -n 1 "$connector/modes" 2>/dev/null)"
+		if [[ "$mode" =~ ^([0-9]+)x([0-9]+) ]]; then
+			echo "${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
+			return
+		fi
+	done
+	echo "1280,800"
+}
+
 # X11 en dernier recours : même Chromium, plate-forme X11, rendu logiciel.
 launch_x11() {
 	local flags=("${FLAGS[@]/--ozone-platform=wayland/--ozone-platform=x11}")
 	systemd-cat -t orion-kiosk xinit /usr/bin/chromium "${flags[@]}" --disable-gpu \
+		--window-position=0,0 "--window-size=$(screen_size)" \
 		-- /usr/bin/Xorg :0 "vt${XDG_VTNR:-1}" -keeptty -nolisten tcp -s 0 -dpms
 }
 
