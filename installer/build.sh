@@ -111,6 +111,7 @@ for item in index.html sw.js version.json manifest.webmanifest assets src; do
 done
 ln -sfn "releases/$VERSION" "$STATE/current"
 install -D -m 0755 "$REPO/server/orion_server.py" "$WORK/config/includes.chroot/opt/orion-server/orion_server.py"
+install -D -m 0644 "$REPO/server/orion_mail.py" "$WORK/config/includes.chroot/opt/orion-server/orion_mail.py"
 install -D -m 0644 "$REPO/server/API.md" "$WORK/config/includes.chroot/opt/orion-server/API.md"
 
 info "Construction (30 à 60 min, environ 1,5 Go téléchargés au premier passage)"

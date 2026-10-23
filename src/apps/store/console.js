@@ -28,12 +28,19 @@ const TEMPLATES = [
     },
     listing: {
       subtitle: 'Vos e-mails, simples et rangés',
-      description: 'Courrier range vos messages dans Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille. Répondez, transférez, recherchez, balayez pour supprimer ou archiver (avec annulation) ; vos brouillons sont enregistrés pendant la saisie. Les messages restent sur l\'appareil.',
+      description: 'Courrier relève et envoie vos e-mails avec les comptes de l\'appareil (Orion installé, autorisation « E-mails ») : dossiers, recherche, drapeaux, archive, corbeille, réponses et transferts, brouillons enregistrés pendant la saisie. Sans compte, il fonctionne en démonstration sur l\'appareil.',
       category: 'Productivité',
       icon: 'mail',
     },
+    permissions: ['mail'],
   },
 ];
+/** Autorisations qu'une app du Store peut déclarer (l'utilisateur les accorde au premier usage). */
+const PERMISSION_TOGGLES = [
+  { perm: 'location', title: 'Utilise la position', subtitle: 'L\'utilisateur devra l\'autoriser' },
+  { perm: 'mail', title: 'Accède aux e-mails', subtitle: 'Comptes des Réglages (Orion installé) ; l\'utilisateur devra l\'autoriser' },
+];
+
 /** Valeurs d'une app qui vient d'être créée (store.createApp) : un exemple peut les remplacer. */
 const UNSET = { subtitle: '', description: '', category: 'Utilitaires', icon: GLYPHS[0] };
 
@@ -180,6 +187,8 @@ export function developerConsole({ ctx, nav, store, verify, topUp, openListing }
       ['orion.device.vibrate(ms | [motif]) · orion.device.info()', 'Vibration ; batterie, connexion et thème.'],
       ['orion.notify({ title, body })', 'Notification (une toutes les 5 secondes au plus).'],
       ['orion.location.current()', 'Position, si l\'app déclare l\'autorisation Localisation et que l\'utilisateur l\'accepte.'],
+      ['orion.mail.status() · accounts() · folders(compte) · messages(compte, dossier, { before, limit, query, filter })', 'Vrais e-mails (Orion installé) : comptes ajoutés dans les Réglages, si l\'app déclare l\'autorisation E-mails et que l\'utilisateur l\'accepte.'],
+      ['orion.mail.message(compte, dossier, uid) · setFlags(…, { add, remove }) · move(…, vers) · remove(…) · send(compte, { to, cc, subject, text, inReplyTo })', 'Lire, marquer (seen, flagged, answered), classer, supprimer, envoyer (10 envois par 10 minutes au plus).'],
       ['orion.on(\'pause\' | \'resume\' | \'theme\', fn) · orion.onBack(fn) · orion.close()', 'Cycle de vie, bouton Retour (renvoyer true si traité), fermeture.'],
     ];
     const content = h(
@@ -258,11 +267,17 @@ export function developerConsole({ ctx, nav, store, verify, topUp, openListing }
           items: [
             listItem({ title: 'Catégorie', detail: d.category, chevron: true, onClick: () => pick('Catégorie', CATEGORIES.map((c) => ({ label: c, value: c })), d.category, 'category') }),
             listItem({ title: 'Prix', detail: formatPrice(d.price), chevron: true, onClick: () => pick('Prix', PRICES.map((p) => ({ label: formatPrice(p), value: p })), d.price, 'price') }),
-            listItem({
-              title: 'Utilise la position',
-              subtitle: 'L\'utilisateur devra l\'autoriser',
-              trailing: toggle(d.permissions.includes('location'), (on) => save({ permissions: on ? ['location'] : [] }), { label: 'Utilise la position' }),
-            }),
+            ...PERMISSION_TOGGLES.map(({ perm, title, subtitle }) =>
+              listItem({
+                title,
+                subtitle,
+                trailing: toggle(d.permissions.includes(perm), (on) => {
+                  // Relu au moment du clic : l'autre interrupteur a pu changer la liste.
+                  const current = store.app(id).draft.permissions.filter((p) => p !== perm);
+                  save({ permissions: on ? [...current, perm] : current });
+                }, { label: title }),
+              }),
+            ),
           ],
           footer: d.price ? `Vous touchez ${formatMoney(Math.round(d.price * (1 - COMMISSION)))} par vente.` : null,
         }),
@@ -328,6 +343,7 @@ export function developerConsole({ ctx, nav, store, verify, topUp, openListing }
       if (!draft) return;
       const patch = { code };
       for (const [key, value] of Object.entries(template.listing ?? {})) if (draft[key] === UNSET[key]) patch[key] = value;
+      if (template.permissions) patch.permissions = [...new Set([...draft.permissions, ...template.permissions])];
       save(patch);
       render();
       if (template.listing) ctx.ui.toast('Exemple chargé : essayez-le, puis publiez-le');

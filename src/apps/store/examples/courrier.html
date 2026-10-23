@@ -1,15 +1,20 @@
 <!--
   Courrier : app d'e-mail pour Orion OS (app du Store, SDK orion).
 
-  Boîtes Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille ;
-  lecture, réponse, réponse à tous, transfert ; brouillons enregistrés
-  pendant la saisie ; recherche ; sélection multiple ; balayage pour
-  supprimer ou archiver, avec annulation ; réglages (signature, aperçu…).
+  Deux façons de l'utiliser :
+  * avec un compte de l'appareil (Orion installé) : les comptes ajoutés
+    dans Réglages → Comptes de messagerie sont relevés et envoyés par
+    orion-server (IMAP et SMTP) ; Courrier y accède par orion.mail, avec
+    l'autorisation « E-mails ». Dossiers du serveur, pages de messages,
+    recherche, lecture, drapeaux, déplacement, corbeille, envoi, relève
+    toutes les minutes (notification si Courrier est en arrière-plan) ;
+  * sans compte (démonstration) : les messages restent dans l'app
+    (orion.storage, 1 Mo) ; ceux que l'on s'adresse arrivent dans Réception
+    et demo@courrier.app répond automatiquement.
 
-  Les apps du Store s'exécutent isolées, sans accès à Internet : les
-  messages restent sur l'appareil (orion.storage, 1 Mo). Ceux que l'on
-  s'adresse arrivent dans Réception, et demo@courrier.app répond
-  automatiquement, pour montrer l'arrivée d'un message.
+  Dans les deux cas : réponse, réponse à tous, transfert, brouillons gardés
+  sur l'appareil pendant la saisie, sélection multiple, balayage pour
+  supprimer ou archiver, réglages (signature, aperçu…).
 -->
 <style>
   :root {
@@ -184,6 +189,21 @@
   :root[data-theme='dark'] #snack { background: rgba(72, 72, 74, 0.97); }
   #snack span { flex: 1; }
   #snack button { color: #64d2ff; font-weight: 600; }
+  .spinner { display: inline-block; flex: none; width: 18px; height: 18px; border: 2px solid var(--field); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .spinner.light { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .list-note { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 18px 16px; color: var(--muted); font-size: 14px; text-align: center; }
+  .list-note button { color: var(--accent); font-size: 14px; }
+  .load-more { display: block; width: 100%; padding: 16px; color: var(--accent); font-size: 16px; }
+  .attachments { display: grid; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 0.5px solid var(--line); }
+  .attachment { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--field); font-size: 14px; }
+  .attachment .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .secondary { display: block; width: calc(100% - 32px); min-height: 50px; margin: 0 16px; border-radius: 14px; background: var(--field); color: var(--accent); font-size: 17px; font-weight: 600; }
+  .setup .or { display: flex; align-items: center; gap: 12px; margin: 22px 32px 14px; color: var(--muted); font-size: 13px; }
+  .setup .or::before, .setup .or::after { content: ''; flex: 1; border-top: 0.5px solid var(--line); }
+  .setup .primary + .or { margin-top: 26px; }
+  .setup > .note { margin-bottom: 18px; }
+  .cell.link-cell { color: var(--accent); }
 </style>
 
 <div id="app"></div>
@@ -202,10 +222,14 @@ const DAY = 86_400_000;
 const DEMO = 'demo@courrier.app';
 const TRASH_DAYS = 30;
 const MAX_BODY = 50_000;
+const PAGE = 40;
+const CHECK_EVERY = MINUTE; // relève des comptes de l'appareil
 const SWIPE = 90; // pixels à balayer pour déclencher l'action
 const EMAIL = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[a-z]{2,}$/i;
 const COLORS = ['#ff9500', '#34c759', '#007aff', '#af52de', '#ff2d55', '#5ac8fa', '#5856d6', '#a2845e'];
+const mailApi = window.orion.mail || null;
 
+// Boîtes du mode « sans compte » (messages gardés par l'app).
 const BOXES = [
   { id: 'inbox', name: 'Réception', icon: 'inbox', empty: 'Aucun message' },
   { id: 'flagged', name: 'Favoris', icon: 'flag', empty: 'Touchez le drapeau d\'un message pour le retrouver ici.' },
@@ -215,6 +239,7 @@ const BOXES = [
   { id: 'trash', name: 'Corbeille', icon: 'trash', empty: `La corbeille est vide. Les messages y restent ${TRASH_DAYS} jours.` },
 ];
 const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
+const ROLE_ICON = { inbox: 'inbox', sent: 'send', drafts: 'draft', trash: 'trash', junk: 'junk', archive: 'archive', all: 'folder' };
 
 const ICONS = {
   back: '<path d="M15 5l-7 7 7 7"/>',
@@ -236,15 +261,23 @@ const ICONS = {
   filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  folder: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+  junk: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+  attach: '<path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/>',
 };
 const icon = (name, size = 22) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
 // ───────────── État ─────────────
 
+const DEFAULT_SETTINGS = { lines: 2, swipe: 'trash', confirmDelete: false, source: null, accountId: null };
 const state = {
-  account: null, // { name, address, signature }
-  settings: { lines: 2, swipe: 'trash', confirmDelete: false },
-  messages: [],
+  mode: 'local', // 'local' : sans compte (démonstration) · 'remote' : compte de l'appareil
+  account: null, // identité et signature : { name, address, signature }
+  settings: { ...DEFAULT_SETTINGS },
+  messages: [], // messages gardés par l'app (tous en mode local, les brouillons en mode compte)
+  remote: null, // compte de l'appareil : voir enterRemote()
+  status: { available: false, permission: 'denied' }, // messagerie d'Orion (orion.mail.status())
   view: 'loading',
   box: 'inbox',
   openId: null,
@@ -253,9 +286,11 @@ const state = {
   selecting: false,
   selected: new Set(),
   draft: null, // message en cours de rédaction
+  setupError: '',
 };
 const stack = []; // écrans précédents (bouton Retour)
 let paused = false;
+let checkTimer = 0;
 
 // ───────────── Outils ─────────────
 
@@ -264,15 +299,20 @@ const fold = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const find = (id) => state.messages.find((m) => m.id === id) || null;
-const me = () => ({ name: state.account.name, address: state.account.address });
+const remoteMode = () => state.mode === 'remote' && Boolean(state.remote);
+const allMessages = () => (remoteMode() ? [...state.messages, ...state.remote.index.values()] : state.messages);
+const find = (id) => allMessages().find((m) => m.id === id) || null;
+const identity = () => (remoteMode() ? { name: state.remote.account.name || state.account?.name || '', address: state.remote.account.address } : { name: state.account.name, address: state.account.address });
+const me = () => identity();
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
-const isMe = (address) => Boolean(state.account) && same(address, state.account.address);
+const isMe = (address) => (remoteMode() || state.account ? same(address, identity().address) : false);
 const nameOf = (person) => (person ? person.name || person.address : 'Inconnu');
-const firstName = () => state.account.name.split(/\s+/)[0];
+const firstName = () => (identity().name || identity().address).split(/[\s@]+/)[0];
 const due = (m) => !m.deliverAt || m.deliverAt <= Date.now();
+const signature = () => state.account?.signature ?? 'Envoyé depuis Courrier';
 
 function fmtDate(ts) {
+  if (!ts) return '';
   const date = new Date(ts);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -281,14 +321,16 @@ function fmtDate(ts) {
   if (ts >= today - 6 * DAY) return capitalize(date.toLocaleDateString('fr-FR', { weekday: 'long' }));
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
-const longDate = (ts) => capitalize(new Date(ts).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+const dateText = (ts) => (ts ? new Date(ts).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+const longDate = (ts) => capitalize(dateText(ts));
+const size = (bytes) => (bytes < 1024 ? `${bytes} o` : bytes < 1048576 ? `${Math.round(bytes / 1024)} Ko` : `${(bytes / 1048576).toFixed(1).replace('.', ',')} Mo`);
 
-function avatar(person, size = 40) {
+function avatar(person, px = 40) {
   const name = nameOf(person);
   const initials = name.split(/[\s.@_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
   let hash = 0;
   for (const c of String(person?.address || name)) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
-  return `<span class="avatar" style="width:${size}px;height:${size}px;background:${COLORS[hash % COLORS.length]}">${esc(initials)}</span>`;
+  return `<span class="avatar" style="width:${px}px;height:${px}px;background:${COLORS[hash % COLORS.length]}">${esc(initials)}</span>`;
 }
 
 /** « Camille <camille@exemple.fr>, lucas@exemple.fr » → { list, bad } */
@@ -305,10 +347,10 @@ function parseAddresses(text) {
 }
 const formatAddresses = (list) => (list || []).map((p) => (p.name ? `${p.name.replace(/[,;<>"]/g, ' ').trim()} <${p.address}>` : p.address)).join(', ');
 
-/** Correspondants connus (tous les messages), sans soi-même. */
+/** Correspondants connus (messages chargés), sans soi-même. */
 function contacts() {
   const map = new Map();
-  for (const m of state.messages) {
+  for (const m of allMessages()) {
     for (const p of [m.from, ...(m.to || []), ...(m.cc || [])]) {
       if (!p?.address || isMe(p.address)) continue;
       const key = p.address.toLowerCase();
@@ -341,7 +383,7 @@ function bodyHtml(text) {
   return out.join('');
 }
 
-// ───────────── Données ─────────────
+// ───────────── Données gardées par l'app ─────────────
 
 let saving = Promise.resolve();
 /** Enregistre des clés de l'état dans le stockage de l'app (dans l'ordre des appels). */
@@ -354,14 +396,23 @@ function persist(...keys) {
   return saving;
 }
 
-function messagesIn(box) {
+function localIn(box) {
   return state.messages
     .filter((m) => due(m) && (box === 'flagged' ? m.flagged && m.box !== 'trash' : m.box === box))
     .sort((a, b) => b.date - a.date);
 }
 
-/** Messages affichés : boîte, recherche et filtre « non lus ». */
+function messagesIn(box) {
+  if (!remoteMode() || box === 'drafts') return localIn(box);
+  return currentList(box)?.messages ?? [];
+}
+
+/** Messages affichés : boîte, recherche et filtre « non lus » (faits par le serveur pour un compte). */
 function visibleList() {
+  if (remoteMode() && state.box !== 'drafts') {
+    const list = messagesIn(state.box);
+    return state.box === 'flagged' && state.unreadOnly ? list.filter((m) => !m.read || m.id === state.openId) : list;
+  }
   const query = fold(state.query.trim());
   return messagesIn(state.box).filter((m) => {
     if (state.unreadOnly && m.read && m.id !== state.openId) return false;
@@ -371,10 +422,10 @@ function visibleList() {
   });
 }
 
-const unreadCount = (box) => messagesIn(box).filter((m) => !m.read).length;
+const unreadCount = (box) => localIn(box).filter((m) => !m.read).length;
 function boxCount(box) {
   if (box === 'inbox' || box === 'archive') return unreadCount(box);
-  if (box === 'flagged' || box === 'drafts') return messagesIn(box).length;
+  if (box === 'flagged' || box === 'drafts') return localIn(box).length;
   return 0;
 }
 
@@ -385,7 +436,7 @@ function purgeTrash() {
   return state.messages.length !== before;
 }
 
-/** Messages d'exemple, à la première ouverture. */
+/** Messages d'exemple, à la première ouverture sans compte. */
 function seed() {
   const now = Date.now();
   const at = (ago) => now - ago;
@@ -397,7 +448,7 @@ function seed() {
       from: { name: 'Équipe Courrier', address: 'bienvenue@courrier.app' },
       subject: 'Bienvenue dans Courrier 👋',
       date: at(4 * MINUTE),
-      body: `Bonjour ${firstName()},\n\nBienvenue dans Courrier ! Quelques astuces pour démarrer :\n\n• Balayez un message vers la gauche pour le mettre à la corbeille (ou l'archiver : à choisir dans les réglages). Un bouton « Annuler » permet de revenir en arrière.\n• « Modifier » sélectionne plusieurs messages pour les marquer comme lus, les archiver ou les supprimer.\n• Le drapeau range un message dans Favoris.\n• Vos brouillons sont enregistrés pendant que vous écrivez.\n• La recherche fouille les expéditeurs, les objets et le texte des messages.\n\nCourrier fonctionne sans accès à Internet (les apps du Store sont isolées) : vos messages restent sur cet appareil. Ceux que vous vous adressez arrivent dans Réception.\n\nBonne lecture !\nL'équipe Courrier`,
+      body: `Bonjour ${firstName()},\n\nBienvenue dans Courrier ! Quelques astuces pour démarrer :\n\n• Balayez un message vers la gauche pour le mettre à la corbeille (ou l'archiver : à choisir dans les réglages). Un bouton « Annuler » permet de revenir en arrière.\n• « Modifier » sélectionne plusieurs messages pour les marquer comme lus, les archiver ou les supprimer.\n• Le drapeau range un message dans Favoris.\n• Vos brouillons sont enregistrés pendant que vous écrivez.\n• La recherche fouille les expéditeurs, les objets et le texte des messages.\n\nCe mode de démonstration garde vos messages sur l'appareil. Sur Orion installé, Courrier relève vos vrais e-mails avec les comptes ajoutés dans Réglages → Comptes de messagerie.\n\nBonne lecture !\nL'équipe Courrier`,
     }),
     message({
       from: { name: 'Camille Martin', address: 'camille.martin@exemple.fr' },
@@ -454,6 +505,204 @@ function seed() {
   ];
 }
 
+// ───────────── Compte de l'appareil (orion.mail) ─────────────
+
+/** Passe sur un compte de messagerie d'Orion (relevé par orion-server). */
+function enterRemote(account) {
+  state.mode = 'remote';
+  state.remote = { account, folders: [], inbox: 'INBOX', lists: {}, index: new Map(), checkedAt: 0, error: '', lastInboxUid: null, checking: false };
+  Object.assign(state.settings, { source: 'device', accountId: account.id });
+  persist('settings');
+  stack.length = 0;
+  stack.push({ view: 'boxes', box: 'f:INBOX', openId: null, scroll: 0 });
+  Object.assign(state, { view: 'list', box: 'f:INBOX', query: '', unreadOnly: false });
+  render();
+  loadFolders();
+  checkMail({ notify: false });
+  clearInterval(checkTimer);
+  checkTimer = setInterval(() => checkMail(), CHECK_EVERY);
+}
+
+function leaveRemote() {
+  clearInterval(checkTimer);
+  state.mode = 'local';
+  state.remote = null;
+  Object.assign(state.settings, { source: 'local', accountId: null });
+  persist('settings');
+}
+
+/** Demande l'accès aux comptes (autorisation « E-mails ») et choisit le compte. */
+async function connectDevice({ quiet = false } = {}) {
+  let accounts;
+  try {
+    accounts = await mailApi.accounts();
+  } catch (error) {
+    const hint = /refusé/.test(error.message) ? ' Autorisez « E-mails » pour Courrier dans Réglages → Applications → Courrier.' : '';
+    return setupProblem(error.message + hint, quiet);
+  }
+  if (!accounts.length) return setupProblem('Aucun compte de messagerie sur cet appareil. Ajoutez-en un dans Réglages → Comptes de messagerie, puis réessayez.', quiet);
+  let account = accounts.find((a) => a.id === state.settings.accountId);
+  if (!account) account = accounts.length === 1 ? accounts[0] : await pickAccount(accounts);
+  if (!account) return false;
+  enterRemote(account);
+  return true;
+}
+
+function setupProblem(message, quiet) {
+  state.setupError = message;
+  if (state.view === 'setup' || state.view === 'loading') {
+    state.view = 'setup';
+    render();
+  } else if (!quiet) orion.ui.alert({ title: 'Comptes indisponibles', message });
+  return false;
+}
+
+async function pickAccount(accounts) {
+  const id = await sheet({ title: 'Quel compte ouvrir ?', actions: accounts.map((a) => ({ label: a.name ? `${a.name} · ${a.address}` : a.address, value: a.id })) });
+  return accounts.find((a) => a.id === id) || null;
+}
+
+const folderOf = (id) => state.remote?.folders.find((f) => f.id === id) || null;
+const roleOf = (folderId) => folderOf(folderId)?.role || (folderId === state.remote?.inbox ? 'inbox' : null);
+const roleFolder = (role) => state.remote?.folders.find((f) => f.role === role) || null;
+const listKey = () => `${state.query.trim()}|${state.unreadOnly ? 'unread' : ''}`;
+/** Liste chargée pour la boîte (si elle correspond à la recherche et au filtre en cours). */
+function currentList(box = state.box) {
+  const list = state.remote?.lists[box];
+  return list && list.key === (box === 'flagged' ? `${state.query.trim()}|` : listKey()) ? list : null;
+}
+
+/** Message du serveur → objet partagé par toutes les listes (mis à jour à chaque relevé). */
+function adopt(folder, m) {
+  const id = `r:${folder}:${m.uid}`;
+  const fields = { from: m.from, to: m.to || [], cc: m.cc || [], subject: m.subject, date: m.date || 0, read: m.seen, flagged: m.flagged, answered: m.answered, hasAttachments: Boolean(m.attachments) };
+  const known = state.remote.index.get(id);
+  if (known) {
+    Object.assign(known, fields);
+    if (!known.full) known.body = m.preview || '';
+    return known;
+  }
+  const message = { id, remote: true, folder, uid: m.uid, box: `f:${folder}`, ...fields, body: m.preview || '', full: false };
+  state.remote.index.set(id, message);
+  return message;
+}
+
+async function loadFolders() {
+  const r = state.remote;
+  try {
+    const folders = await mailApi.folders(r.account.id);
+    if (r !== state.remote) return;
+    r.folders = folders;
+    r.inbox = folders.find((f) => f.role === 'inbox')?.id || 'INBOX';
+    r.error = '';
+  } catch (error) {
+    if (r === state.remote) r.error = error.message;
+  }
+  if (r === state.remote && (state.view === 'boxes' || state.view === 'list')) refresh();
+}
+
+/** Charge (ou complète avec `more`) la liste d'une boîte : dossier du serveur, ou Favoris de Réception. */
+async function loadList(box = state.box, { more = false } = {}) {
+  const r = state.remote;
+  if (!r || box === 'drafts') return;
+  const key = box === 'flagged' ? `${state.query.trim()}|` : listKey();
+  let list = r.lists[box];
+  if (!list || list.key !== key) list = r.lists[box] = { key, messages: [], more: false, loading: false, error: '', loaded: false };
+  if (list.loading) return;
+  list.loading = true;
+  list.error = '';
+  if (state.view === 'list' && state.box === box) fillList();
+  const folder = box === 'flagged' ? r.inbox : box.slice(2);
+  const before = more && list.messages.length ? Math.min(...list.messages.map((m) => m.uid)) : null;
+  try {
+    const page = await mailApi.messages(r.account.id, folder, { before, limit: PAGE, query: state.query.trim(), filter: box === 'flagged' ? 'flagged' : state.unreadOnly ? 'unread' : '' });
+    if (r !== state.remote || r.lists[box] !== list) return; // recherche changée entre-temps
+    const items = page.messages.map((m) => adopt(folder, m));
+    list.messages = more ? [...list.messages, ...items.filter((m) => !list.messages.includes(m))] : items;
+    list.more = page.more;
+    list.loaded = true;
+  } catch (error) {
+    list.error = error.message;
+  } finally {
+    list.loading = false;
+  }
+  if (r === state.remote && state.view === 'list' && state.box === box) fillList();
+}
+
+/** Relève Réception : compteurs, nouveaux messages (notification), liste à jour. */
+async function checkMail({ notify = true } = {}) {
+  const r = state.remote;
+  if (!r || r.checking) return;
+  r.checking = true;
+  try {
+    await loadFolders();
+    const page = await mailApi.messages(r.account.id, r.inbox, { limit: 20 });
+    if (r !== state.remote) return;
+    const items = page.messages.map((m) => adopt(r.inbox, m));
+    const top = items.reduce((max, m) => Math.max(max, m.uid), 0);
+    const fresh = r.lastInboxUid === null ? [] : items.filter((m) => m.uid > r.lastInboxUid && !m.read);
+    r.lastInboxUid = Math.max(r.lastInboxUid ?? 0, top);
+    const list = r.lists[`f:${r.inbox}`];
+    if (list && list.key === '|' && list.loaded && items.length) {
+      const oldest = items.reduce((min, m) => Math.min(min, m.uid), Infinity);
+      list.messages = [...items, ...list.messages.filter((m) => m.uid < oldest && !items.includes(m))];
+    }
+    r.checkedAt = Date.now();
+    r.error = '';
+    if (fresh.length && notify) announce(fresh);
+  } catch (error) {
+    if (r === state.remote) r.error = error.message;
+  } finally {
+    r.checking = false;
+  }
+  if (r === state.remote) refresh();
+}
+
+function announce(fresh) {
+  const last = fresh[0];
+  const who = nameOf(last.from);
+  if (paused) {
+    orion.notify({ title: fresh.length > 1 ? `${fresh.length} nouveaux messages` : who, body: fresh.length > 1 ? `Dont « ${last.subject || '(Sans objet)'} » de ${who}` : last.subject || '(Sans objet)' }).catch(() => {});
+  } else {
+    orion.device.vibrate([15, 60, 15]);
+    snack(fresh.length > 1 ? `${fresh.length} nouveaux messages` : `Nouveau message de ${who}`, state.view === 'compose' ? null : { label: 'Lire', run: () => openMessage(last.id, `f:${state.remote.inbox}`) });
+  }
+}
+
+/** Texte complet d'un message du serveur (l'aperçu suffit pour la liste). */
+async function loadFull(m) {
+  if (m.full || m.loading) return;
+  m.loading = true;
+  try {
+    const full = await mailApi.message(state.remote.account.id, m.folder, m.uid);
+    Object.assign(m, { body: full.text, full: true, html: full.html, truncated: full.truncated, attachmentList: full.attachments || [], messageId: full.messageId, references: full.references, replyTo: full.replyTo || [], to: full.to, cc: full.cc, from: full.from });
+  } catch (error) {
+    m.loadError = error.message;
+  } finally {
+    m.loading = false;
+  }
+  if (state.view === 'read' && state.openId === m.id) rerender();
+}
+
+/** Retire des messages de toutes les listes (déplacés ou supprimés sur le serveur). */
+function drop(items) {
+  const gone = new Set(items.map((m) => m.id));
+  for (const list of Object.values(state.remote.lists)) list.messages = list.messages.filter((m) => !gone.has(m.id));
+  for (const id of gone) state.remote.index.delete(id);
+}
+
+/** Les autres listes seront rechargées à leur prochaine ouverture. */
+function invalidateOthers() {
+  const keep = state.remote.lists[state.box];
+  state.remote.lists = keep ? { [state.box]: keep } : {};
+}
+
+function byFolder(items) {
+  const groups = new Map();
+  for (const m of items) groups.set(m.folder, [...(groups.get(m.folder) || []), m]);
+  return groups;
+}
+
 // ───────────── Navigation ─────────────
 
 const currentScroll = () => $app.querySelector('.scroll')?.scrollTop || 0;
@@ -466,7 +715,8 @@ function go(view, params = {}) {
 }
 
 function back() {
-  const previous = stack.pop() || (state.view === 'boxes' ? null : { view: 'boxes', box: state.box, openId: null, scroll: 0 });
+  const home = remoteMode() ? 'f:INBOX' : 'inbox';
+  const previous = stack.pop() || (state.view === 'boxes' ? null : { view: 'boxes', box: home, openId: null, scroll: 0 });
   if (!previous) return false;
   Object.assign(state, { view: previous.view, box: previous.box, openId: previous.openId, selecting: false });
   state.selected.clear();
@@ -479,48 +729,87 @@ function back() {
 /** Met l'écran à jour après un changement des messages (sans perdre la saisie en cours). */
 function refresh() {
   if (state.view === 'list') fillList();
-  else if (state.view === 'boxes') render();
+  else if (state.view === 'boxes') rerender();
   else if (state.view === 'read' && !find(state.openId)) back();
+}
+
+function boxInfo(box) {
+  if (!remoteMode()) return BOX[box];
+  if (box === 'flagged') return { name: 'Favoris', icon: 'flag', empty: 'Aucun message de Réception n\'a de drapeau.' };
+  if (box === 'drafts') return { name: 'Brouillons', icon: 'draft', empty: 'Aucun brouillon. Ils restent sur cet appareil jusqu\'à l\'envoi.' };
+  const id = box.slice(2);
+  const folder = folderOf(id);
+  const role = folder?.role || (id === state.remote.inbox ? 'inbox' : null);
+  const name = role === 'drafts' ? 'Brouillons du serveur' : folder?.name || (role === 'inbox' ? 'Réception' : id);
+  return { name, icon: ROLE_ICON[role] || 'folder', empty: role === 'trash' ? 'La corbeille est vide.' : 'Aucun message', role };
 }
 
 // ───────────── Écrans ─────────────
 
 const VIEWS = {
-  loading: () => '',
-  setup: () => `
+  loading: () => '<div class="list-note" style="margin-top:40vh"><span class="spinner"></span>Ouverture…</div>',
+  setup: () => {
+    const device = state.status.available;
+    return `
     <div class="scroll setup">
       <div class="setup-logo">${icon('mail', 44)}</div>
       <h1>Bienvenue dans Courrier</h1>
-      <p class="muted">Indiquez le nom et l'adresse qui apparaîtront sur vos messages.</p>
+      ${device
+        ? `<p class="muted">Relevez et envoyez vos vrais e-mails avec les comptes ajoutés dans Réglages → Comptes de messagerie.</p>
+           ${state.setupError ? `<p class="note">${icon('info', 18)}<span>${esc(state.setupError)}</span></p>` : ''}
+           <button class="primary" data-act="use-device">Utiliser mes comptes e-mail</button>
+           <p class="or">ou</p>
+           <p class="muted">Essayez Courrier sans compte : les messages restent dans l'app.</p>`
+        : '<p class="muted">Indiquez le nom et l\'adresse qui apparaîtront sur vos messages.</p>'}
       <div class="group">
         <label class="cell"><span>Nom</span><input id="setup-name" maxlength="60" autocomplete="name" placeholder="Camille Martin"></label>
         <label class="cell"><span>Adresse</span><input id="setup-address" type="email" maxlength="120" autocomplete="email" autocapitalize="off" placeholder="vous@exemple.fr"></label>
       </div>
       <p class="error" id="setup-error"></p>
-      <button class="primary" data-act="setup">Commencer</button>
-      <p class="note">${icon('info', 18)}<span>Les apps du Store n'ont pas accès à Internet : Courrier garde vos messages sur cet appareil.</span></p>
-    </div>`,
+      <button class="${device ? 'secondary' : 'primary'}" data-act="setup">${device ? 'Essayer sans compte' : 'Commencer'}</button>
+      ${device ? '' : `<p class="note">${icon('info', 18)}<span>Les apps du Store n'ont pas accès à Internet : sans compte, Courrier garde vos messages sur cet appareil. Sur Orion installé, il relève vos vrais e-mails (Réglages → Comptes de messagerie).</span></p>`}
+    </div>`;
+  },
 
-  boxes: () => `
-    <header class="bar"><span class="spacer"></span><button class="link" data-act="settings" aria-label="Réglages">${icon('gear')}</button></header>
+  boxes: () => {
+    const remote = remoteMode();
+    const row = (box, name, iconName, count, css = '') => `<button class="cell icon" data-act="box" data-box="${esc(box)}"><span class="box-icon ${css}">${icon(iconName)}</span><span class="grow">${esc(name)}</span><span class="count">${count || ''}</span><span class="chev">${icon('chevron', 16)}</span></button>`;
+    let groups;
+    if (remote) {
+      const r = state.remote;
+      const inbox = r.folders.find((f) => f.role === 'inbox');
+      const main = [row(`f:${r.inbox}`, 'Réception', 'inbox', inbox?.unread), row('flagged', 'Favoris', 'flag', '', 'flagged'), row('drafts', 'Brouillons', 'draft', localIn('drafts').length)];
+      for (const role of ['sent', 'archive', 'junk', 'trash']) {
+        const f = roleFolder(role);
+        if (f) main.push(row(`f:${f.id}`, f.name, ROLE_ICON[role], role === 'junk' ? f.unread : ''));
+      }
+      const others = r.folders.filter((f) => !f.role || f.role === 'all' || f.role === 'drafts');
+      groups = `<div class="group">${main.join('')}</div>${others.length ? `<p class="group-title">Dossiers</p><div class="group">${others.map((f) => row(`f:${f.id}`, f.role === 'drafts' ? 'Brouillons du serveur' : f.name, ROLE_ICON[f.role] || 'folder', '')).join('')}</div>` : ''}${!r.folders.length && !r.error ? '<div class="list-note"><span class="spinner"></span>Chargement des dossiers…</div>' : ''}`;
+    } else {
+      groups = `<div class="group">${BOXES.map((b) => row(b.id, b.name, b.icon, boxCount(b.id), b.id)).join('')}</div>`;
+    }
+    const who = identity();
+    return `
+    <header class="bar">${remote ? `<button class="link" data-act="check" aria-label="Relever le courrier">${icon('refresh')}</button>` : ''}<span class="spacer"></span><button class="link" data-act="settings" aria-label="Réglages">${icon('gear')}</button></header>
     <div class="scroll">
       <h1 class="large">Boîtes</h1>
-      <div class="account">${avatar(me(), 44)}<div><strong>${esc(state.account.name)}</strong><span>${esc(state.account.address)}</span></div></div>
-      <div class="group">
-        ${BOXES.map((b) => `<button class="cell icon" data-act="box" data-box="${b.id}"><span class="box-icon ${b.id}">${icon(b.icon)}</span><span class="grow">${b.name}</span><span class="count">${boxCount(b.id) || ''}</span><span class="chev">${icon('chevron', 16)}</span></button>`).join('')}
-      </div>
+      <div class="account">${avatar(who, 44)}<div><strong>${esc(who.name || who.address)}</strong><span>${esc(who.address)}${remote ? ' · compte de l\'appareil' : ' · sans compte'}</span></div></div>
+      ${remote && state.remote.error ? `<p class="note">${icon('info', 18)}<span>${esc(state.remote.error)}</span></p>` : ''}
+      ${groups}
     </div>
-    <footer class="toolbar"><span style="width:40px"></span><span class="status">${unreadStatus()}</span><button class="link" data-act="compose" aria-label="Nouveau message">${icon('compose')}</button></footer>`,
+    <footer class="toolbar"><span style="width:40px"></span><span class="status">${esc(statusLine())}</span><button class="link" data-act="compose" aria-label="Nouveau message">${icon('compose')}</button></footer>`;
+  },
 
   list: () => `
     <header class="bar">
       <button class="link" data-act="back">${icon('back')}Boîtes</button>
       <span class="spacer"></span>
+      ${remoteMode() && state.box !== 'drafts' ? `<button class="link" data-act="reload" aria-label="Actualiser">${icon('refresh')}</button>` : ''}
       <button class="link" data-act="select" id="select-btn">${state.selecting ? 'OK' : 'Modifier'}</button>
     </header>
     <div class="scroll" style="--lines:${state.settings.lines}">
-      <h1 class="large">${BOX[state.box].name}</h1>
-      <label class="search">${icon('search', 18)}<input id="search" type="search" placeholder="Rechercher" autocomplete="off" value="${esc(state.query)}" aria-label="Rechercher"></label>
+      <h1 class="large">${esc(boxInfo(state.box).name)}</h1>
+      <label class="search">${icon('search', 18)}<input id="search" type="search" placeholder="${remoteMode() && state.box !== 'drafts' ? 'Rechercher dans ce dossier' : 'Rechercher'}" autocomplete="off" value="${esc(state.query)}" aria-label="Rechercher"></label>
       <div id="rows"></div>
     </div>
     <footer class="toolbar" id="list-toolbar"></footer>`,
@@ -531,10 +820,16 @@ const VIEWS = {
     const list = visibleList();
     const index = list.findIndex((x) => x.id === m.id);
     const recipients = [...(m.to || [])].map(nameOf).join(', ') || '—';
-    const trash = m.box === 'trash';
+    const role = m.remote ? roleOf(m.folder) : m.box;
+    const trash = role === 'trash';
+    const archived = role === 'archive';
+    const attachments = m.attachmentList?.length
+      ? `<div class="attachments">${m.attachmentList.map((a) => `<div class="attachment">${icon('attach', 18)}<span class="grow">${esc(a.name)}</span><span class="muted small">${size(a.size)}</span></div>`).join('')}<p class="muted small">Les pièces jointes s'ouvrent dans votre logiciel de messagerie habituel (pas encore dans Courrier).</p></div>`
+      : '';
+    const pending = m.remote && !m.full ? `<p class="list-note">${m.loadError ? `${esc(m.loadError)} <button data-act="retry-full">Réessayer</button>` : '<span class="spinner"></span>Chargement du message…'}</p>` : '';
     return `
       <header class="bar">
-        <button class="link" data-act="back">${icon('back')}${esc(BOX[state.box].name)}</button>
+        <button class="link" data-act="back">${icon('back')}${esc(boxInfo(state.box).name)}</button>
         <span class="spacer"></span>
         <button class="link" data-act="prev" aria-label="Message précédent" ${index <= 0 ? 'disabled' : ''}>${icon('up')}</button>
         <button class="link" data-act="next" aria-label="Message suivant" ${index < 0 || index >= list.length - 1 ? 'disabled' : ''}>${icon('down')}</button>
@@ -551,26 +846,32 @@ const VIEWS = {
         <h2 class="msg-subject">${m.flagged ? '<span class="flag-dot"></span>' : ''}<span>${esc(m.subject || '(Sans objet)')}</span></h2>
         <div class="muted small">${esc(longDate(m.date))}</div>
         <div class="msg-body">${bodyHtml(m.body)}</div>
+        ${pending}
+        ${m.truncated ? '<p class="muted small">Message trop long : la fin n\'est pas affichée.</p>' : ''}
+        ${attachments}
       </div>
       <footer class="toolbar">
         <button class="link flag" data-act="flag" aria-pressed="${Boolean(m.flagged)}" aria-label="${m.flagged ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${icon('flag')}</button>
         <button class="link" data-act="unread" aria-label="Marquer comme non lu">${icon('mail')}</button>
         ${trash
           ? `<button class="link" data-act="restore" aria-label="Restaurer">${icon('restore')}</button>`
-          : `<button class="link" data-act="archive" aria-label="${m.box === 'archive' ? 'Remettre dans Réception' : 'Archiver'}">${icon(m.box === 'archive' ? 'inbox' : 'archive')}</button>`}
+          : `<button class="link" data-act="archive" aria-label="${archived ? 'Remettre dans Réception' : 'Archiver'}">${icon(archived ? 'inbox' : 'archive')}</button>`}
         <button class="link${trash ? ' danger' : ''}" data-act="delete" aria-label="${trash ? 'Effacer définitivement' : 'Supprimer'}">${icon('trash')}</button>
-        <button class="link" data-act="reply-menu" aria-label="Répondre ou transférer">${icon('reply')}</button>
+        <button class="link" data-act="reply-menu" aria-label="Répondre, transférer ou déplacer">${icon('reply')}</button>
       </footer>`;
   },
 
   compose: () => {
     const d = state.draft;
     const title = { new: 'Nouveau message', reply: 'Réponse', all: 'Réponse à tous', forward: 'Transfert' }[d.kind] || 'Nouveau message';
+    const note = remoteMode()
+      ? `Envoyé depuis ${esc(identity().address)} par le serveur de votre fournisseur.`
+      : `Sans compte, Courrier n'a pas accès à Internet : vos messages sont enregistrés dans Envoyés, sur cet appareil. Ceux qui vous sont adressés (ou à ${DEMO}) arrivent dans Réception.`;
     return `
       <header class="bar">
         <button class="link" data-act="cancel-compose">Annuler</button>
         <span class="bar-title">${title}</span>
-        <button class="send" data-act="send" id="send-btn" aria-label="Envoyer">${icon('send', 20)}</button>
+        <button class="send" data-act="send" id="send-btn" aria-label="Envoyer">${d.sending ? '<span class="spinner light"></span>' : icon('send', 20)}</button>
       </header>
       <div class="scroll">
         <label class="cfield"><span>À :</span><input id="c-to" type="text" inputmode="email" autocapitalize="off" autocomplete="off" spellcheck="false" value="${esc(d.to)}" aria-label="Destinataires">${d.showCc ? '' : '<button class="link" data-act="show-cc">Cc</button>'}</label>
@@ -578,33 +879,44 @@ const VIEWS = {
         ${d.showCc ? `<label class="cfield"><span>Cc :</span><input id="c-cc" type="text" inputmode="email" autocapitalize="off" autocomplete="off" spellcheck="false" value="${esc(d.cc)}" aria-label="Copie à"></label><div class="suggest" id="suggest-cc" data-field="c-cc"></div>` : ''}
         <label class="cfield"><span>Objet :</span><input id="c-subject" type="text" maxlength="200" value="${esc(d.subject)}" aria-label="Objet"></label>
         <textarea class="cbody" id="c-body" aria-label="Message">${esc(d.body)}</textarea>
-        <p class="note">${icon('info', 18)}<span>Courrier n'a pas accès à Internet : vos messages sont enregistrés dans Envoyés, sur cet appareil. Ceux qui vous sont adressés (ou à ${DEMO}) arrivent dans Réception.</span></p>
+        <p class="note">${icon('info', 18)}<span>${note}</span></p>
       </div>`;
   },
 
   settings: () => {
     const s = state.settings;
+    const remote = remoteMode();
     const seg = (key, options) => `<div class="seg" role="group">${options.map(([value, label]) => `<button data-act="setting" data-key="${key}" data-value="${value}" aria-pressed="${String(s[key]) === String(value)}">${label}</button>`).join('')}</div>`;
-    const trash = messagesIn('trash').length;
+    const trash = localIn('trash').length;
+    const source = remote
+      ? `<p class="group-title">Compte de l'appareil</p>
+         <div class="group">
+           <div class="cell"><span class="grow">${esc(state.remote.account.address)}</span><span class="muted small">${esc(state.remote.account.name)}</span></div>
+           <button class="cell link-cell" data-act="switch-account">Changer de compte</button>
+           <button class="cell link-cell" data-act="use-local">Utiliser Courrier sans compte</button>
+         </div>
+         <p class="group-foot">Les comptes se gèrent dans Réglages → Comptes de messagerie. Courrier relève le courrier toutes les minutes tant qu'il est ouvert.</p>`
+      : `${state.status.available ? '<div class="group"><button class="cell link-cell" data-act="use-device">Utiliser mes comptes e-mail</button></div>' : ''}
+         <p class="group-title">Identité (sans compte)</p>
+         <div class="group">
+           <label class="cell"><span>Nom</span><input id="s-name" maxlength="60" value="${esc(state.account.name)}"></label>
+           <label class="cell"><span>Adresse</span><input id="s-address" type="email" maxlength="120" autocapitalize="off" value="${esc(state.account.address)}"></label>
+         </div>`;
     return `
       <header class="bar"><button class="link" data-act="back">${icon('back')}Boîtes</button><span class="bar-title">Réglages</span><span style="width:84px"></span></header>
       <div class="scroll">
-        <p class="group-title">Compte</p>
-        <div class="group">
-          <label class="cell"><span>Nom</span><input id="s-name" maxlength="60" value="${esc(state.account.name)}"></label>
-          <label class="cell"><span>Adresse</span><input id="s-address" type="email" maxlength="120" autocapitalize="off" value="${esc(state.account.address)}"></label>
-        </div>
+        ${source}
         <p class="group-title">Signature</p>
-        <div class="group"><label class="cell"><textarea id="s-signature" maxlength="500" placeholder="Aucune signature" aria-label="Signature">${esc(state.account.signature)}</textarea></label></div>
+        <div class="group"><label class="cell"><textarea id="s-signature" maxlength="500" placeholder="Aucune signature" aria-label="Signature">${esc(signature())}</textarea></label></div>
         <p class="group-title">Liste des messages</p>
         <div class="group">
           <div class="cell stack"><span>Aperçu</span>${seg('lines', [[0, 'Aucun'], [1, '1 ligne'], [2, '2 lignes'], [3, '3 lignes']])}</div>
           <div class="cell stack"><span>Balayer vers la gauche</span>${seg('swipe', [['trash', 'Corbeille'], ['archive', 'Archive']])}</div>
           <label class="cell"><span class="grow">Demander avant de supprimer</span><input type="checkbox" class="switch" id="s-confirm" ${s.confirmDelete ? 'checked' : ''}></label>
         </div>
-        <div class="group"><button class="cell danger" data-act="empty-trash" ${trash ? '' : 'disabled'}>Vider la corbeille${trash ? ` (${trash})` : ''}</button></div>
+        ${remote ? '' : `<div class="group"><button class="cell danger" data-act="empty-trash" ${trash ? '' : 'disabled'}>Vider la corbeille${trash ? ` (${trash})` : ''}</button></div>`}
         <div class="group"><button class="cell danger" data-act="reset">Réinitialiser Courrier</button></div>
-        <p class="group-foot">Courrier ${esc(orion.app.version || '')} · ${plural(state.messages.length, 'message')} sur cet appareil. Les apps du Store n'ont pas accès à Internet : vos messages ne quittent pas l'appareil.</p>
+        <p class="group-foot">Courrier ${esc(orion.app.version || '')} · ${remote ? 'vos e-mails restent chez votre fournisseur ; les brouillons, sur cet appareil.' : `${plural(state.messages.length, 'message')} sur cet appareil (sans compte, rien n'est envoyé sur Internet).`}</p>
       </div>`;
   },
 };
@@ -612,7 +924,10 @@ const VIEWS = {
 function render() {
   $app.dataset.view = state.view;
   $app.innerHTML = VIEWS[state.view]();
-  if (state.view === 'list') fillList();
+  if (state.view === 'list') {
+    fillList();
+    if (remoteMode() && state.box !== 'drafts' && !currentList()) loadList();
+  }
   if (state.view === 'compose') {
     autosize(document.getElementById('c-body'));
     updateSend();
@@ -627,7 +942,15 @@ function rerender() {
   if (el) el.scrollTop = scroll;
 }
 
-function unreadStatus() {
+function statusLine() {
+  if (remoteMode()) {
+    const r = state.remote;
+    if (r.error) return 'Relève impossible';
+    if (r.checking && !r.checkedAt) return 'Relève du courrier…';
+    const inbox = r.folders.find((f) => f.role === 'inbox');
+    const unread = inbox?.unread ? `${inbox.unread} non lu${inbox.unread > 1 ? 's' : ''} · ` : '';
+    return r.checkedAt ? `${unread}Relevé à ${new Date(r.checkedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : unread;
+  }
   const n = unreadCount('inbox');
   return n ? `${n} non lu${n > 1 ? 's' : ''}` : 'Tout est lu';
 }
@@ -638,32 +961,41 @@ function fillList() {
   if (!rows) return;
   const list = visibleList();
   for (const id of state.selected) if (!list.some((m) => m.id === id)) state.selected.delete(id);
-  rows.innerHTML = list.length
-    ? list.map(rowHtml).join('')
-    : `<div class="empty">${icon(BOX[state.box].icon, 40)}<p>${state.query ? 'Aucun résultat' : state.unreadOnly ? 'Aucun message non lu' : esc(BOX[state.box].empty)}</p></div>`;
+  const remote = remoteMode() && state.box !== 'drafts';
+  const loaded = remote ? currentList() : null;
+  let html = list.map(rowHtml).join('');
+  if (remote && (!loaded || (loaded.loading && !list.length))) html = '<div class="list-note"><span class="spinner"></span>Chargement des messages…</div>';
+  else if (!list.length) html = loaded?.error ? '' : `<div class="empty">${icon(boxInfo(state.box).icon, 40)}<p>${state.query ? 'Aucun résultat' : state.unreadOnly ? 'Aucun message non lu' : esc(boxInfo(state.box).empty)}</p></div>`;
+  if (remote && loaded?.error) html += `<div class="list-note">${esc(loaded.error)} <button data-act="reload">Réessayer</button></div>`;
+  else if (remote && loaded?.more) html += loaded.loading ? '<div class="list-note"><span class="spinner"></span>Chargement…</div>' : '<button class="load-more" data-act="more">Charger plus de messages</button>';
+  rows.innerHTML = html;
   document.getElementById('select-btn').hidden = !list.length && !state.selecting;
   document.getElementById('list-toolbar').innerHTML = state.selecting ? selectionToolbar(list) : listToolbar(list);
 }
 
 function swipeKind(m) {
-  if (m.box === 'trash') return { css: '', icon: 'trash', label: 'Effacer' };
-  if (state.settings.swipe === 'archive' && (m.box === 'inbox' || m.box === 'sent')) return { css: ' archive', icon: 'archive', label: 'Archiver' };
+  const role = m.remote ? roleOf(m.folder) : m.box;
+  if (role === 'trash') return { css: '', icon: 'trash', label: 'Effacer' };
+  const canArchive = m.remote ? Boolean(roleFolder('archive')) : true;
+  if (state.settings.swipe === 'archive' && canArchive && (role === 'inbox' || role === 'sent')) return { css: ' archive', icon: 'archive', label: 'Archiver' };
   return { css: '', icon: 'trash', label: 'Corbeille' };
 }
 
 function rowHtml(m) {
-  const outgoing = m.box === 'sent' || m.box === 'drafts';
+  const role = m.remote ? roleOf(m.folder) : m.box;
+  const outgoing = role === 'sent' || role === 'drafts' || m.box === 'drafts';
   const who = outgoing ? (m.to?.length ? `À : ${m.to.map(nameOf).join(', ')}` : 'Aucun destinataire') : nameOf(m.from);
   const selected = state.selected.has(m.id);
   const swipe = swipeKind(m);
   return `
-    <div class="row${m.read ? '' : ' unread'}${selected ? ' selected' : ''}" data-id="${m.id}">
+    <div class="row${m.read ? '' : ' unread'}${selected ? ' selected' : ''}" data-id="${esc(m.id)}">
       <div class="row-behind${swipe.css}" aria-hidden="true"><span>${icon(swipe.icon)}</span>${swipe.label}</div>
-      <button class="row-main" data-act="open" data-id="${m.id}">
+      <button class="row-main" data-act="open" data-id="${esc(m.id)}">
         ${state.selecting ? `<span class="check">${selected ? icon('check', 14) : ''}</span>` : '<span class="dot"></span>'}
         <span class="row-body">
           <span class="row-top">
             <span class="from">${m.box === 'drafts' ? '<em>Brouillon</em> ' : ''}${esc(who)}</span>
+            ${m.hasAttachments ? `<span class="replied" title="Pièce jointe">${icon('attach', 14)}</span>` : ''}
             ${m.answered ? `<span class="replied" title="Répondu">${icon('reply', 14)}</span>` : ''}
             ${m.flagged ? '<span class="flag-dot"></span>' : ''}
             <span class="date">${fmtDate(m.date)}</span>
@@ -678,13 +1010,14 @@ function rowHtml(m) {
 
 function listToolbar(list) {
   const unread = list.filter((m) => !m.read).length;
+  const role = remoteMode() && state.box !== 'drafts' ? boxInfo(state.box).role : state.box;
   const status = state.query
-    ? plural(list.length, 'résultat')
-    : state.box === 'inbox' || state.box === 'archive' ? (unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu') : plural(list.length, 'message');
+    ? plural(list.length, 'résultat') + (currentList()?.more ? ' et plus' : '')
+    : role === 'inbox' || role === 'archive' ? (unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu') : plural(list.length, 'message');
   return `
     <button class="link" data-act="filter" aria-pressed="${state.unreadOnly}" aria-label="Non lus seulement">${icon('filter')}</button>
     <span class="status">${status}</span>
-    ${state.box === 'trash'
+    ${!remoteMode() && state.box === 'trash'
       ? `<button class="link danger" data-act="empty-trash" ${list.length ? '' : 'disabled'}>Vider</button>`
       : `<button class="link" data-act="compose" aria-label="Nouveau message">${icon('compose')}</button>`}`;
 }
@@ -693,16 +1026,18 @@ function selectionToolbar(list) {
   const chosen = list.filter((m) => state.selected.has(m.id));
   const off = chosen.length ? '' : 'disabled';
   const all = list.length > 0 && chosen.length === list.length;
+  const role = remoteMode() && state.box !== 'drafts' ? boxInfo(state.box).role : state.box;
   let middle = '';
-  if (state.box === 'trash') middle = `<button class="link" data-act="restore-selected" ${off}>Restaurer</button>`;
+  if (role === 'trash') middle = `<button class="link" data-act="restore-selected" ${off}>Restaurer</button>`;
   else if (state.box !== 'drafts') {
     middle = `<button class="link" data-act="mark-selected" ${off}>${chosen.some((m) => !m.read) ? 'Lu' : 'Non lu'}</button>`;
-    if (state.box !== 'flagged') middle += `<button class="link" data-act="archive-selected" ${off}>${state.box === 'archive' ? 'Réception' : 'Archiver'}</button>`;
+    const canArchive = remoteMode() ? Boolean(roleFolder('archive')) : true;
+    if (state.box !== 'flagged' && canArchive) middle += `<button class="link" data-act="archive-selected" ${off}>${role === 'archive' ? 'Réception' : 'Archiver'}</button>`;
   }
   return `
     <button class="link" data-act="select-all">${all ? 'Aucun' : 'Tout'}</button>
     ${middle}
-    <button class="link danger" data-act="delete-selected" ${off}>${state.box === 'trash' ? 'Effacer' : 'Supprimer'}</button>`;
+    <button class="link danger" data-act="delete-selected" ${off}>${role === 'trash' ? 'Effacer' : 'Supprimer'}</button>`;
 }
 
 // ───────────── Actions sur les messages ─────────────
@@ -716,46 +1051,77 @@ const undoAction = (saved) => ({
   },
 });
 const remember = (items) => items.map((m) => ({ m, box: m.box, prevBox: m.prevBox, trashedAt: m.trashedAt }));
+const confirmText = (n, permanent) =>
+  permanent
+    ? { title: n > 1 ? `Effacer ${n} messages ?` : 'Effacer ce message ?', message: 'Ils seront supprimés définitivement.', confirmLabel: 'Effacer' }
+    : { title: n > 1 ? `Supprimer ${n} messages ?` : 'Supprimer ce message ?', message: remoteMode() ? 'Ils iront dans la corbeille de votre compte.' : `Ils iront dans la corbeille et y resteront ${TRASH_DAYS} jours.`, confirmLabel: 'Supprimer' };
 
 /** Met à la corbeille (ou efface définitivement ce qui y est déjà). */
 async function remove(ids) {
   const items = ids.map(find).filter(Boolean);
+  if (!items.length) return false;
+  const remote = items.filter((m) => m.remote);
+  const local = items.filter((m) => !m.remote);
   const n = items.length;
-  if (!n) return false;
-  if (items.every((m) => m.box === 'trash')) {
-    const ok = await orion.ui.confirm({ title: n > 1 ? `Effacer ${n} messages ?` : 'Effacer ce message ?', message: 'Ils seront supprimés définitivement.', confirmLabel: 'Effacer' });
-    if (!ok) return false;
-    const gone = new Set(items.map((m) => m.id));
+  const permanent = remote.length ? remote.every((m) => roleOf(m.folder) === 'trash' || !roleFolder('trash')) : local.every((m) => m.box === 'trash');
+  if ((permanent || state.settings.confirmDelete) && !(await orion.ui.confirm(confirmText(n, permanent)))) return false;
+  if (remote.length) {
+    try {
+      let where = null;
+      for (const [folder, group] of byFolder(remote)) where = await mailApi.remove(state.remote.account.id, folder, group.map((m) => m.uid));
+      drop(remote);
+      invalidateOthers();
+      loadFolders();
+      snack(where ? (n > 1 ? `${n} messages mis à la corbeille` : 'Message mis à la corbeille') : n > 1 ? `${n} messages effacés` : 'Message effacé');
+    } catch (error) {
+      snack(error.message);
+      return false;
+    }
+  }
+  if (!local.length) return true;
+  if (local.every((m) => m.box === 'trash') || local.every((m) => m.box === 'drafts' && remoteMode())) {
+    const gone = new Set(local.map((m) => m.id));
     state.messages = state.messages.filter((m) => !gone.has(m.id));
     persist('messages');
-    snack(n > 1 ? `${n} messages effacés` : 'Message effacé');
+    if (!remote.length) snack(n > 1 ? `${n} messages effacés` : 'Message effacé');
     return true;
   }
-  if (state.settings.confirmDelete) {
-    const ok = await orion.ui.confirm({ title: n > 1 ? `Supprimer ${n} messages ?` : 'Supprimer ce message ?', message: `Ils iront dans la corbeille et y resteront ${TRASH_DAYS} jours.`, confirmLabel: 'Supprimer' });
-    if (!ok) return false;
-  }
-  const saved = remember(items);
+  const saved = remember(local);
   const now = Date.now();
-  for (const m of items) Object.assign(m, { prevBox: m.box, box: 'trash', trashedAt: now });
+  for (const m of local) Object.assign(m, { prevBox: m.box, box: 'trash', trashedAt: now });
   persist('messages');
   snack(n > 1 ? `${n} messages mis à la corbeille` : 'Message mis à la corbeille', undoAction(saved));
   return true;
 }
 
-/** Déplace vers une boîte ('restore' : la boîte d'avant la corbeille). */
-function move(ids, box) {
+/** Déplace vers une boîte ('restore' : la boîte d'avant la corbeille ; compte : rôle ou dossier). */
+async function move(ids, box) {
   const items = ids.map(find).filter(Boolean);
   if (!items.length) return false;
+  const n = items.length;
+  const what = n > 1 ? `${n} messages` : 'Message';
+  const where = { archive: n > 1 ? 'archivés' : 'archivé', inbox: 'remis dans Réception', restore: n > 1 ? 'restaurés' : 'restauré' }[box] || (n > 1 ? 'déplacés' : 'déplacé');
+  const remote = items.filter((m) => m.remote);
+  if (remote.length) {
+    try {
+      const target = box === 'restore' ? 'inbox' : box;
+      for (const [folder, group] of byFolder(remote)) await mailApi.move(state.remote.account.id, folder, group.map((m) => m.uid), target);
+      drop(remote);
+      invalidateOthers();
+      loadFolders();
+      snack(`${what} ${where}`);
+      return true;
+    } catch (error) {
+      snack(error.message);
+      return false;
+    }
+  }
   const saved = remember(items);
   for (const m of items) {
     m.box = box === 'restore' ? (m.prevBox && m.prevBox !== 'trash' ? m.prevBox : 'inbox') : box;
     delete m.trashedAt;
   }
   persist('messages');
-  const n = items.length;
-  const what = n > 1 ? `${n} messages` : 'Message';
-  const where = { archive: n > 1 ? 'archivés' : 'archivé', inbox: 'remis dans Réception', restore: n > 1 ? 'restaurés' : 'restauré' }[box];
   snack(`${what} ${where}`, undoAction(saved));
   return true;
 }
@@ -763,26 +1129,45 @@ function move(ids, box) {
 function swipeAction(id) {
   const m = find(id);
   if (!m) return Promise.resolve(false);
-  return swipeKind(m).label === 'Archiver' ? Promise.resolve(move([id], 'archive')) : remove([id]);
+  return swipeKind(m).label === 'Archiver' ? move([id], 'archive') : remove([id]);
 }
 
-function markRead(ids, read) {
-  for (const m of ids.map(find).filter(Boolean)) m.read = read;
-  persist('messages');
+/** Drapeaux (lu, favori, répondu) : tout de suite à l'écran, puis sur le serveur pour un compte. */
+function setFlag(ids, flag, value) {
+  const items = ids.map(find).filter(Boolean);
+  const key = flag === 'seen' ? 'read' : flag;
+  const remote = items.filter((m) => m.remote && m[key] !== value);
+  for (const m of items) m[key] = value;
+  if (items.some((m) => !m.remote)) persist('messages');
+  for (const [folder, group] of byFolder(remote)) {
+    mailApi
+      .setFlags(state.remote.account.id, folder, group.map((m) => m.uid), value ? { add: [flag] } : { remove: [flag] })
+      .then(() => {
+        if (flag === 'seen') loadFolders();
+        if (flag === 'flagged') delete state.remote.lists.flagged;
+      })
+      .catch((error) => {
+        for (const m of group) m[key] = !value;
+        snack(error.message);
+        refresh();
+      });
+  }
 }
+
+const markRead = (ids, read) => setFlag(ids, 'seen', read);
 
 // ───────────── Rédaction ─────────────
 
-const signatureBlock = () => (state.account.signature ? `\n\n${state.account.signature}` : '');
-const quoteHeader = (m) => `Le ${longDate(m.date)}, ${nameOf(m.from)} <${m.from.address}> a écrit :`;
+const signatureBlock = () => (signature() ? `\n\n${signature()}` : '');
+const quoteHeader = (m) => `Le ${dateText(m.date)}, ${nameOf(m.from)} <${m.from.address}> a écrit :`;
 const quoteLines = (text) => String(text || '').split('\n').map((line) => `> ${line}`).join('\n');
 
 function startCompose(kind = 'new', m = null) {
-  const signature = signatureBlock();
-  const draft = { id: null, kind, to: '', cc: '', subject: '', body: signature, replyTo: null, showCc: false, dirty: false };
+  const sig = signatureBlock();
+  const draft = { id: null, kind, to: '', cc: '', subject: '', body: sig, replyTo: null, showCc: false, dirty: false };
   if (m && (kind === 'reply' || kind === 'all')) {
     const mine = isMe(m.from.address);
-    const target = mine ? m.to || [] : [m.from];
+    const target = mine ? m.to || [] : m.replyTo?.length ? m.replyTo : [m.from];
     draft.to = formatAddresses(target);
     if (kind === 'all') {
       const others = [...(m.to || []), ...(m.cc || [])].filter((p) => !isMe(p.address) && !target.some((t) => same(t.address, p.address)));
@@ -790,21 +1175,24 @@ function startCompose(kind = 'new', m = null) {
       draft.showCc = others.length > 0;
     }
     draft.subject = /^re\s*:/i.test(m.subject) ? m.subject : `Re: ${m.subject || ''}`.trim();
-    draft.body = `${signature}\n\n${quoteHeader(m)}\n${quoteLines(m.body)}`;
+    draft.body = `${sig}\n\n${quoteHeader(m)}\n${quoteLines(m.body)}`;
     draft.replyTo = m.id;
   } else if (m && kind === 'forward') {
     draft.subject = /^(fwd?|tr)\s*:/i.test(m.subject) ? m.subject : `Fwd: ${m.subject || ''}`.trim();
-    draft.body = `${signature}\n\n---------- Message transféré ----------\nDe : ${formatAddresses([m.from])}\nDate : ${longDate(m.date)}\nObjet : ${m.subject || '(Sans objet)'}\nÀ : ${formatAddresses(m.to)}\n\n${m.body}`;
+    draft.body = `${sig}\n\n---------- Message transféré ----------\nDe : ${formatAddresses([m.from])}\nDate : ${longDate(m.date)}\nObjet : ${m.subject || '(Sans objet)'}\nÀ : ${formatAddresses(m.to)}\n\n${m.body}`;
   }
   draft.initial = { to: draft.to, cc: draft.cc, subject: draft.subject, body: draft.body };
   openCompose(draft);
 }
 
 function openDraft(m) {
-  openCompose({ id: m.id, kind: m.kind || 'new', to: m.rawTo ?? formatAddresses(m.to), cc: m.rawCc ?? formatAddresses(m.cc), subject: m.subject || '', body: m.body || '', replyTo: m.inReplyTo || null, showCc: Boolean(m.rawCc ?? m.cc?.length), dirty: false, initial: null });
+  openCompose({ id: m.id, kind: m.kind || 'new', to: m.rawTo ?? formatAddresses(m.to), cc: m.rawCc ?? formatAddresses(m.cc), subject: m.subject || '', body: m.body || '', replyTo: m.inReplyTo || null, reply: m.reply || null, showCc: Boolean(m.rawCc ?? m.cc?.length), dirty: false, initial: null });
 }
 
 function openCompose(draft) {
+  // Réponse à un message du serveur : son identifiant suit le brouillon (fil de discussion).
+  const original = draft.replyTo && find(draft.replyTo);
+  if (original?.remote) draft.reply = { folder: original.folder, uid: original.uid, messageId: original.messageId || '', references: original.references || '' };
   go('compose', { draft });
   const target = draft.to ? document.getElementById('c-body') : document.getElementById('c-to');
   target.focus();
@@ -830,13 +1218,13 @@ function saveDraft() {
   clearTimeout(draftTimer);
   const d = state.draft;
   if (!d || !d.dirty || (untouched(d) && !d.id)) return null;
-  let m = d.id ? find(d.id) : null;
+  let m = d.id ? state.messages.find((x) => x.id === d.id) : null;
   if (!m) {
     m = { id: newId(), read: true, flagged: false };
     d.id = m.id;
     state.messages.push(m);
   }
-  Object.assign(m, { box: 'drafts', from: me(), to: parseAddresses(d.to).list, cc: parseAddresses(d.cc).list, rawTo: d.to, rawCc: d.cc, subject: d.subject.trim(), body: d.body.slice(0, MAX_BODY), date: Date.now(), inReplyTo: d.replyTo, kind: d.kind });
+  Object.assign(m, { box: 'drafts', from: me(), to: parseAddresses(d.to).list, cc: parseAddresses(d.cc).list, rawTo: d.to, rawCc: d.cc, subject: d.subject.trim(), body: d.body.slice(0, MAX_BODY), date: Date.now(), inReplyTo: d.replyTo, reply: d.reply || null, kind: d.kind });
   persist('messages');
   return m;
 }
@@ -847,7 +1235,7 @@ function updateSend() {
   if (!d || !button) return;
   const to = parseAddresses(d.to);
   const cc = parseAddresses(d.cc);
-  button.disabled = !to.list.length || to.bad.length > 0 || cc.bad.length > 0;
+  button.disabled = d.sending || !to.list.length || to.bad.length > 0 || cc.bad.length > 0;
 }
 
 function autosize(textarea) {
@@ -868,6 +1256,7 @@ function suggest(input) {
 async function leaveCompose() {
   const d = readCompose();
   clearTimeout(draftTimer);
+  if (d.sending) return;
   if (!d.dirty || (untouched(d) && !d.id)) return closeCompose();
   const choice = await sheet({ actions: [{ label: 'Enregistrer le brouillon', value: 'save' }, { label: 'Supprimer le brouillon', value: 'delete', danger: true }] });
   if (choice === 'save') {
@@ -890,6 +1279,7 @@ function closeCompose() {
 
 async function send() {
   const d = readCompose();
+  if (d.sending) return;
   const to = parseAddresses(d.to);
   const cc = parseAddresses(d.cc);
   const bad = [...to.bad, ...cc.bad];
@@ -897,6 +1287,7 @@ async function send() {
   if (!to.list.length) return orion.ui.alert({ title: 'Aucun destinataire', message: 'Indiquez au moins une adresse dans le champ « À ».' });
   if (!d.subject.trim() && !(await orion.ui.confirm({ title: 'Message sans objet', message: 'Envoyer ce message sans objet ?', confirmLabel: 'Envoyer' }))) return;
   clearTimeout(draftTimer);
+  if (remoteMode()) return sendRemote(d, to.list, cc.list);
   const now = Date.now();
   const message = { id: d.id || newId(), box: 'sent', from: me(), to: to.list, cc: cc.list, subject: d.subject.trim(), body: d.body.slice(0, MAX_BODY), date: now, read: true, flagged: false, inReplyTo: d.replyTo || null };
   const existing = d.id ? find(d.id) : null;
@@ -919,6 +1310,45 @@ async function send() {
   snack(local.length === recipients.length ? 'Message envoyé' : 'Message enregistré dans Envoyés (sans accès à Internet)');
 }
 
+/** Envoi par le compte de l'appareil (serveur SMTP du fournisseur, via orion-server). */
+async function sendRemote(d, to, cc) {
+  d.sending = true;
+  rerender();
+  const reply = d.reply || null;
+  if (reply && !reply.messageId) {
+    // Réponse écrite avant que le message d'origine ait fini de charger : son identifiant garde le fil.
+    try {
+      const full = await mailApi.message(state.remote.account.id, reply.folder, reply.uid);
+      Object.assign(reply, { messageId: full.messageId, references: full.references });
+    } catch {
+      // Message déplacé entre-temps : la réponse part sans fil de discussion.
+    }
+  }
+  try {
+    await mailApi.send(state.remote.account.id, { to, cc, subject: d.subject.trim(), text: d.body.slice(0, MAX_BODY), inReplyTo: d.kind === 'forward' ? '' : reply?.messageId || '', references: reply?.references || '' });
+  } catch (error) {
+    d.sending = false;
+    rerender();
+    return orion.ui.alert({ title: 'Message non envoyé', message: `${error.message}\n\nLe message reste ouvert : vous pouvez réessayer.` });
+  }
+  if (reply && d.kind !== 'forward') {
+    const original = find(`r:${reply.folder}:${reply.uid}`);
+    if (original) setFlag([original.id], 'answered', true);
+    else mailApi.setFlags(state.remote.account.id, reply.folder, [reply.uid], { add: ['answered'] }).catch(() => {});
+  }
+  if (d.id) {
+    state.messages = state.messages.filter((m) => m.id !== d.id);
+    persist('messages');
+  }
+  const sent = roleFolder('sent');
+  if (sent) delete state.remote.lists[`f:${sent.id}`];
+  orion.device.vibrate(15);
+  state.draft = null;
+  back();
+  snack('Message envoyé');
+  if (to.concat(cc).some((p) => isMe(p.address))) setTimeout(() => checkMail(), 3000);
+}
+
 function autoReply(sent, at) {
   return {
     id: newId(),
@@ -935,7 +1365,7 @@ function autoReply(sent, at) {
   };
 }
 
-/** Messages arrivés (distribution différée) : affichage et notification. */
+/** Messages arrivés (distribution différée, mode sans compte) : affichage et notification. */
 function deliver() {
   const arrived = state.messages.filter((m) => m.deliverAt && m.deliverAt <= Date.now());
   if (!arrived.length) return;
@@ -955,14 +1385,12 @@ function openMessage(id, box = state.box) {
   const m = find(id);
   if (!m) return;
   if (m.box === 'drafts') return openDraft(m);
-  if (!m.read) {
-    m.read = true;
-    persist('messages');
-  }
+  if (!m.read) markRead([m.id], true);
   if (state.view === 'read') {
     Object.assign(state, { box, openId: id });
     render();
   } else go('read', { box, openId: id });
+  if (m.remote) loadFull(m);
 }
 
 // ───────────── Feuille d'actions et message temporaire ─────────────
@@ -1028,17 +1456,63 @@ const ACTIONS = {
     if (!name) return void (error.textContent = 'Indiquez votre nom.');
     if (!EMAIL.test(address)) return void (error.textContent = 'Cette adresse e-mail n\'est pas valide.');
     state.account = { name, address, signature: 'Envoyé depuis Courrier' };
-    if (!state.messages.length) state.messages = seed();
-    persist('account', 'messages');
+    if (state.mode === 'remote') leaveRemote();
+    Object.assign(state.settings, { source: 'local' });
+    if (!state.messages.some((m) => m.box !== 'drafts')) state.messages = [...state.messages, ...seed()];
+    persist('account', 'messages', 'settings');
     stack.length = 0;
     stack.push({ view: 'boxes', box: 'inbox', openId: null, scroll: 0 });
     Object.assign(state, { view: 'list', box: 'inbox' });
+    render();
+  },
+  'use-device': async (el) => {
+    el.disabled = true;
+    await connectDevice();
+    if (el.isConnected) el.disabled = false;
+  },
+  async 'switch-account'() {
+    try {
+      const accounts = await mailApi.accounts();
+      const account = accounts.length > 1 ? await pickAccount(accounts) : accounts[0];
+      if (account && account.id !== state.remote.account.id) enterRemote(account);
+      else if (accounts.length <= 1) snack('Un seul compte : ajoutez-en d\'autres dans Réglages → Comptes de messagerie');
+    } catch (error) {
+      snack(error.message);
+    }
+  },
+  'use-local'() {
+    leaveRemote();
+    if (!state.account) {
+      state.view = 'setup';
+      state.setupError = '';
+      render();
+      return;
+    }
+    stack.length = 0;
+    stack.push({ view: 'boxes', box: 'inbox', openId: null, scroll: 0 });
+    Object.assign(state, { view: 'list', box: 'inbox', query: '', unreadOnly: false });
     render();
   },
   back: () => back(),
   settings: () => go('settings'),
   box: (el) => go('list', { box: el.dataset.box, query: '', unreadOnly: false }),
   compose: () => startCompose(),
+  check: () => checkMail(),
+  reload() {
+    if (!remoteMode()) return;
+    delete state.remote.lists[state.box];
+    loadList();
+    if (state.box === `f:${state.remote.inbox}`) checkMail();
+  },
+  more: () => loadList(state.box, { more: true }),
+  'retry-full'() {
+    const m = find(state.openId);
+    if (m) {
+      delete m.loadError;
+      rerender();
+      loadFull(m);
+    }
+  },
   open(el) {
     if (!state.selecting) return openMessage(el.dataset.id);
     const id = el.dataset.id;
@@ -1063,13 +1537,12 @@ const ACTIONS = {
     markRead([...state.selected], chosen.some((m) => !m.read));
     ACTIONS.select();
   },
-  'archive-selected'() {
-    move([...state.selected], state.box === 'archive' ? 'inbox' : 'archive');
-    ACTIONS.select();
+  async 'archive-selected'() {
+    const role = remoteMode() ? boxInfo(state.box).role : state.box;
+    if (await move([...state.selected], role === 'archive' ? 'inbox' : 'archive')) ACTIONS.select();
   },
-  'restore-selected'() {
-    move([...state.selected], 'restore');
-    ACTIONS.select();
+  async 'restore-selected'() {
+    if (await move([...state.selected], 'restore')) ACTIONS.select();
   },
   async 'delete-selected'() {
     if (await remove([...state.selected])) ACTIONS.select();
@@ -1077,9 +1550,10 @@ const ACTIONS = {
   filter() {
     state.unreadOnly = !state.unreadOnly;
     fillList();
+    if (remoteMode() && state.box !== 'drafts' && !currentList()) loadList();
   },
   async 'empty-trash'() {
-    const trash = messagesIn('trash');
+    const trash = localIn('trash');
     if (!trash.length || !(await orion.ui.confirm({ title: 'Vider la corbeille ?', message: `${plural(trash.length, 'message')} seront supprimés définitivement.`, confirmLabel: 'Vider' }))) return;
     state.messages = state.messages.filter((m) => m.box !== 'trash');
     persist('messages');
@@ -1091,20 +1565,20 @@ const ACTIONS = {
   next: () => step(1),
   flag() {
     const m = find(state.openId);
-    m.flagged = !m.flagged;
-    persist('messages');
+    setFlag([m.id], 'flagged', !m.flagged);
     rerender();
   },
   unread() {
     markRead([state.openId], false);
     back();
   },
-  archive() {
+  async archive() {
     const m = find(state.openId);
-    if (move([m.id], m.box === 'archive' ? 'inbox' : 'archive')) back();
+    const role = m.remote ? roleOf(m.folder) : m.box;
+    if (await move([m.id], role === 'archive' ? 'inbox' : 'archive')) back();
   },
-  restore() {
-    if (move([state.openId], 'restore')) back();
+  async restore() {
+    if (await move([state.openId], 'restore')) back();
   },
   async delete() {
     if (await remove([state.openId])) back();
@@ -1115,7 +1589,9 @@ const ACTIONS = {
     const actions = [{ label: 'Répondre', value: 'reply' }];
     if (others.length > (isMe(m.from.address) ? 1 : 0)) actions.push({ label: 'Répondre à tous', value: 'all' });
     actions.push({ label: 'Transférer', value: 'forward' });
+    if (m.remote) actions.push({ label: 'Déplacer vers…', value: 'move' });
     const kind = await sheet({ title: m.subject || '(Sans objet)', actions });
+    if (kind === 'move') return moveTo(m);
     if (kind) startCompose(kind, m);
   },
   'cancel-compose': () => leaveCompose(),
@@ -1144,15 +1620,23 @@ const ACTIONS = {
     rerender();
   },
   async reset() {
-    const ok = await orion.ui.confirm({ title: 'Réinitialiser Courrier ?', message: 'Tous les messages, brouillons et réglages de Courrier seront effacés de cet appareil.', confirmLabel: 'Réinitialiser' });
+    const ok = await orion.ui.confirm({ title: 'Réinitialiser Courrier ?', message: 'Les brouillons, les messages gardés par l\'app et les réglages de Courrier seront effacés de cet appareil. Vos comptes de messagerie et leurs e-mails ne sont pas touchés.', confirmLabel: 'Réinitialiser' });
     if (!ok) return;
+    clearInterval(checkTimer);
     await saving;
     await orion.storage.clear();
-    Object.assign(state, { account: null, messages: [], settings: { lines: 2, swipe: 'trash', confirmDelete: false }, view: 'setup', box: 'inbox', query: '', unreadOnly: false });
+    Object.assign(state, { mode: 'local', remote: null, account: null, messages: [], settings: { ...DEFAULT_SETTINGS }, view: 'setup', box: 'inbox', query: '', unreadOnly: false, setupError: '' });
     stack.length = 0;
     render();
   },
 };
+
+/** Choix du dossier de destination (compte de l'appareil). */
+async function moveTo(m) {
+  const targets = state.remote.folders.filter((f) => f.id !== m.folder);
+  const id = await sheet({ title: 'Déplacer vers', actions: targets.map((f) => ({ label: f.role === 'drafts' ? 'Brouillons du serveur' : f.name, value: f.id })) });
+  if (id && (await move([m.id], id))) back();
+}
 
 function step(delta) {
   const list = visibleList();
@@ -1215,10 +1699,16 @@ $app.addEventListener('click', (event) => {
   ACTIONS[el.dataset.act]?.(el, event);
 });
 
+let searchTimer = 0;
 $app.addEventListener('input', (event) => {
   const t = event.target;
   if (t.id === 'search') {
     state.query = t.value;
+    if (remoteMode() && state.box !== 'drafts') {
+      // Recherche faite par le serveur : lancée quand la saisie s'arrête.
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadList(), 450);
+    }
     fillList();
   } else if (state.view === 'compose' && state.draft) {
     readCompose();
@@ -1242,6 +1732,12 @@ $app.addEventListener('focusout', (event) => {
 // Réglages : enregistrés quand le champ est quitté.
 $app.addEventListener('change', (event) => {
   const t = event.target;
+  if (t.id === 's-confirm') {
+    state.settings.confirmDelete = t.checked;
+    return void persist('settings');
+  }
+  if (!['s-name', 's-address', 's-signature'].includes(t.id)) return;
+  state.account ??= { name: identity().name, address: identity().address, signature: signature() };
   if (t.id === 's-name') {
     const name = t.value.trim();
     if (name) state.account.name = name;
@@ -1253,17 +1749,13 @@ $app.addEventListener('change', (event) => {
       t.value = state.account.address;
       return void snack('Cette adresse e-mail n\'est pas valide');
     }
-  } else if (t.id === 's-signature') state.account.signature = t.value.trim();
-  else if (t.id === 's-confirm') {
-    state.settings.confirmDelete = t.checked;
-    return void persist('settings');
-  } else return;
+  } else state.account.signature = t.value.trim();
   persist('account');
 });
 
 $app.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter') return;
-  if (state.view === 'setup') ACTIONS.setup();
+  if (state.view === 'setup' && event.target.closest('.group')) ACTIONS.setup();
   else if (state.view === 'compose' && (event.ctrlKey || event.metaKey) && !document.getElementById('send-btn').disabled) send();
 });
 
@@ -1284,23 +1776,33 @@ orion.on('pause', () => {
 orion.on('resume', () => {
   paused = false;
   deliver();
+  if (remoteMode()) checkMail();
   refresh();
 });
 
 // ───────────── Démarrage ─────────────
 
 async function start() {
-  const [account, settings, messages] = await Promise.all([orion.storage.get('account'), orion.storage.get('settings'), orion.storage.get('messages')]);
+  const [account, settings, messages, status] = await Promise.all([
+    orion.storage.get('account'),
+    orion.storage.get('settings'),
+    orion.storage.get('messages'),
+    mailApi ? mailApi.status().catch(() => null) : null,
+  ]);
   state.account = account || null;
   Object.assign(state.settings, settings || {});
   state.messages = Array.isArray(messages) ? messages : [];
+  state.status = status || { available: false, permission: 'denied' };
   if (purgeTrash()) persist('messages');
+  setInterval(deliver, 1000);
+  // Compte de l'appareil choisi la dernière fois : rouvert directement (sans redemander si refusé).
+  if (state.settings.source === 'device' && state.status.available && state.status.permission !== 'denied' && (await connectDevice({ quiet: true }))) return;
   if (state.account) {
+    if (state.settings.source === 'device') snack(state.setupError || 'Compte de l\'appareil indisponible : Courrier s\'ouvre sans compte');
     stack.push({ view: 'boxes', box: 'inbox', openId: null, scroll: 0 });
     state.view = 'list';
   } else state.view = 'setup';
   render();
-  setInterval(deliver, 1000);
 }
 
 start().catch((error) => {

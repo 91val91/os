@@ -4,7 +4,7 @@
 import { h } from '../../lib/dom.js';
 import { icon } from '../../lib/icons.js';
 import { formatBytes, formatDuration, relativeTime } from '../../lib/format.js';
-import { navStack, page, listGroup, listItem, toggle, slider, segmented, avatar, button, spinner } from '../../lib/ui.js';
+import { navStack, page, listGroup, listItem, toggle, slider, segmented, avatar, button, spinner, field } from '../../lib/ui.js';
 import { PERMISSIONS } from '../../kernel/permissions.js';
 import { createPasscode } from '../../kernel/settings.js';
 import { displayName } from '../../kernel/contacts.js';
@@ -98,6 +98,7 @@ export function mount(root, ctx) {
               className: 'settings-profile',
             }),
             accounts ? row({ icon: 'users', iconColor: '#8e8e93', title: 'Utilisateurs', detail: String(accounts.list().length), chevron: true, onClick: usersPage }) : null,
+            row({ icon: 'mail', iconColor: '#0a84ff', title: 'Comptes de messagerie', chevron: true, onClick: mailPage }),
           ].filter(Boolean),
         }),
         // Comme sur iOS : une mise à jour disponible est proposée en tête des Réglages.
@@ -152,6 +153,190 @@ export function mount(root, ctx) {
     p.onShow = () => view.run();
     view.run();
     return p;
+  }
+
+  // ───────────── Comptes de messagerie ─────────────
+
+  const SECURITY_OPTIONS = [{ label: 'SSL/TLS', value: 'ssl' }, { label: 'STARTTLS', value: 'starttls' }];
+  const securityLabel = (value) => ({ ssl: 'SSL/TLS', starttls: 'STARTTLS', none: 'sans chiffrement (local)' })[value] ?? value;
+  const serverText = (server) => `${server.host}:${server.port} · ${securityLabel(server.security)}`;
+
+  /** Comptes e-mail (IMAP/SMTP) relevés par orion-server ; les apps y accèdent avec l'autorisation « E-mails ». */
+  function mailPage() {
+    let list = null;
+    let error = null;
+    let loading = false;
+    let stale = true;
+    const load = async (refresh) => {
+      loading = true;
+      stale = false;
+      try {
+        list = await k.mail.accounts({ refresh: true });
+        error = null;
+      } catch (e) {
+        error = e.message;
+      }
+      loading = false;
+      refresh();
+    };
+    const p = open('Messagerie', (refresh) => {
+      if (!k.mail.available) {
+        return listGroup({
+          items: [row({ icon: 'mail', iconColor: '#8e8e93', title: 'Indisponible sur cet appareil', subtitle: 'Demande Orion installé (ordinateur ou machine virtuelle)' })],
+          footer: 'Un navigateur ne peut pas se connecter à un serveur de messagerie : sur Orion installé, c\'est orion-server qui relève et envoie le courrier (IMAP et SMTP). Ici, les apps d\'e-mail fonctionnent sans compte, sur l\'appareil.',
+        });
+      }
+      if (stale && !loading) load(refresh);
+      const items = list
+        ? list.map((a) =>
+            row({
+              leading: avatar(a.name || a.address, { size: 40, color: '#0a84ff' }),
+              title: a.name || a.address,
+              subtitle: a.name ? a.address : a.imap.host,
+              chevron: true,
+              onClick: () => mailAccountPage(a, () => (stale = true)),
+            }),
+          )
+        : [h('div.list-item.mail-loading', spinner(22), h('span', 'Chargement des comptes…'))];
+      return [
+        error ? listGroup({ items: [row({ icon: 'info', iconColor: '#ff3b30', title: 'orion-server injoignable', subtitle: error })] }) : null,
+        listGroup({
+          header: 'Comptes',
+          items: [...(list?.length === 0 ? [row({ title: 'Aucun compte', subtitle: 'Ajoutez votre adresse e-mail pour la relever dans les apps d\'e-mail' })] : items), row({ icon: 'plus', iconColor: '#30d158', title: 'Ajouter un compte', onClick: () => addMailAccountPage(() => (stale = true)) })],
+          footer: `Le mot de passe est gardé par orion-server sur cet appareil, dans un fichier réservé au service ; il n'est jamais montré aux apps. Une app d'e-mail du Store doit obtenir l'autorisation « E-mails » (Réglages → Applications).${k.mail.simulated ? ' Messagerie simulée (orion-server --simulate) : tout mot de passe est accepté, sauf « faux ».' : ''}`,
+        }),
+      ];
+    });
+    const show = p.onShow;
+    p.onShow = () => {
+      if (!loading) stale = true;
+      show();
+    };
+  }
+
+  function mailAccountPage(a, onChange) {
+    open(a.address, () => [
+      listGroup({
+        header: 'Compte',
+        items: [row({ title: 'Nom affiché', detail: a.name || '—' }), row({ title: 'Adresse', detail: a.address }), row({ title: 'Identifiant', detail: a.username })],
+      }),
+      listGroup({ header: 'Réception (IMAP)', items: [row({ title: serverText(a.imap) })] }),
+      listGroup({
+        header: 'Envoi (SMTP)',
+        items: [row({ title: serverText(a.smtp) }), row({ title: 'Copie dans « Envoyés »', detail: a.saveSent ? 'Par Orion' : 'Par le fournisseur' })],
+      }),
+      listGroup({
+        items: [
+          row({
+            title: 'Supprimer le compte',
+            destructive: true,
+            onClick: async () => {
+              if (!(await ctx.ui.confirm({ title: `Supprimer ${a.address} ?`, message: 'Le compte et son mot de passe sont retirés de cet appareil. Vos e-mails restent chez votre fournisseur.', confirmLabel: 'Supprimer', destructive: true }))) return;
+              try {
+                await k.mail.removeAccount(a.id);
+                onChange();
+                ctx.ui.toast('Compte supprimé');
+                nav.pop();
+              } catch (e) {
+                ctx.ui.alert({ title: 'Suppression impossible', message: e.message });
+              }
+            },
+          }),
+        ],
+      }),
+    ], { back: 'Messagerie' });
+  }
+
+  function addMailAccountPage(onAdded) {
+    const name = field({ label: 'Nom affiché', value: me().name || '', placeholder: 'Camille Martin' });
+    const address = field({ label: 'Adresse e-mail', type: 'email', placeholder: 'vous@exemple.fr', inputmode: 'email' });
+    const password = field({ label: 'Mot de passe', type: 'password', placeholder: 'Mot de passe (ou mot de passe d\'application)' });
+    const username = field({ label: 'Identifiant', placeholder: 'Par défaut : l\'adresse e-mail' });
+    const server = (label, port, security) => {
+      const host = field({ label: 'Serveur', placeholder: `${label}.exemple.fr` });
+      const portField = field({ label: 'Port', value: String(port), inputmode: 'numeric' });
+      const sec = segmented(SECURITY_OPTIONS, security);
+      return { host, port: portField, sec, view: h('div.list-item.mail-form', host, portField, h('div.mail-security', h('span.field-label', 'Sécurité'), sec)) };
+    };
+    const imap = server('imap', 993, 'ssl');
+    const smtp = server('smtp', 465, 'ssl');
+    const saveSent = toggle(true, null, { label: 'Copie dans Envoyés' });
+    const note = h('p.mail-note');
+    const status = h('p.mail-status');
+    let detectedFor = '';
+    for (const input of [address.input, password.input, username.input, imap.host.input, smtp.host.input]) {
+      input.autocapitalize = 'off';
+      input.spellcheck = false;
+    }
+    password.input.autocomplete = 'new-password';
+
+    const fill = (config) => {
+      username.input.value = config.username === address.input.value.trim() ? '' : config.username;
+      for (const [part, spec] of [[imap, config.imap], [smtp, config.smtp]]) {
+        part.host.input.value = spec.host;
+        part.port.input.value = String(spec.port);
+        part.sec.set(spec.security === 'starttls' ? 'starttls' : 'ssl');
+      }
+      saveSent.set(config.saveSent);
+      const origin = { known: 'Réglages connus pour ce fournisseur.', ispdb: 'Réglages trouvés dans la base de Thunderbird.', guess: 'Réglages devinés : vérifiez-les auprès de votre fournisseur.' }[config.source] ?? '';
+      note.textContent = [origin, config.note].filter(Boolean).join(' ');
+    };
+    async function detect() {
+      const value = address.input.value.trim();
+      if (!EMAIL.test(value) || value === detectedFor) return;
+      detectedFor = value;
+      try {
+        fill(await k.mail.autoconfig(value));
+      } catch (e) {
+        note.textContent = e.message;
+      }
+    }
+    address.input.addEventListener('change', detect);
+
+    const submit = button('Ajouter le compte', { block: true, onClick: () => add() });
+    async function add() {
+      status.className = 'mail-status';
+      status.textContent = '';
+      const mail = address.input.value.trim();
+      if (!EMAIL.test(mail)) return fail('Adresse e-mail invalide.');
+      if (!password.input.value) return fail('Indiquez le mot de passe.');
+      await detect();
+      const spec = (part) => ({ host: part.host.input.value.trim().toLowerCase(), port: Number(part.port.input.value), security: part.sec.value });
+      if (!imap.host.input.value.trim() || !smtp.host.input.value.trim()) return fail('Indiquez les serveurs de réception et d\'envoi.');
+      submit.disabled = true;
+      status.replaceChildren(spinner(18), h('span', 'Connexion aux serveurs de messagerie…'));
+      try {
+        const account = await k.mail.addAccount({ name: name.input.value.trim(), address: mail, username: username.input.value.trim(), password: password.input.value, imap: spec(imap), smtp: spec(smtp), saveSent: saveSent.input.checked });
+        password.input.value = '';
+        onAdded();
+        ctx.ui.toast(`${account.address} ajouté`);
+        nav.pop();
+      } catch (e) {
+        fail(e.message);
+      } finally {
+        submit.disabled = false;
+      }
+    }
+    function fail(message) {
+      status.className = 'mail-status error';
+      status.textContent = message;
+    }
+
+    const content = h(
+      'div',
+      listGroup({ header: 'Compte', items: [h('div.list-item.mail-form', name, address, password)] }),
+      note,
+      listGroup({ header: 'Réception (IMAP)', items: [imap.view] }),
+      listGroup({ header: 'Envoi (SMTP)', items: [smtp.view, h('div.list-item.mail-form', username)] }),
+      listGroup({
+        items: [row({ title: 'Copie dans « Envoyés »', subtitle: 'À désactiver si le fournisseur la fait déjà (Gmail, Outlook)', trailing: saveSent })],
+        footer: 'Les serveurs sont remplis d\'après l\'adresse. La connexion est toujours chiffrée et le certificat du serveur vérifié. Orion se connecte aux deux serveurs avant d\'enregistrer le compte.',
+      }),
+      status,
+      submit,
+    );
+    content.className = 'mail-add';
+    nav.push(page({ title: 'Nouveau compte', large: false, back: { label: 'Messagerie', onClick: () => nav.pop() }, content }));
   }
 
   // ───────────── Compte et utilisateurs ─────────────
@@ -1702,7 +1887,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, cellular: cellularPage, location: locationPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, protection: protectionPage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, cellular: cellularPage, location: locationPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, protection: protectionPage, mail: mailPage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;

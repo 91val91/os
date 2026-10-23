@@ -16,6 +16,7 @@
  *     ├─ network         connexion réelle, Wi‑Fi (NetworkManager), mode avion
  *     ├─ bluetooth       BlueZ ou Web Bluetooth
  *     ├─ location        GPS (gpsd) ou géolocalisation du navigateur
+ *     ├─ mail            comptes e-mail IMAP/SMTP (relevés et envoyés par orion-server)
  *     ├─ telephony       appels et SMS : modem, apps du téléphone ou simulation
  *     └─ device          HAL : batterie, vibreur, informations
  */
@@ -38,6 +39,7 @@ import { HardwareBridge } from './bridge.js';
 import { NetworkService } from './network.js';
 import { BluetoothService } from './bluetooth.js';
 import { LocationService } from './location.js';
+import { MailService } from './mail.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
 import { RELEASE, versionLabel } from './version.js';
@@ -124,6 +126,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const network = new NetworkService({ events, settings, env, bridge, log, timers }).init();
   const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
   const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
+  const mail = new MailService({ bridge, events, log, account: () => accountId });
 
   const contacts = new ContactsProvider({ fs, events }).load();
   const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);
@@ -191,6 +194,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     network,
     bluetooth,
     location,
+    mail,
     telephony,
     device,
     /** Efface toutes les données (réinitialisation d'usine). */

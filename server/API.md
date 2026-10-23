@@ -1,6 +1,6 @@
 # Contrat de l'API matérielle d'Orion (orion-server)
 
-Servie par `orion-server` ([`orion_server.py`](orion_server.py), Python ≥ 3.11, bibliothèque standard uniquement) sur la même origine qu'Orion (http://127.0.0.1:8080), préfixe `/api/`.
+Servie par `orion-server` ([`orion_server.py`](orion_server.py) et, pour la messagerie, [`orion_mail.py`](orion_mail.py) ; Python ≥ 3.11, bibliothèque standard uniquement) sur la même origine qu'Orion (http://127.0.0.1:8080), préfixe `/api/`.
 Toutes les réponses sont du JSON (`Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store`).
 Erreurs : statut HTTP 4xx/5xx et corps `{ "error": "message en français" }`.
 
@@ -10,7 +10,7 @@ python3 server/orion_server.py                          # vrai matériel (machin
 python3 -m unittest discover -s server -v               # tests
 ```
 
-Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racine du dépôt ; sur une machine Orion `/var/lib/orion/current`), `--host` (défaut `127.0.0.1`), `--port` (défaut `8080`), `--simulate`, `--allow-host NOM` (nom d'hôte supplémentaire accepté dans `Host`, à n'utiliser qu'avec `--host`), `--state DOSSIER` (données gardées par le serveur, dont la protection de l'appareil : défaut `/var/lib/orion`, en mémoire avec `--simulate`).
+Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racine du dépôt ; sur une machine Orion `/var/lib/orion/current`), `--host` (défaut `127.0.0.1`), `--port` (défaut `8080`), `--simulate`, `--allow-host NOM` (nom d'hôte supplémentaire accepté dans `Host`, à n'utiliser qu'avec `--host`), `--state DOSSIER` (données gardées par le serveur : protection de l'appareil, comptes de messagerie ; défaut `/var/lib/orion`, en mémoire avec `--simulate`).
 
 ## Sécurité
 
@@ -20,7 +20,7 @@ Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racin
   que le serveur refuse : aucun site tiers ne peut piloter le matériel), sinon 403 ;
 - aucun en-tête CORS n'est jamais envoyé ; `OPTIONS` (pré-vol), `PUT`, `DELETE`… → 405 ;
 - en plus : un en-tête `Origin` différent de `http://<Host>` ou un `Sec-Fetch-Site` autre que `same-origin`/`none` → 403 `Origine refusée` sur `/api/` (une page d'un autre port de 127.0.0.1 est donc refusée elle aussi) ;
-- corps limité à 64 Kio (413), JSON invalide ou non objet → 400, `Transfer-Encoding` refusé (411) ;
+- corps limité à 256 Kio (413 ; la taille d'un e-mail envoyé), JSON invalide ou non objet → 400, `Transfer-Encoding` refusé (411) ;
 - les outils système sont lancés avec une liste d'arguments (jamais de shell), avec délai maximal ; adresses MAC, numéros, identifiants, SSID, APN et code PIN sont validés strictement ;
 - toute réponse porte `X-Content-Type-Options: nosniff` et `Cross-Origin-Resource-Policy: same-origin`.
 
@@ -32,7 +32,7 @@ Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racin
 ```json
 { "bridge": "orion-server", "version": "1.0.0", "hostname": "orion", "simulated": false,
   "capabilities": { "wifi": true, "bluetooth": true, "modem": false, "gps": false, "power": true, "network": true,
-                    "protection": true, "integrity": true } }
+                    "protection": true, "integrity": true, "mail": true } }
 ```
 Une capacité est vraie si l'outil correspondant est présent et répond :
 - `wifi` : nmcli présent, NetworkManager actif et au moins une carte Wi‑Fi ;
@@ -41,7 +41,7 @@ Une capacité est vraie si l'outil correspondant est présent et répond :
 - `gps` : gpsd joignable sur 127.0.0.1:2947 **et** au moins un récepteur branché ;
 - `power` : systemctl présent ;
 - `network` *(ajout)* : NetworkManager utilisable (actif), même sans Wi‑Fi (machine virtuelle, câble) ;
-- `protection` et `integrity` *(ajout)* : toujours vrais (voir plus bas).
+- `protection`, `integrity` et `mail` *(ajout)* : toujours vrais (voir plus bas).
 
 Résultat gardé 5 s. *(Ajout)* `simulated` vaut `true` avec `--simulate`.
 
@@ -143,6 +143,30 @@ Compare les fichiers de l'interface servie (`--root`) à `version.json` (taille 
 ```
 `status` : `ok` ou `altered` (100 chemins au plus par liste). 500 si `version.json` est illisible.
 
+## Messagerie *(ajout)*
+
+Un navigateur ne peut pas ouvrir de connexion IMAP ou SMTP : orion-server relève et envoie le courrier des comptes que l'utilisateur ajoute dans **Réglages → Comptes de messagerie** ([`orion_mail.py`](orion_mail.py) : `imaplib`, `smtplib`, `email`).
+
+- **Identifiants** : gardés dans `--state`/`mail.json` (droits 0600, lisible seulement par l'utilisateur du service et root), comme le ferait un logiciel de messagerie sans mot de passe principal. **Le mot de passe n'est jamais renvoyé.** Un compte n'est enregistré qu'après une connexion réussie aux deux serveurs.
+- **Chiffrement** : `ssl` (TLS dès la connexion, ports 993/465) ou `starttls` (143/587) ; certificats et nom du serveur toujours vérifiés. `none` (sans chiffrement) n'est accepté que pour un serveur sur la machine (127.0.0.1, `::1`, `localhost` : passerelle locale comme Proton Mail Bridge, dont le certificat auto-signé est alors accepté).
+- **Lecture** : `BODY.PEEK` (lire ne marque pas comme lu : c'est l'interface qui le demande) ; le texte est extrait de la partie `text/plain`, sinon le HTML est **converti en texte** (scripts, styles et images retirés, adresse des liens ajoutée) : aucun HTML n'est renvoyé à l'interface. Pièces jointes : nom, type et taille (pas encore de téléchargement). 25 Mo au plus par message.
+- **Connexion IMAP** gardée par compte (90 s après la dernière requête) et vérifiée par `NOOP` avant d'être réutilisée ; une requête à la fois par compte.
+- Identifiants accentués : `AUTHENTICATE PLAIN` / `AUTH PLAIN` en UTF-8.
+
+Les comptes portent un `owner` (identifiant du compte Orion qui l'a ajouté) : l'interface ne montre à chaque utilisateur d'Orion que ses comptes (les comptes sans `owner`, à tous).
+
+- `GET /api/mail?owner=<id>` → `{ "available": true, "simulated": false, "accounts": [ { "id": "3f9c…", "owner": "<id>", "name": "Camille Martin", "address": "camille@free.fr", "username": "camille@free.fr", "imap": { "host": "imap.free.fr", "port": 993, "security": "ssl" }, "smtp": { "host": "smtp.free.fr", "port": 465, "security": "ssl" }, "saveSent": true, "createdAt": 1792749951916 } ] }` ;
+- `POST /api/mail/autoconfig` `{ "address": "camille@free.fr" }` → `{ "source": "known", "username": "…", "imap": {…}, "smtp": {…}, "saveSent": true, "note": "" }` : fournisseurs courants (`known` : Gmail, Outlook/Hotmail, Yahoo, iCloud, Orange, Free, SFR, La Poste, Fastmail), sinon la base de Thunderbird (`ispdb`, `autoconfig.thunderbird.net`), sinon `imap.`/`smtp.<domaine>` (`guess`). `note` : conseil (mot de passe d'application de Gmail, d'iCloud…) ;
+- `POST /api/mail/accounts/add` `{ "owner", "name", "address", "username" (défaut : l'adresse), "password", "imap": { "host", "port", "security" }, "smtp": {…}, "saveSent": true }` → le compte (sans mot de passe) ; 401 identifiants refusés (avec un conseil pour Gmail, iCloud…), 502/504 serveur introuvable, injoignable, certificat invalide, 409 compte déjà ajouté ;
+- `POST /api/mail/accounts/remove` `{ "id" }` → `{ "ok": true }` ;
+- `GET /api/mail/folders?account=<id>` → `{ "folders": [ { "id": "INBOX", "name": "Réception", "role": "inbox", "unread": 3, "total": 120 }, { "id": "Sent", "name": "Envoyés", "role": "sent", … }, { "id": "Reçus/Factures", "name": "Reçus › Factures", "role": null, "unread": null, "total": null } ] }` : `id` = nom IMAP (décodé de l'UTF-7 modifié), `role` ∈ `inbox` `sent` `drafts` `trash` `junk` `archive` `all` (attributs RFC 6154, sinon reconnu au nom : « Sent », « Éléments envoyés », « Corbeille »…), compteurs pour Réception et les dossiers à rôle ; les dossiers `\Noselect` sont omis ;
+- `GET /api/mail/messages?account=&folder=&limit=40&before=<uid>&q=<texte>&filter=unread|flagged` → `{ "messages": [ { "uid": 42, "from": { "name", "address" }, "to": […], "cc": […], "subject", "date": <ms>, "seen", "flagged", "answered", "size", "attachments": <booléen>, "preview": "…" } ], "more": true, "uidValidity": 7 }` : du plus récent au plus ancien, `before` pour la page suivante, `q` : recherche `TEXT` du serveur (UTF-8), 100 messages au plus par page ;
+- `GET /api/mail/message?account=&folder=&uid=` → résumé + `"text"`, `"html"` (le texte venait du HTML), `"truncated"`, `"attachments": [ { "name", "type", "size" } ]`, `"replyTo"`, `"messageId"`, `"references"` ; 404 si le message a été déplacé ;
+- `POST /api/mail/flags` `{ "account", "folder", "uids": [42], "add": ["seen"], "remove": ["flagged"] }` (drapeaux `seen`, `flagged`, `answered`) ;
+- `POST /api/mail/move` `{ "account", "folder", "uids", "to": "archive" | "<dossier>" }` → `{ "ok": true, "folder": "Archive" }` (`UID MOVE`, sinon `COPY` + `\Deleted` + `EXPUNGE`) ;
+- `POST /api/mail/delete` `{ "account", "folder", "uids" }` → vers la corbeille (`"folder": "Trash"`) ; définitivement (`"folder": null`) si le message y est déjà ou sans corbeille ;
+- `POST /api/mail/send` `{ "account", "to": [ { "name", "address" } | "adresse" ], "cc", "bcc", "subject", "text", "inReplyTo": "<id@…>", "references": "…" }` → `{ "ok": true, "messageId": "<…>", "refused": [], "savedTo": "Sent" }` : texte brut UTF-8, `Bcc` jamais transmis aux destinataires, en-têtes nettoyés (pas de retour à la ligne dans l'objet), 100 destinataires et 100 000 caractères au plus ; copie dans « Envoyés » si `saveSent` (Gmail et Outlook la font eux-mêmes : désactivée par défaut). 400 destinataire refusé par le serveur.
+
 ## Mode simulé (`--simulate`)
 
 Tout le matériel est imité en mémoire, avec un état qui évolue, pour développer l'interface dans un navigateur ordinaire :
@@ -152,11 +176,13 @@ Tout le matériel est imité en mémoire, avec un état qui évolue, pour dével
 - **GPS** : promenade à pied (1,4 m/s) sur un cercle de 220 m autour de l'île de la Cité à Paris, 8 à 11 satellites, précision 3 à 7 m.
 - **Réseau** (`/api/network`) : `wifi` si le Wi‑Fi simulé est connecté, sinon `gsm` si les données mobiles sont actives, sinon `{ "connectivity": "none", "primary": null }`.
 - **Alimentation** : la demande est seulement écrite dans le journal.
+- **Messagerie** : tout mot de passe est accepté sauf `faux` (401), un serveur `introuvable.…` donne 502 ; chaque compte a ses dossiers en mémoire (Réception, Envoyés, Brouillons, Corbeille, Indésirables, Archives, Factures) et quelques messages, dont un en HTML ; un message envoyé va dans Envoyés, et dans Réception s'il vous est adressé. Rien ne part sur Internet (l'autoconfiguration n'interroge pas Thunderbird).
 - `/api/status` indique `"simulated": true`.
 
 Points d'accès de test, **uniquement avec `--simulate`** (404 sinon) :
 - `POST /api/simulate/incoming-call` `{ "number": "+33…" }` → `{ "ok": true, "id": "4" }` : un appel entrant sonne (`ringing`, manqué au bout de 30 s) ;
-- `POST /api/simulate/incoming-sms` `{ "number": "+33…", "text": "…" }` → `{ "ok": true }` : un SMS est reçu.
+- `POST /api/simulate/incoming-sms` `{ "number": "+33…", "text": "…" }` → `{ "ok": true }` : un SMS est reçu ;
+- `POST /api/simulate/incoming-mail` `{ "account" (défaut : le premier), "from": "lucas@exemple.fr", "name": "Lucas", "subject": "…", "text": "…" }` → `{ "ok": true, "uid": 9 }` : un e-mail arrive dans Réception.
 
 ## Mises à jour d'une machine installée (`sync`)
 

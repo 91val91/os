@@ -9,6 +9,7 @@ export const PERMISSIONS = {
   microphone: { label: 'Microphone', icon: 'mic', reason: 'enregistrer du son' },
   location: { label: 'Localisation', icon: 'location', reason: 'connaître votre position' },
   contacts: { label: 'Contacts', icon: 'user', reason: 'accéder à vos contacts' },
+  mail: { label: 'E-mails', icon: 'mail', reason: 'lire, classer et envoyer vos e-mails (comptes ajoutés dans les Réglages)' },
 };
 
 export class PermissionService {

@@ -8,13 +8,14 @@
  "notes": [
   "Orion OS passe en 0.1 (alpha) : la numérotation repart de zéro jusqu'à la première version stable. Vos données, comptes et réglages sont conservés.",
   "Programme développeur du Store : publiez vos propres apps, gratuites ou payantes, et suivez vos ventes dans la console développeur (Store → Compte).",
-  "Exemple pour les développeurs : Courrier, une app d'e-mail complète (boîtes, brouillons, recherche, balayage), à charger dans la console avec « Modèles » puis à publier.",
+  "Nouveau : messagerie sur Orion installé. Ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie (configuration automatique, connexion chiffrée) ; orion-server les relève et envoie le courrier.",
+  "Exemple pour les développeurs : Courrier, une app d'e-mail complète qui utilise vos comptes (autorisation « E-mails ») ou fonctionne sans compte, à charger dans la console avec « Modèles » puis à publier.",
   "Le Store affiche les apps des développeurs, avec achat, reçus et remboursement (paiements fictifs pendant l'alpha : solde de test) ; les apps publiées s'exécutent isolées du système, sans accès à Internet.",
   "Nouveau : Protection de l'appareil — bilan de sécurité, vérification de l'intégrité du système, analyse des apps, protection contre la réinitialisation, effacement après trop d'échecs du code et verrouillage en cas de vol.",
   "Les erreurs de code de verrouillage sont comptées même après un redémarrage ; achats et réglages sensibles demandent le code.",
   "Image installable : orion-server garde la protection contre la réinitialisation et vérifie les fichiers servis ; le mode sans échec démarre aussi Orion."
  ],
- "size": 1373062,
+ "size": 1425001,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -181,12 +182,12 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "8ad09c77d8c1bc15e995b25fcc7d8a88c61c44fde1c2fb628adb2e3e82e29131",
-   "size": 92346
+   "hash": "69002883123dd168dd109f4cad9b3607d9a82b78c16fc2699b59166e63fed716",
+   "size": 101845
   },
   "./src/apps/settings/style.css": {
-   "hash": "1aa69d3ff97ca0773b53a8a68121f813a8dfccc84b6d492d3b14d3f33dbfb4c8",
-   "size": 9183
+   "hash": "2bdf749e1c805f2b6a707fb04b338fbd59aa8603b4b592135212bdd60d95565a",
+   "size": 9963
   },
   "./src/apps/snake/index.js": {
    "hash": "b3fb224253a05a9a97646c80f7a2e3f925dd83953fa78cf2ea3a52022edde337",
@@ -197,12 +198,12 @@
    "size": 1368
   },
   "./src/apps/store/console.js": {
-   "hash": "b91a7607ed543e30da32a31b0fd2444f115510c5839e62545197bae994f96a0e",
-   "size": 20875
+   "hash": "d92025ea442c8475ca3e9643649931c26080112d8a891ea3882cd47461932dfd",
+   "size": 22218
   },
   "./src/apps/store/examples/courrier.html": {
-   "hash": "211848f59c0151505dbeeba02af03efae3021449546d33404edf17043355f0cb",
-   "size": 66126
+   "hash": "c43abcabe913c92b122731cb7830545e2b0fe47b0300958feef61eb8c69204a0",
+   "size": 94430
   },
   "./src/apps/store/index.js": {
    "hash": "b791da9e04fb795c3e1ff59693d5f006217a043f28786f28476fced42a824629",
@@ -269,8 +270,8 @@
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "d47562289a30e063ba65a0c8db2b5c798e3059bedac90be5df991f0197b53ce0",
-   "size": 9551
+   "hash": "623d71327bf409a00fb1a8407c877a1a300b1112b4a79a1203df6cc75f00e4b7",
+   "size": 9780
   },
   "./src/kernel/location.js": {
    "hash": "abcca202a3bb8459dd36456b469ebf2cfbbc8c54e791fc680ae64b8d6114e730",
@@ -279,6 +280,10 @@
   "./src/kernel/log.js": {
    "hash": "e4944db860b8fd5be6a1c7eb729f6894d2f825d42c1ec6bd6e7b6a1fb20dd4c9",
    "size": 1630
+  },
+  "./src/kernel/mail.js": {
+   "hash": "7978eb1d0e7b3dedd9f1d22a1b0c5cbd6256c76fdbaa8ab4724a5d8f2ae6a405",
+   "size": 6382
   },
   "./src/kernel/media.js": {
    "hash": "f50db07a450900ffc7f16241797bbfae88139da388ffcfaf6060975304dfa20c",
@@ -297,8 +302,8 @@
    "size": 3740
   },
   "./src/kernel/permissions.js": {
-   "hash": "4e2da9e4ac8e4d88e8b0e950f90b8ffb323ebb311bf506dae3a36c49c60c1c5a",
-   "size": 3205
+   "hash": "034d6cd53e98e886ddf8620c695b18f5fe901aae0e984f679b762a68707dc3ed",
+   "size": 3335
   },
   "./src/kernel/processes.js": {
    "hash": "d6ec4418e32d916ea282bf11a14c126b4fa11db6e2cd8ce114ded4e4d385cf85",
@@ -325,16 +330,16 @@
    "size": 5861
   },
   "./src/kernel/store.js": {
-   "hash": "513b3ebd3e7a84a3f125e57bf25b6f542bebe8031c8de3f162320b19625b3d9e",
-   "size": 22273
+   "hash": "bae45e5c18b106a4aa01a2f67cc2a94102e1666eca934dd1e90b148d467955b9",
+   "size": 22281
   },
   "./src/kernel/telephony.js": {
    "hash": "131bbba14cecea607ad625b48a4b01172c8e977b6a90867bfce8fc546c1e5518",
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "936ccbb16ada3aeb4d970762657b0baa4f399f4ab9c30a5691b60dee19e78f02",
-   "size": 2180
+   "hash": "d46a60171f17efcea7cf9a343fb82050eaeea5308c014f57c244e4b687b24e95",
+   "size": 2432
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
@@ -401,16 +406,16 @@
    "size": 19754
   },
   "./src/system/app-context.js": {
-   "hash": "f70bafcd1bea4659049f79210b482ca50bcbbe830ba2b211b07198c975386dc2",
-   "size": 8506
+   "hash": "d7ea03fe78d47bf3ce1d868b6b37e14ddb42095e1c71a2c97a07c694c1cb9060",
+   "size": 9729
   },
   "./src/system/app-icon.js": {
    "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
    "size": 4624
   },
   "./src/system/app-runtime.js": {
-   "hash": "60f9826a17d220843babd7251c06d89876ec742662aa31e1099015c7736d9d3c",
-   "size": 14018
+   "hash": "2b8adc928011d7afaacdf94fc649244a42cc55afc1c03c56070cea715dd27729",
+   "size": 17807
   },
   "./src/system/banners.js": {
    "hash": "563899c6c61665d7d4f42df91761ee2c08ff81f019b4a3de78faff4cf749a9fe",

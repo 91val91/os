@@ -209,12 +209,14 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
   orion.device.vibrate(10);                           // et device.info()
   orion.notify({ title: 'Rappel', body: '…' });       // une toutes les 5 s au plus
   const pos = await orion.location.current();         // si l'app déclare la localisation et que l'utilisateur l'accepte
+  const [compte] = await orion.mail.accounts();       // e-mails (Orion installé) : autorisation « E-mails » déclarée et acceptée
+  const { messages } = await orion.mail.messages(compte.id, 'INBOX', { limit: 20 });   // aussi folders, message, setFlags, move, remove, send
   };
   orion.onBack(() => false);                          // bouton Retour (true : traité par l'app) ; orion.on('pause' | 'resume' | 'theme', fn) ; orion.close()
 </script>
 ```
 
-**Exemple complet : Courrier**, une app d'e-mail ([`src/apps/store/examples/courrier.html`](src/apps/store/examples/courrier.html), environ 65 Ko). Dans l'éditeur d'une app, **Modèles → Exemple : Courrier** remplace le code et complète la fiche (sous-titre, description, catégorie Productivité, icône) ; il ne reste qu'à l'essayer et le publier. Elle montre l'usage du SDK dans une vraie app :
+**Exemple complet : Courrier**, une app d'e-mail ([`src/apps/store/examples/courrier.html`](src/apps/store/examples/courrier.html), environ 95 Ko). Dans l'éditeur d'une app, **Modèles → Exemple : Courrier** remplace le code et complète la fiche (sous-titre, description, catégorie Productivité, icône, autorisation « E-mails ») ; il ne reste qu'à l'essayer et le publier. Elle montre l'usage du SDK dans une vraie app :
 
 - boîtes Réception, Favoris, Brouillons, Envoyés, Archive et Corbeille (vidée au bout de 30 jours), avec les non lus ;
 - lecture (message précédent ou suivant, citations en retrait), réponse, réponse à tous, transfert ;
@@ -222,7 +224,7 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
 - recherche sans tenir compte des accents, filtre « non lus », sélection multiple, **balayage vers la gauche** (corbeille ou archive) avec « Annuler » ;
 - réglages (nom, adresse, signature, lignes d'aperçu, confirmation avant suppression), thème clair ou sombre d'Orion, bouton Retour d'Orion (`orion.onBack`).
 
-Comme toute app du Store, Courrier n'a pas accès à Internet : elle ne relève ni n'envoie de vrais e-mails, les messages restent sur l'appareil (`orion.storage`). Ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message (notification si l'app est en arrière-plan). Relever une vraie boîte demandera un service de messagerie dans `orion-server`.
+Sur Orion installé, **« Utiliser mes comptes e-mail »** relève et envoie vos vrais e-mails par `orion.mail` (voir [Messagerie](#messagerie)) : dossiers du serveur, pages de 40 messages, recherche faite par le serveur, relève toutes les minutes. Comme toute app du Store, Courrier n'a pas accès à Internet par lui-même : c'est Orion qui passe ses demandes à `orion-server`. Sans compte (téléphone, navigateur, ou au choix), les messages restent dans l'app (`orion.storage`) : ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message. Pendant un « Essayer » de la console, l'app n'est pas installée : elle n'a pas accès aux vrais comptes.
 
 ## Protection de l'appareil
 
@@ -271,8 +273,21 @@ Une page web n'a pas le droit de piloter les radios d'un téléphone : c'est And
 | Appels et SMS | Vrais appels et SMS confiés aux apps Téléphone et Messages du téléphone (liens `tel:` et `sms:`) ; Orion garde l'historique et les conversations | Modem 4G/5G USB ou M.2 : appels entrants et sortants, SMS envoyés et reçus, données mobiles, opérateur et signal (ModemManager) |
 | Localisation | GPS du téléphone (API Geolocation, en https), avec votre accord et celui du navigateur | Récepteur GPS USB (gpsd) : position, altitude, vitesse, satellites |
 | Mode avion | Coupe les services d'Orion (appels, SMS, Bluetooth) | Coupe réellement le Wi‑Fi, le Bluetooth et le modem, puis les rallume comme avant |
+| E-mails | Indisponible (un navigateur ne peut pas se connecter à un serveur de messagerie) : les apps d'e-mail fonctionnent sans compte | Vrais comptes IMAP/SMTP (voir [Messagerie](#messagerie)) |
 
 Sur un ordinateur sans modem, **Réglages → Réseau mobile** permet de choisir le mode démonstration (appels et SMS simulés, correspondants qui répondent).
+
+## Messagerie
+
+Sur Orion installé, **Réglages → Comptes de messagerie** ajoute vos comptes e-mail (Gmail, Outlook, Yahoo, iCloud, Orange, Free, SFR, La Poste… ou tout serveur IMAP et SMTP). Les serveurs sont remplis d'après l'adresse (fournisseurs connus, puis la base de configuration de Thunderbird) ; Orion se connecte aux deux serveurs avant d'enregistrer le compte. Gmail, iCloud et Yahoo demandent un **mot de passe d'application**.
+
+- C'est `orion-server` qui relève et envoie le courrier, en Python (bibliothèque standard) : connexion **toujours chiffrée** (TLS ou STARTTLS) et certificat vérifié, sauf pour une passerelle sur la machine elle-même (Proton Mail Bridge).
+- Le mot de passe est gardé par `orion-server` dans `/var/lib/orion/mail.json` (droits 0600) et **n'est jamais montré aux apps** ni renvoyé à l'interface. Chaque utilisateur d'Orion ne voit que ses comptes.
+- Les apps y accèdent par le SDK (`orion.mail`) avec l'autorisation **« E-mails »**, demandée au premier usage et révocable dans Réglages → Applications. Une app du Store doit déclarer cette autorisation (console développeur → « Accède aux e-mails ») ; elle ne voit des comptes que le nom et l'adresse, et ne peut envoyer que 10 e-mails par 10 minutes.
+- Le HTML des messages est converti en texte par le serveur (pas de script, pas de pixel espion) ; les pièces jointes sont listées mais ne s'ouvrent pas encore.
+- **Courrier**, l'exemple d'app du Store, s'en sert : « Utiliser mes comptes e-mail » relève Réception toutes les minutes (notification quand l'app est en arrière-plan), parcourt les dossiers du serveur, cherche, répond, transfère, déplace et supprime. Sans orion-server, il fonctionne sans compte.
+
+Avec `python3 server/orion_server.py --simulate`, la messagerie est imitée en mémoire (tout mot de passe est accepté sauf `faux`) ; l'API est décrite dans [`server/API.md`](server/API.md#messagerie-ajout).
 
 ## Installer Orion sur un PC ou une machine virtuelle
 
@@ -284,7 +299,7 @@ Le dossier [`installer/`](installer/README.md) construit une **image ISO d'Orion
 - **Construire l'image** : `sudo installer/build.sh` sur Debian 12, `installer/build-in-docker.sh` partout ailleurs, ou l'action GitHub `installer.yml` (onglet **Actions**, et jointe aux publications `v*`).
 - **Mises à jour** : `orion-update.timer` télécharge et vérifie la dernière version publiée toutes les 6 heures ; Orion la propose ensuite comme sur le Web.
 
-Pour développer sans le matériel : `python3 server/orion_server.py --simulate`, puis http://127.0.0.1:8080 (Wi‑Fi, Bluetooth, modem et GPS imités ; mot de passe Wi‑Fi `orion1234`). L'API est décrite dans [`server/API.md`](server/API.md).
+Pour développer sans le matériel : `python3 server/orion_server.py --simulate`, puis http://127.0.0.1:8080 (Wi‑Fi, Bluetooth, modem, GPS et messagerie imités ; mot de passe Wi‑Fi `orion1234`). L'API est décrite dans [`server/API.md`](server/API.md).
 
 > L'image n'a pas encore été construite ni démarrée sur de vrais PC : c'est un premier jet, à essayer d'abord en machine virtuelle. Les téléphones ARM (PinePhone, Librem 5…) viendront plus tard.
 
@@ -305,13 +320,13 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 ## Tests
 
 ```bash
-npm test            # 113 tests unitaires (noyau, Store, protection, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 117 tests unitaires (noyau, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
 npm run screenshots # régénère les captures du README
 npm run release     # régénère version.json avant de publier une version
-python3 -m unittest discover -s server   # 78 tests d'orion-server (pont matériel, protection, synchronisation)
+python3 -m unittest discover -s server   # 99 tests d'orion-server (pont matériel, protection, messagerie avec de faux serveurs IMAP et SMTP, synchronisation)
 ```
 
 ## Structure du projet
@@ -327,7 +342,7 @@ src/lib/                                  DOM, icônes, gestes, kit d'interface,
 src/styles/                               jetons de design, interface système, composants
 tests/                                    tests unitaires et de bout en bout
 scripts/                                  serveur local, publication (version.json), icônes PWA, captures
-server/                                   orion-server : pont matériel et mises à jour d'Orion installé (Python)
+server/                                   orion-server : pont matériel, messagerie et mises à jour d'Orion installé (Python)
 installer/                                image ISO installable (live-build), machine virtuelle, Docker
 ```
 
@@ -335,7 +350,7 @@ installer/                                image ISO installable (live-build), ma
 
 Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, et s'appuie sur le navigateur (donc sur Android ou iOS) ou sur `orion-server` (Orion installé) pour le matériel. Concrètement :
 
-- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi (Orion installé), plein écran et hors ligne ;
+- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi et e-mails (Orion installé), plein écran et hors ligne ;
 - **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie, et les **paiements du Store** (solde de test : pas encore de service de paiement ni de serveur du Store).
 
 Installé avec l'image prévue pour cela, Orion devient le système principal de la machine, à la manière de Firefox OS (B2G) ou KaiOS : un noyau Linux, un navigateur en mode kiosque lancé au démarrage et `orion-server` pour le matériel.

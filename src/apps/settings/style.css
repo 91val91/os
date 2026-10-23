@@ -575,3 +575,60 @@
 .protect-hero + .btn.block {
   margin: 0 auto 22px;
 }
+
+/* Comptes de messagerie */
+.mail-form {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.mail-form .field {
+  background: transparent;
+}
+
+.mail-security {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  border-top: .5px solid var(--sep);
+}
+
+.mail-note {
+  margin: -10px 20px 18px;
+  font-size: .8rem;
+  color: var(--fg-2);
+}
+
+.mail-note:empty {
+  display: none;
+}
+
+.mail-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px 14px;
+  font-size: .85rem;
+  color: var(--fg-2);
+}
+
+.mail-status:empty {
+  display: none;
+}
+
+.mail-status.error {
+  color: var(--red);
+}
+
+.mail-add > .btn {
+  margin: 0 16px 32px;
+  width: calc(100% - 32px);
+}
+
+.mail-loading {
+  gap: 10px;
+  color: var(--fg-2);
+}

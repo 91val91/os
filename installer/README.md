@@ -26,8 +26,9 @@ Démarrage (GRUB en UEFI, isolinux en BIOS)
 | Élément | Où |
 | --- | --- |
 | Interface d'Orion (version en service) | `/var/lib/orion/current` → `/var/lib/orion/releases/<version>/` |
-| Serveur matériel | `/opt/orion-server/orion_server.py` (+ `API.md`) |
+| Serveur matériel et messagerie | `/opt/orion-server/orion_server.py`, `orion_mail.py` (+ `API.md`) |
 | Protection contre la réinitialisation (empreinte du code du propriétaire) | `/var/lib/orion/protection.json` |
+| Comptes de messagerie (avec leur mot de passe, droits 0600) | `/var/lib/orion/mail.json` |
 | Lancement de l'interface | `/usr/local/bin/orion-kiosk`, appelé par `~/.bash_profile` sur tty1 |
 | Réglages (port, source des mises à jour, affichage plein écran ou cadre de téléphone, options de Chromium) | `/etc/default/orion` |
 | Droits de l'utilisateur `orion` (réseau, modem, alimentation) | `/etc/polkit-1/rules.d/50-orion.rules` |

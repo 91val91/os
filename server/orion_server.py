@@ -6,8 +6,9 @@ Sur une machine Orion (image installable, voir installer/), ce programme :
 * sert les fichiers de l'interface (index.html, sw.js, version.json,
   manifest.webmanifest, assets/, src/) sur http://127.0.0.1:8080 ;
 * expose sous /api/ le Wi-Fi (NetworkManager), le Bluetooth (BlueZ), le
-  réseau mobile (ModemManager), le GPS (gpsd) et l'alimentation (systemd),
-  selon le contrat décrit dans server/API.md ;
+  réseau mobile (ModemManager), le GPS (gpsd), l'alimentation (systemd) et
+  la messagerie (comptes IMAP/SMTP, voir orion_mail.py), selon le contrat
+  décrit dans server/API.md ;
 * avec --simulate, imite tout ce matériel en mémoire pour développer et
   tester l'interface dans un navigateur ordinaire ;
 * avec la sous-commande « sync », télécharge et vérifie la dernière version
@@ -50,6 +51,8 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+
+from orion_mail import MailError, MailService, MailStore, SimulatedMailService
 
 BRIDGE_NAME = "orion-server"
 BRIDGE_VERSION = "1.0.0"
@@ -95,7 +98,7 @@ MIME_TYPES = {
     ".wasm": "application/wasm",
 }
 
-MAX_BODY = 64 * 1024  # taille maximale du corps d'une requête POST
+MAX_BODY = 256 * 1024  # taille maximale du corps d'une requête POST (un e-mail envoyé)
 
 
 def static_parts(url_path: str) -> list[str] | None:
@@ -2053,6 +2056,54 @@ def server_routes(protection: ProtectionStore, root: str) -> dict[str, dict[str,
     }
 
 
+def _query(query: dict, name: str) -> str:
+    return (query.get(name) or [""])[-1]
+
+
+def _query_int(query: dict, name: str) -> int | None:
+    value = _query(query, name)
+    if not value:
+        return None
+    if not value.isdigit() or len(value) > 10:
+        raise ApiError(400, f"Paramètre « {name} » invalide")
+    return int(value)
+
+
+def _mail_call(action: Callable[[], Any]) -> Any:
+    try:
+        return action()
+    except MailError as error:
+        raise ApiError(error.status, error.message) from None
+
+
+def mail_routes(mail: MailService) -> dict[str, dict[str, Handler]]:
+    """Messagerie : comptes de l'utilisateur et opérations IMAP/SMTP (voir orion_mail.py)."""
+    return {
+        "/api/mail": {"GET": lambda hw, body, q: _mail_call(lambda: mail.status(_query(q, "owner") or None))},
+        "/api/mail/autoconfig": {"POST": lambda hw, body, q: _mail_call(lambda: mail.autoconfig(body))},
+        "/api/mail/accounts/add": {"POST": lambda hw, body, q: _mail_call(lambda: mail.add_account(body))},
+        "/api/mail/accounts/remove": {"POST": lambda hw, body, q: _mail_call(lambda: mail.remove_account(body))},
+        "/api/mail/folders": {"GET": lambda hw, body, q: _mail_call(lambda: mail.folders(_query(q, "account")))},
+        "/api/mail/messages": {
+            "GET": lambda hw, body, q: _mail_call(
+                lambda: mail.messages(
+                    _query(q, "account"),
+                    _query(q, "folder"),
+                    before=_query_int(q, "before"),
+                    limit=_query_int(q, "limit") or 40,
+                    query=_query(q, "q"),
+                    filter_=_query(q, "filter"),
+                )
+            )
+        },
+        "/api/mail/message": {"GET": lambda hw, body, q: _mail_call(lambda: mail.message(_query(q, "account"), _query(q, "folder"), _query_int(q, "uid")))},
+        "/api/mail/flags": {"POST": lambda hw, body, q: _mail_call(lambda: mail.flags(body))},
+        "/api/mail/move": {"POST": lambda hw, body, q: _mail_call(lambda: mail.move(body))},
+        "/api/mail/delete": {"POST": lambda hw, body, q: _mail_call(lambda: mail.delete(body))},
+        "/api/mail/send": {"POST": lambda hw, body, q: _mail_call(lambda: mail.send(body))},
+    }
+
+
 # --------------------------------------------------------------------------
 # API HTTP
 # --------------------------------------------------------------------------
@@ -2380,24 +2431,38 @@ class OrionHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address: tuple[str, int], root: str | os.PathLike[str], hardware: Any, allow_hosts: tuple[str, ...] = (), protection: ProtectionStore | None = None):
+    def __init__(
+        self,
+        address: tuple[str, int],
+        root: str | os.PathLike[str],
+        hardware: Any,
+        allow_hosts: tuple[str, ...] = (),
+        protection: ProtectionStore | None = None,
+        mail: MailService | None = None,
+    ):
         if ":" in address[0]:
             self.address_family = socket.AF_INET6
         super().__init__(address, OrionHandler)
         self.root = str(root)
         self.hardware = hardware
         self.protection = protection if protection is not None else ProtectionStore(None)
+        simulated = getattr(hardware, "simulated", False)
+        self.mail = mail if mail is not None else (SimulatedMailService() if simulated else MailService(MailStore(None)))
         self.routes = dict(API_ROUTES)
         self.routes.update(server_routes(self.protection, self.root))
+        self.routes.update(mail_routes(self.mail))
         hardware_status = self.routes["/api/status"]["GET"]
 
         def status(hw: Any, body: dict, query: dict) -> dict:
             data = hardware_status(hw, body, query)
-            return {**data, "capabilities": {**data.get("capabilities", {}), "protection": True, "integrity": True}}
+            return {**data, "capabilities": {**data.get("capabilities", {}), "protection": True, "integrity": True, "mail": True}}
 
         self.routes["/api/status"] = {"GET": status}
-        if getattr(hardware, "simulated", False):
+        if simulated:
             self.routes.update(SIMULATE_ROUTES)
+            if isinstance(self.mail, SimulatedMailService):
+                receive = self.mail.receive
+                self.routes["/api/simulate/incoming-mail"] = {"POST": lambda hw, body, q: _mail_call(lambda: receive(body))}
         port = self.server_address[1]
         hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         if address[0] == "::1":
@@ -2408,8 +2473,16 @@ class OrionHTTPServer(ThreadingHTTPServer):
         self.allowed_hosts = frozenset(hosts)
 
 
-def make_server(root: str | os.PathLike[str], host: str, port: int, hardware: Any, allow_hosts: tuple[str, ...] = (), protection: ProtectionStore | None = None) -> OrionHTTPServer:
-    return OrionHTTPServer((host, port), root, hardware, allow_hosts, protection)
+def make_server(
+    root: str | os.PathLike[str],
+    host: str,
+    port: int,
+    hardware: Any,
+    allow_hosts: tuple[str, ...] = (),
+    protection: ProtectionStore | None = None,
+    mail: MailService | None = None,
+) -> OrionHTTPServer:
+    return OrionHTTPServer((host, port), root, hardware, allow_hosts, protection, mail)
 
 
 # --------------------------------------------------------------------------
@@ -2748,7 +2821,10 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-host", action="append", default=[], metavar="NOM", help="nom d'hôte supplémentaire accepté dans l'en-tête Host (avec --host)"
     )
     parser.add_argument(
-        "--state", default=None, metavar="DOSSIER", help=f"données gardées par le serveur, dont la protection de l'appareil (défaut : {DEFAULT_DATA} ; en mémoire avec --simulate)"
+        "--state",
+        default=None,
+        metavar="DOSSIER",
+        help=f"données gardées par le serveur : protection de l'appareil, comptes de messagerie (défaut : {DEFAULT_DATA} ; en mémoire avec --simulate)",
     )
     args = parser.parse_args(argv)
     if not os.path.isfile(os.path.join(os.path.realpath(args.root), "index.html")):
@@ -2757,7 +2833,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         state = args.state or (None if args.simulate else DEFAULT_DATA)
         protection = ProtectionStore(Path(state) / "protection.json" if state else None)
-        server = make_server(args.root, args.host, args.port, hardware, tuple(args.allow_host), protection)
+        mail_store = MailStore(Path(state) / "mail.json" if state else None)
+        mail = SimulatedMailService(mail_store) if args.simulate else MailService(mail_store)
+        server = make_server(args.root, args.host, args.port, hardware, tuple(args.allow_host), protection, mail)
     except OSError as error:
         LOG.error("Impossible d'écouter sur %s:%s : %s", args.host, args.port, error)
         return 1

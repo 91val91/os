@@ -874,7 +874,7 @@ class SecurityTest(ServerTestCase):
 
     def test_body_validation(self):
         headers = {"X-Orion": "1", "Content-Type": "application/json"}
-        self.assertEqual(self.request("POST", "/api/wifi/connect", b"x" * (64 * 1024 + 1), headers)[0], 413)
+        self.assertEqual(self.request("POST", "/api/wifi/connect", b"x" * (osv.MAX_BODY + 1), headers)[0], 413)
         self.assertEqual(self.request("POST", "/api/wifi/connect", b"{pas du json", headers)[0], 400)
         self.assertEqual(self.request("POST", "/api/wifi/connect", b"[1, 2]", headers)[0], 400)
         self.assertEqual(self.request("POST", "/api/wifi/connect", b"[" * 5000 + b"]" * 5000, headers)[0], 400)
@@ -901,7 +901,7 @@ class SimulatedFlowsTest(ServerTestCase):
         status, payload = self.api("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertTrue(payload["simulated"])
-        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network", "protection", "integrity"})
+        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network", "protection", "integrity", "mail"})
 
     def test_wifi(self):
         wifi = self.api("GET", "/api/wifi?rescan=1")[1]

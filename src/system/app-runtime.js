@@ -16,6 +16,9 @@
  *   orion.device.vibrate(motif) · orion.device.info()
  *   orion.notify({ title, body })
  *   orion.location.current()          autorisation « Localisation » déclarée
+ *   orion.mail.status() · accounts() · folders() · messages() · message()
+ *     · setFlags() · move() · remove() · send()   autorisation « E-mails » déclarée
+ *                                     (comptes des Réglages, relevés par orion-server)
  *   orion.on('pause' | 'resume' | 'theme', fn) · orion.onBack(fn) · orion.close()
  *
  * Limite connue : une boucle infinie dans l'app peut ralentir Orion (le
@@ -27,6 +30,9 @@ export const styles = [];
 
 const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'";
 const MAX_STORAGE = 1_048_576;
+/** Envois d'e-mails par une app : au plus SEND_LIMIT par fenêtre de SEND_WINDOW. */
+const SEND_LIMIT = 10;
+const SEND_WINDOW = 600_000;
 
 /** SDK injecté dans l'iframe, avant le code de l'app. */
 const SDK = `(() => {
@@ -98,6 +104,17 @@ const SDK = `(() => {
       info: () => call('device.info'),
     }),
     location: Object.freeze({ current: () => call('location.current') }),
+    mail: Object.freeze({
+      status: () => call('mail.status'),
+      accounts: () => call('mail.accounts'),
+      folders: (account) => call('mail.folders', account),
+      messages: (account, folder, options) => call('mail.messages', account, folder, options || {}),
+      message: (account, folder, uid) => call('mail.message', account, folder, uid),
+      setFlags: (account, folder, uids, change) => call('mail.flags', account, folder, uids, change || {}),
+      move: (account, folder, uids, to) => call('mail.move', account, folder, uids, to),
+      remove: (account, folder, uids) => call('mail.delete', account, folder, uids),
+      send: (account, message) => call('mail.send', account, message || {}),
+    }),
     notify: (options) => call('notify', options),
     close: () => call('app.close'),
     on(event, fn) {
@@ -146,6 +163,8 @@ export function hostFromContext(ctx, { test = false } = {}) {
     info: () => ({ battery: ctx.device.battery?.level ?? null, online: ctx.device.connectivity?.online ?? true, locale: 'fr-FR' }),
     notify: test ? (options) => ctx.ui.toast(`Notification (essai) : ${options.title}`) : (options) => ctx.notify(options),
     location: () => (test ? Promise.reject(new Error('Position indisponible pendant un essai')) : ctx.location.current()),
+    // Pendant un essai, l'app n'est pas installée : pas d'accès aux vrais e-mails.
+    mail: test ? null : ctx.mail,
     close: () => (test ? null : ctx.exit()),
     log: (message) => ctx.log(message),
   };
@@ -195,6 +214,18 @@ export function runApp(root, { app, code, host, onStop = null }) {
   });
 
   const storageSize = (data) => new Blob([JSON.stringify(data)]).size;
+  const sends = [];
+
+  const mailbox = () => {
+    if (!host.mail) throw new Error('Messagerie indisponible pendant un essai : publiez l\'app et installez-la pour utiliser vos comptes');
+    return host.mail;
+  };
+  const uidList = (value) => (Array.isArray(value) ? value : [value]).slice(0, 1000).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const flagList = (value) => (Array.isArray(value) ? value : []).filter((f) => ['seen', 'flagged', 'answered'].includes(f));
+  const people = (value) =>
+    (Array.isArray(value) ? value : [])
+      .slice(0, 100)
+      .map((p) => (typeof p === 'string' ? { address: text(p, 254) } : { name: text(p?.name, 120), address: text(p?.address, 254) }));
 
   async function modal(fn) {
     if (dialog) throw new Error('Une boîte de dialogue est déjà ouverte');
@@ -248,6 +279,35 @@ export function runApp(root, { app, code, host, onStop = null }) {
     'location.current': async () => {
       const fix = await host.location();
       return fix && { lat: fix.lat, lon: fix.lon, accuracy: fix.accuracy ?? null, altitude: fix.alt ?? null, time: fix.time ?? null };
+    },
+    'mail.status': () => ({ available: Boolean(host.mail?.available), permission: host.mail ? host.mail.permission() : 'denied', test: !host.mail }),
+    'mail.accounts': () => mailbox().accounts(),
+    'mail.folders': (account) => mailbox().folders(text(account, 64)),
+    'mail.messages': (account, folder, o = {}) =>
+      mailbox().messages(text(account, 64), text(folder, 512), {
+        before: Number.isInteger(o.before) && o.before > 0 ? o.before : null,
+        limit: Math.max(1, Math.min(100, Number(o.limit) || 40)),
+        query: text(o.query, 200),
+        filter: ['unread', 'flagged'].includes(o.filter) ? o.filter : '',
+      }),
+    'mail.message': (account, folder, uid) => mailbox().message(text(account, 64), text(folder, 512), uidList(uid)[0] ?? 0),
+    'mail.flags': (account, folder, uids, change = {}) => mailbox().setFlags(text(account, 64), text(folder, 512), uidList(uids), { add: flagList(change.add), remove: flagList(change.remove) }).then(() => true),
+    'mail.move': (account, folder, uids, to) => mailbox().move(text(account, 64), text(folder, 512), uidList(uids), text(to, 512)),
+    'mail.delete': (account, folder, uids) => mailbox().remove(text(account, 64), text(folder, 512), uidList(uids)),
+    'mail.send': (account, m = {}) => {
+      const now = Date.now();
+      while (sends.length && now - sends[0] > SEND_WINDOW) sends.shift();
+      if (sends.length >= SEND_LIMIT) throw new Error('Trop d\'e-mails envoyés en peu de temps : attendez quelques minutes');
+      sends.push(now);
+      return mailbox().send(text(account, 64), {
+        to: people(m.to),
+        cc: people(m.cc),
+        bcc: people(m.bcc),
+        subject: text(m.subject, 500),
+        text: text(m.text, 100_000),
+        inReplyTo: text(m.inReplyTo, 300),
+        references: text(m.references, 4000),
+      });
     },
     'app.close': () => {
       host.close();

@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 
-export function fakeBridge({ capabilities = { wifi: true, network: true, bluetooth: true, modem: true, gps: true, power: true } } = {}) {
+export function fakeBridge({ capabilities = { wifi: true, network: true, bluetooth: true, modem: true, gps: true, power: true, mail: true } } = {}) {
   const state = {
     wifi: {
       enabled: true,
@@ -20,6 +20,8 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
     calls: [],
     sms: [],
     protection: {},
+    // Messagerie (comme orion_mail : comptes sans mot de passe à l'extérieur, un dossier par nom).
+    mail: { accounts: [], boxes: {}, sent: [], next: 1 },
     gps: { available: true, fix: { lat: 48.8566, lon: 2.3522, alt: 35, speed: 0, heading: null, accuracy: 6, time: '2026-01-15T09:00:00Z', satellites: 9 } },
   };
   const requests = [];
@@ -141,7 +143,49 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       state.protection.record = record;
       return routes['GET protection']();
     },
+    'GET mail': (_, q) => ok({ available: true, simulated: true, accounts: state.mail.accounts.filter((a) => !q.owner || a.owner === q.owner || !a.owner).map(publicAccount) }),
+    'POST mail/autoconfig': ({ address }) => ok({ source: 'guess', username: address, imap: { host: `imap.${address.split('@')[1]}`, port: 993, security: 'ssl' }, smtp: { host: `smtp.${address.split('@')[1]}`, port: 465, security: 'ssl' }, saveSent: true, note: '' }),
+    'POST mail/accounts/add': (body) => {
+      if (body.password === 'faux') return fail(401, 'Connexion refusée par le serveur de réception');
+      const account = { ...body, id: `acc${String(state.mail.next++).padStart(13, '0')}`, username: body.username || body.address };
+      state.mail.accounts.push(account);
+      state.mail.boxes[account.id] = { INBOX: [{ uid: 1, from: { name: 'Lucas', address: 'lucas@exemple.fr' }, to: [{ name: '', address: account.address }], cc: [], subject: 'Bonjour', date: 1, seen: false, flagged: false, answered: false, size: 10, attachments: false, preview: 'Salut', text: 'Salut' }], Envoyés: [] };
+      return ok(publicAccount(account));
+    },
+    'POST mail/accounts/remove': ({ id }) => {
+      if (!state.mail.accounts.some((a) => a.id === id)) return fail(404, 'Compte de messagerie introuvable');
+      state.mail.accounts = state.mail.accounts.filter((a) => a.id !== id);
+      return ok();
+    },
+    'GET mail/folders': (_, q) => mailBox(q.account, (box) => ok({ folders: Object.keys(box).map((id) => ({ id, name: id === 'INBOX' ? 'Réception' : id, role: id === 'INBOX' ? 'inbox' : 'sent', unread: box[id].filter((m) => !m.seen).length, total: box[id].length })) })),
+    'GET mail/messages': (_, q) => mailBox(q.account, (box) => ok({ messages: (box[q.folder] ?? []).filter((m) => !q.q || m.subject.includes(q.q)).map(({ text, ...m }) => m), more: false, uidValidity: 1 })),
+    'GET mail/message': (_, q) => mailBox(q.account, (box) => {
+      const found = (box[q.folder] ?? []).find((m) => m.uid === Number(q.uid));
+      return found ? ok({ ...found, html: false, attachments: [] }) : fail(404, 'Message introuvable');
+    }),
+    'POST mail/flags': ({ account, folder, uids, add = [], remove = [] }) => mailBox(account, (box) => {
+      for (const m of box[folder].filter((x) => uids.includes(x.uid))) {
+        for (const f of add) m[f] = true;
+        for (const f of remove) m[f] = false;
+      }
+      return ok();
+    }),
+    'POST mail/delete': ({ account, folder, uids }) => mailBox(account, (box) => {
+      box[folder] = box[folder].filter((m) => !uids.includes(m.uid));
+      return ok({ ok: true, folder: null });
+    }),
+    'POST mail/send': (body) => mailBox(body.account, (box) => {
+      state.mail.sent.push(body);
+      box.Envoyés.push({ uid: 100 + state.mail.sent.length, from: { name: '', address: 'moi' }, to: body.to, cc: [], subject: body.subject, date: 2, seen: true, flagged: false, answered: false, size: 1, attachments: false, preview: body.text, text: body.text });
+      return ok({ ok: true, messageId: '<x@orion.test>', refused: [], savedTo: 'Envoyés' });
+    }),
   };
+
+  const publicAccount = ({ password: _password, ...account }) => account;
+  function mailBox(id, then) {
+    const box = state.mail.boxes[id];
+    return box && state.mail.accounts.some((a) => a.id === id) ? then(box) : fail(404, 'Compte de messagerie introuvable');
+  }
 
   function checkCode(code) {
     const { record } = state.protection;
@@ -153,11 +197,12 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
 
   async function fetch(url, { method = 'GET', headers = {}, body } = {}) {
     const path = String(url).replace(/^api\//, '').replace(/\?.*$/, '');
+    const query = Object.fromEntries(new URLSearchParams(String(url).split('?')[1] ?? ''));
     const data = body ? JSON.parse(body) : undefined;
     requests.push({ method, path, url: String(url), headers, body: data });
     if (method === 'POST' && (headers['X-Orion'] !== '1' || headers['Content-Type'] !== 'application/json')) return response(fail(403, 'Requête refusée'));
     const route = routes[`${method} ${path}`];
-    return response(route ? route(data) : fail(404, 'Introuvable'));
+    return response(route ? route(data, query) : fail(404, 'Introuvable'));
   }
 
   const response = ({ status, body }) => ({ ok: status < 400, status, json: async () => structuredClone(body) });

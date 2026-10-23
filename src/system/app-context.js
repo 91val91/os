@@ -69,6 +69,38 @@ export function createAppContext({ ui, proc, pkg }) {
     },
   };
 
+  /**
+   * Messagerie (comptes ajoutés dans les Réglages) : autorisation « E-mails »
+   * demandée au premier usage et vérifiée à chaque appel. Les apps ne voient
+   * des comptes que le nom et l'adresse.
+   */
+  const allowMail = async () => {
+    if (!kernel.mail.available) throw new Error('La messagerie demande Orion installé (orion-server)');
+    if (!(await kernel.permissions.request(appId, 'mail'))) throw new Error('Accès aux e-mails refusé');
+  };
+  const mailCall = (method) => async (...args) => {
+    await allowMail();
+    return kernel.mail[method](...args);
+  };
+  const mail = {
+    get available() {
+      return kernel.mail.available;
+    },
+    /** État de l'autorisation sans la demander : 'granted' | 'denied' | 'prompt'. */
+    permission: () => kernel.permissions.check(appId, 'mail'),
+    async accounts() {
+      await allowMail();
+      return (await kernel.mail.accounts()).map(({ id, name, address }) => ({ id, name, address }));
+    },
+    folders: mailCall('folders'),
+    messages: mailCall('messages'),
+    message: mailCall('message'),
+    setFlags: mailCall('setFlags'),
+    move: mailCall('move'),
+    remove: mailCall('remove'),
+    send: mailCall('send'),
+  };
+
   const storage = {
     get(key, fallback = null) {
       storageCache ??= kernel.fs.readJSON(storageFile, {});
@@ -105,6 +137,7 @@ export function createAppContext({ ui, proc, pkg }) {
     telephony: pkg.system ? expose(kernel.telephony, TELEPHONY_API, ['call', 'network', 'mode']) : null,
     device: expose(kernel.device, DEVICE_API, ['battery', 'connectivity']),
     location,
+    mail,
     sound: expose(ui.sound, SOUND_API),
     now: () => kernel.now(),
     log: (message) => kernel.log.info(appId, message),
