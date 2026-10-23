@@ -181,7 +181,13 @@ fi
 # Carte virtio : le compositeur Wayland (cage) doit fonctionner ; X11 n'est qu'un secours.
 if [ "$GPU" = virtio ] && [[ "$mode" == *X11* ]]; then
 	echo "Erreur : cage n'a pas pu démarrer avec la carte virtio (affichage de secours X11 utilisé)" >&2
-	grep -E "orion-kiosk.*(ERROR|Error|error)" "$OUT/serial.log" | head -10 >&2 || true
+	# Les tentatives Wayland : messages d'orion-kiosk, de cage et de Chromium (sans le bruit
+	# de crashpad ni le démarrage de Xorg), plantages signalés par le noyau ou systemd.
+	echo "----- TENTATIVES WAYLAND -----" >&2
+	awk '/Lancement de l.interface \(X11/ { exit } { print }' "$OUT/serial.log" |
+		grep -aE "orion-kiosk|segfault|dumped core|traps:|general protection|cage\[" |
+		grep -avE "crashpad|cpufreq" | tail -n 80 >&2 || true
+	echo "----- FIN -----" >&2
 	exit 1
 fi
 if awk "BEGIN { exit !($lit < 0.5) }"; then

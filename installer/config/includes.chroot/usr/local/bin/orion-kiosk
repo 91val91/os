@@ -96,6 +96,23 @@ mark_clean_exit() {
 	fi
 }
 
+# Un Chromium resté en vie après l'arrêt de son compositeur (il démarre lentement et ne
+# voit qu'ensuite que l'affichage a disparu), ou le verrou laissé par un arrêt brutal :
+# le Chromium suivant lui passerait la main et quitterait aussitôt (code 0), en boucle.
+stop_leftovers() {
+	local _
+	rm -f "$PROFILE_DIR"/Singleton{Lock,Socket,Cookie}
+	pgrep -u "$UID" -x chromium >/dev/null 2>&1 || return 0
+	log "Chromium d'une session précédente encore ouvert : arrêt"
+	pkill -u "$UID" -x chromium
+	for _ in $(seq 1 10); do
+		pgrep -u "$UID" -x chromium >/dev/null 2>&1 || break
+		sleep 0.5
+	done
+	pkill -KILL -u "$UID" -x chromium 2>/dev/null || true
+	rm -f "$PROFILE_DIR"/Singleton{Lock,Socket,Cookie}
+}
+
 # Taille de l'écran branché (mode préféré, lu dans /sys) : sans gestionnaire de fenêtres,
 # Chromium ne se met pas de lui-même en plein écran sous X11.
 screen_size() {
@@ -124,6 +141,7 @@ gpu_flags=()
 display=wayland
 while :; do
 	wait_for_server || log "orion-server ne répond pas sur le port $ORION_PORT : lancement quand même"
+	stop_leftovers
 	mark_clean_exit
 	started=$(date +%s)
 	if [ "$display" = x11 ]; then

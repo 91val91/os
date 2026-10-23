@@ -64,6 +64,7 @@ live-config
 live-config-systemd
 pciutils
 usbutils
+procps
 less
 nano
 
