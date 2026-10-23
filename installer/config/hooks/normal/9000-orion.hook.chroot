@@ -29,6 +29,14 @@ if [ -f /etc/bluetooth/main.conf ]; then
 	sed -i 's/^#\{0,1\} *TemporaryTimeout *=.*/TemporaryTimeout = 300/' /etc/bluetooth/main.conf
 fi
 
+echo "Orion : l'affichage est géré par orion-kiosk, pas par live-config"
+# Avec xinit installé (affichage de secours d'orion-kiosk), le composant « xinit » de
+# live-config ajouterait /etc/profile.d/zz-live-config_xinit.sh, qui lance startx en
+# boucle sur tty1 avant ~/.bash_profile : l'interface d'Orion ne démarrerait jamais.
+rm -f /lib/live/config/*-xinit
+mkdir -p /var/lib/live/config
+touch /var/lib/live/config/xinit
+
 echo "Orion : services"
 chmod 0755 /usr/local/bin/orion-kiosk /opt/orion-server/orion_server.py
 systemctl enable NetworkManager.service ModemManager.service bluetooth.service \

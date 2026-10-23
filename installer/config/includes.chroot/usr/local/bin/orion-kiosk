@@ -27,6 +27,8 @@ log() {
 	fi
 }
 
+log "Session graphique d'Orion ($(tty 2>/dev/null || echo '?'))"
+
 # Clavier du système (/etc/default/keyboard) pour cage.
 if [ -r /etc/default/keyboard ]; then
 	# shellcheck disable=SC1091
