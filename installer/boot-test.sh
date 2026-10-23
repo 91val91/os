@@ -93,20 +93,39 @@ PY
 start=$(date +%s)
 elapsed() { echo $(( $(date +%s) - start )); }
 
+# Aperçu réduit d'une capture dans le journal de l'action (les artefacts ne sont pas toujours accessibles).
+preview() {
+	echo "----- APERÇU -----"
+	convert "$OUT/screen.png" -resize 320x -quality 70 jpg:- | base64 -w 0
+	echo
+	echo "----- FIN APERÇU -----"
+}
+
 failed() {
 	echo "Erreur : $1" >&2
 	tail -80 "$OUT/serial.log" >&2
+	# Ce que montre l'écran de la machine (console tty1, message d'erreur…).
+	if kill -0 "$QEMU_PID" 2>/dev/null; then
+		monitor "screendump $WORK/screen.ppm"
+		sleep 1
+		if convert "$WORK/screen.ppm" "$OUT/screen.png" 2>/dev/null; then
+			echo "==> Écran au moment de l'échec :"
+			preview
+		fi
+	fi
 	exit 1
 }
 
-# Attend une ligne du journal (expression régulière étendue), en surveillant les échecs.
+# Attend une ligne du journal (expression régulière étendue), en surveillant les échecs ;
+# $3 : délai maximal en secondes (DEADLINE par défaut).
 wait_for() {
+	local limit=$(( $(elapsed) + ${3:-$DEADLINE} ))
 	until grep -qE "$1" "$OUT/serial.log" 2>/dev/null; do
 		kill -0 "$QEMU_PID" 2>/dev/null || failed "QEMU s'est arrêté"
 		if grep -qE "BOOT FAILED|Kernel panic|emergency mode|orion-server.service: Failed at step" "$OUT/serial.log" 2>/dev/null; then
 			failed "le démarrage a échoué"
 		fi
-		[ "$(elapsed)" -lt "$DEADLINE" ] || failed "$2 après ${DEADLINE} s"
+		[ "$(elapsed)" -lt "$limit" ] || failed "$2 (au bout de $(elapsed) s)"
 		sleep 5
 	done
 }
@@ -117,7 +136,7 @@ echo "==> orion-server démarré après $(elapsed) s"
 
 # 3. L'interface : Chromium dans cage, sur tty1. Avant, orion-kiosk vérifie qu'orion-server
 #    répond dans la machine (il l'écrit dans le journal sinon).
-wait_for "Lancement de l'interface" "l'interface ne s'est pas lancée"
+wait_for "Lancement de l'interface" "l'interface ne s'est pas lancée" "${BOOT_TEST_UI_TIMEOUT:-300}"
 echo "==> Interface lancée après $(elapsed) s"
 if grep -q "orion-server ne répond pas" "$OUT/serial.log"; then
 	failed "orion-server ne répond pas dans la machine"
@@ -137,12 +156,8 @@ while :; do
 done
 echo "==> Part de l'écran allumée : $lit (après $(elapsed) s)"
 grep -E "orion-kiosk|orion-server|orion_server" "$OUT/serial.log" | tee "$OUT/orion.log" | tail -20 || true
-# Aperçu réduit dans le journal de l'action (les artefacts ne sont pas toujours accessibles).
 echo "==> Aperçu (JPEG 320 px, base64) :"
-echo "----- APERÇU -----"
-convert "$OUT/screen.png" -resize 320x -quality 70 jpg:- | base64 -w 0
-echo
-echo "----- FIN APERÇU -----"
+preview
 mode="$(grep -o "Lancement de l'interface ([^)]*)" "$OUT/serial.log" | tail -n 1)"
 echo "==> Affichage : ${mode:-inconnu}"
 if awk "BEGIN { exit !($lit < 0.02) }"; then
