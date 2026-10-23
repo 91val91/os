@@ -2,22 +2,24 @@
 # Test de démarrage de l'image d'Orion OS dans QEMU, sans écran (utilisé par
 # l'action GitHub « Installateur ») :
 #   1. démarre l'ISO avec la console série (journal du système copié dessus) ;
-#   2. attend qu'orion-server réponde depuis la machine virtuelle ;
+#   2. attend le démarrage d'orion-server dans le journal. Il n'écoute que sur
+#      127.0.0.1 dans la machine (par sécurité) : la redirection de port de
+#      QEMU ne peut pas l'atteindre depuis l'hôte ; c'est l'interface, lancée
+#      dans la machine, qui vérifie qu'il répond ;
 #   3. attend le lancement de l'interface (cage + Chromium) et enregistre une
 #      capture de l'écran ;
 #   4. vérifie que l'écran n'est pas resté noir.
 #
 #   installer/boot-test.sh installer/out/orion-os-0.1-amd64.iso [dossier-de-sortie]
 #
-# Sortie : serial.log (journal du démarrage), screen.png (capture), status.json.
+# Sortie : serial.log (journal du démarrage), screen.png (capture), orion.log (lignes d'Orion).
 set -euo pipefail
 
 ISO="${1:?usage : $0 image.iso [dossier-de-sortie]}"
 OUT="${2:-boot-test}"
 DEADLINE="${BOOT_TEST_TIMEOUT:-1500}" # secondes (sans KVM, tout est émulé et lent)
-PORT=8080
 
-for tool in qemu-system-x86_64 xorriso curl convert; do
+for tool in qemu-system-x86_64 xorriso convert; do
 	command -v "$tool" >/dev/null 2>&1 || { echo "Erreur : $tool est introuvable" >&2; exit 2; }
 done
 mkdir -p "$OUT"
@@ -61,7 +63,7 @@ echo "==> Accélération : $ACCEL"
 qemu-system-x86_64 \
 	-machine "q35,accel=$ACCEL" -cpu max -m 3072 -smp 2 \
 	-cdrom "$ISO" -kernel "$WORK/vmlinuz" -initrd "$WORK/initrd.img" -append "$APPEND" \
-	-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$PORT-:$PORT" -device virtio-net-pci,netdev=net0 \
+	-netdev "user,id=net0" -device virtio-net-pci,netdev=net0 \
 	-vga std -display none \
 	-serial "file:$OUT/serial.log" \
 	-monitor "unix:$WORK/monitor.sock,server,nowait" &
@@ -82,34 +84,35 @@ PY
 start=$(date +%s)
 elapsed() { echo $(( $(date +%s) - start )); }
 
-# 2. orion-server répond (même hôte et même port que dans la machine : l'en-tête Host est accepté).
-status=""
-until status="$(curl -fsS --max-time 5 "http://127.0.0.1:$PORT/api/status" 2>/dev/null)"; do
-	kill -0 "$QEMU_PID" 2>/dev/null || { echo "Erreur : QEMU s'est arrêté" >&2; tail -50 "$OUT/serial.log" >&2; exit 1; }
-	if grep -qE "BOOT FAILED|Kernel panic|emergency mode|orion-server.service: Failed at step" "$OUT/serial.log" 2>/dev/null; then
-		echo "Erreur : le démarrage a échoué" >&2
-		tail -80 "$OUT/serial.log" >&2
-		exit 1
-	fi
-	if [ "$(elapsed)" -ge "$DEADLINE" ]; then
-		echo "Erreur : orion-server ne répond pas après ${DEADLINE} s" >&2
-		tail -80 "$OUT/serial.log" >&2
-		exit 1
-	fi
-	sleep 10
-done
-echo "$status" >"$OUT/status.json"
-echo "==> orion-server répond après $(elapsed) s : $status"
-curl -fsS --max-time 10 "http://127.0.0.1:$PORT/" | grep -q '<title>' && echo "==> L'interface d'Orion est servie"
+failed() {
+	echo "Erreur : $1" >&2
+	tail -80 "$OUT/serial.log" >&2
+	exit 1
+}
 
-# 3. L'interface : Chromium dans cage, sur tty1.
-until grep -q "Lancement de l'interface" "$OUT/serial.log" 2>/dev/null; do
-	if [ "$(elapsed)" -ge "$DEADLINE" ]; then
-		echo "::warning::Le lancement de l'interface n'apparaît pas dans le journal"
-		break
-	fi
-	sleep 10
-done
+# Attend une ligne du journal (expression régulière étendue), en surveillant les échecs.
+wait_for() {
+	until grep -qE "$1" "$OUT/serial.log" 2>/dev/null; do
+		kill -0 "$QEMU_PID" 2>/dev/null || failed "QEMU s'est arrêté"
+		if grep -qE "BOOT FAILED|Kernel panic|emergency mode|orion-server.service: Failed at step" "$OUT/serial.log" 2>/dev/null; then
+			failed "le démarrage a échoué"
+		fi
+		[ "$(elapsed)" -lt "$DEADLINE" ] || failed "$2 après ${DEADLINE} s"
+		sleep 5
+	done
+}
+
+# 2. orion-server démarré (journal copié sur la console série).
+wait_for "Orion OS servi sur http://127\.0\.0\.1" "orion-server n'a pas démarré"
+echo "==> orion-server démarré après $(elapsed) s"
+
+# 3. L'interface : Chromium dans cage, sur tty1. Avant, orion-kiosk vérifie qu'orion-server
+#    répond dans la machine (il l'écrit dans le journal sinon).
+wait_for "Lancement de l'interface" "l'interface ne s'est pas lancée"
+echo "==> Interface lancée après $(elapsed) s"
+if grep -q "orion-server ne répond pas" "$OUT/serial.log"; then
+	failed "orion-server ne répond pas dans la machine"
+fi
 # Chromium charge Orion puis l'assistant de configuration s'affiche (lent sans KVM).
 sleep "${BOOT_TEST_SETTLE:-90}"
 monitor "screendump $WORK/screen.ppm"
@@ -119,7 +122,7 @@ convert "$WORK/screen.ppm" "$OUT/screen.png"
 # 4. Écran : part des pixels non noirs.
 lit="$(convert "$OUT/screen.png" -colorspace Gray -threshold 8% -format '%[fx:mean]' info:)"
 echo "==> Part de l'écran allumée : $lit"
-grep -E "orion-kiosk|orion-server" "$OUT/serial.log" | tail -20 || true
+grep -E "orion-kiosk|orion-server|orion_server" "$OUT/serial.log" | tee "$OUT/orion.log" | tail -20 || true
 # Aperçu réduit dans le journal de l'action (les artefacts ne sont pas toujours accessibles).
 echo "==> Aperçu (JPEG 320 px, base64) :"
 echo "----- APERÇU -----"
