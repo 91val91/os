@@ -10,7 +10,7 @@ python3 server/orion_server.py                          # vrai matériel (machin
 python3 -m unittest discover -s server -v               # tests
 ```
 
-Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racine du dépôt ; sur une machine Orion `/var/lib/orion/current`), `--host` (défaut `127.0.0.1`), `--port` (défaut `8080`), `--simulate`, `--allow-host NOM` (nom d'hôte supplémentaire accepté dans `Host`, à n'utiliser qu'avec `--host`).
+Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racine du dépôt ; sur une machine Orion `/var/lib/orion/current`), `--host` (défaut `127.0.0.1`), `--port` (défaut `8080`), `--simulate`, `--allow-host NOM` (nom d'hôte supplémentaire accepté dans `Host`, à n'utiliser qu'avec `--host`), `--state DOSSIER` (données gardées par le serveur, dont la protection de l'appareil : défaut `/var/lib/orion`, en mémoire avec `--simulate`).
 
 ## Sécurité
 
@@ -31,7 +31,8 @@ Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racin
 ## GET /api/status
 ```json
 { "bridge": "orion-server", "version": "1.0.0", "hostname": "orion", "simulated": false,
-  "capabilities": { "wifi": true, "bluetooth": true, "modem": false, "gps": false, "power": true, "network": true } }
+  "capabilities": { "wifi": true, "bluetooth": true, "modem": false, "gps": false, "power": true, "network": true,
+                    "protection": true, "integrity": true } }
 ```
 Une capacité est vraie si l'outil correspondant est présent et répond :
 - `wifi` : nmcli présent, NetworkManager actif et au moins une carte Wi‑Fi ;
@@ -39,7 +40,8 @@ Une capacité est vraie si l'outil correspondant est présent et répond :
 - `modem` : mmcli présent et au moins un modem (`mmcli -L`) ;
 - `gps` : gpsd joignable sur 127.0.0.1:2947 **et** au moins un récepteur branché ;
 - `power` : systemctl présent ;
-- `network` *(ajout)* : NetworkManager utilisable (actif), même sans Wi‑Fi (machine virtuelle, câble).
+- `network` *(ajout)* : NetworkManager utilisable (actif), même sans Wi‑Fi (machine virtuelle, câble) ;
+- `protection` et `integrity` *(ajout)* : toujours vrais (voir plus bas).
 
 Résultat gardé 5 s. *(Ajout)* `simulated` vaut `true` avec `--simulate`.
 
@@ -120,6 +122,26 @@ Numéros : espaces, points, tirets et parenthèses sont retirés, puis le numér
 
 ## Alimentation (systemd / logind)
 - `POST /api/system/reboot` `{}` et `POST /api/system/poweroff` `{}` → `{ "ok": true }` (exécuté 1 s après la réponse, par `systemctl reboot|poweroff` ; l'utilisateur `orion` y est autorisé par une règle polkit)
+
+## Protection de l'appareil *(ajout)*
+
+Protection contre la réinitialisation : l'empreinte du code de verrouillage du propriétaire (sel + SHA-256 de `sel:code`, comme `hashPasscode()` de l'interface) est gardée dans `--state`/`protection.json` (droits 0600), hors des données de l'interface : elle survit à l'effacement d'Orion et du profil du navigateur. **L'empreinte n'est jamais renvoyée** ; le code est vérifié ici, et les essais sont limités (après 5 erreurs, attente de 30 s doublée à chaque erreur, 1 h au plus, conservée sur le disque).
+
+- `GET /api/protection` → `{ "enabled": true, "owner": { "name": "Camille", "email": "c@exemple.fr" }, "since": 1792749951916, "wait": 0 }` ou `{ "enabled": false, "wait": 0 }` (`wait` : secondes avant un nouvel essai) ;
+- `POST /api/protection/enable` `{ "record": { "salt": "<hex>", "hash": "<sha256>", "length": 4 }, "owner": { "name": "…", "email": "…" } }` → état public ; 409 si déjà activée (la remplacer demande le code) ;
+- `POST /api/protection/verify` `{ "code": "1234" }` → `{ "ok": true }` ; 403 `Code incorrect` ; 429 `Trop d'essais : réessayez dans N s` ;
+- `POST /api/protection/disable` `{ "code": "1234" }` → `{ "ok": true }` (même contrôle que `verify`, puis le fichier est supprimé) ;
+- `POST /api/protection/update` `{ "code": "<ancien>", "record": { … } }` → état public (le propriétaire a changé de code).
+
+Codes : 4 à 8 chiffres ; `salt` : 8 à 64 caractères hexadécimaux ; `length` : 4 à 8.
+
+## GET /api/integrity *(ajout)*
+
+Compare les fichiers de l'interface servie (`--root`) à `version.json` (taille et SHA-256) :
+```json
+{ "status": "altered", "version": "0.1", "checked": 122, "altered": ["./src/main.js"], "missing": [] }
+```
+`status` : `ok` ou `altered` (100 chemins au plus par liste). 500 si `version.json` est illisible.
 
 ## Mode simulé (`--simulate`)
 

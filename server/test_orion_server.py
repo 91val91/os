@@ -901,7 +901,7 @@ class SimulatedFlowsTest(ServerTestCase):
         status, payload = self.api("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertTrue(payload["simulated"])
-        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network"})
+        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network", "protection", "integrity"})
 
     def test_wifi(self):
         wifi = self.api("GET", "/api/wifi?rescan=1")[1]
@@ -1019,6 +1019,84 @@ class SimulatedFlowsTest(ServerTestCase):
 # ---------------------------------------------------------------------------
 # Mises à jour (sous-commande sync)
 # ---------------------------------------------------------------------------
+
+
+class ProtectionTest(ServerTestCase):
+    """Protection contre la réinitialisation gardée par le serveur, et intégrité de l'interface."""
+
+    SALT = "00112233aabbccdd"
+
+    def setUp(self):
+        super().setUp()
+        self.server.protection.clock = self.clock
+
+    def record(self, code):
+        return {"salt": self.SALT, "hash": hashlib.sha256(f"{self.SALT}:{code}".encode()).hexdigest(), "length": len(code)}
+
+    def test_status_announces_protection(self):
+        status, data = self.api("GET", "/api/status")
+        self.assertEqual(status, 200)
+        self.assertTrue(data["capabilities"]["protection"])
+        self.assertTrue(data["capabilities"]["integrity"])
+
+    def test_enable_verify_throttle_and_disable(self):
+        self.assertEqual(self.api("GET", "/api/protection"), (200, {"enabled": False, "wait": 0}))
+        status, data = self.api("POST", "/api/protection/enable", {"record": self.record("1234"), "owner": {"name": "Camille", "email": "c@example.com"}})
+        self.assertEqual(status, 200)
+        self.assertEqual(data["owner"]["name"], "Camille")
+        self.assertNotIn("record", data)
+        # Une seule protection : la remplacer demanderait le code.
+        self.assertEqual(self.api("POST", "/api/protection/enable", {"record": self.record("9999")})[0], 409)
+        self.assertEqual(self.api("POST", "/api/protection/verify", {"code": "1234"}), (200, {"ok": True}))
+        for _ in range(4):
+            self.assertEqual(self.api("POST", "/api/protection/verify", {"code": "0000"})[0], 403)
+        # Cinquième échec : attente imposée, même avec le bon code.
+        self.assertEqual(self.api("POST", "/api/protection/verify", {"code": "0000"})[0], 403)
+        self.assertEqual(self.api("GET", "/api/protection")[1]["wait"], 30)
+        status, data = self.api("POST", "/api/protection/verify", {"code": "1234"})
+        self.assertEqual(status, 429)
+        self.assertIn("30 s", data["error"])
+        self.clock.now += 31
+        self.assertEqual(self.api("POST", "/api/protection/disable", {"code": "1234"}), (200, {"ok": True}))
+        self.assertFalse(self.api("GET", "/api/protection")[1]["enabled"])
+
+    def test_update_requires_the_current_code(self):
+        self.api("POST", "/api/protection/enable", {"record": self.record("1234")})
+        self.assertEqual(self.api("POST", "/api/protection/update", {"code": "4321", "record": self.record("5678")})[0], 403)
+        self.assertEqual(self.api("POST", "/api/protection/update", {"code": "1234", "record": self.record("5678")})[0], 200)
+        self.assertEqual(self.api("POST", "/api/protection/verify", {"code": "5678"})[0], 200)
+
+    def test_invalid_requests(self):
+        self.assertEqual(self.api("POST", "/api/protection/enable", {"record": {"salt": "x", "hash": "y", "length": 4}})[0], 400)
+        self.assertEqual(self.api("POST", "/api/protection/verify", {"code": "12ab"})[0], 400)
+
+    def test_kept_on_disk(self):
+        clock = FakeClock()
+        path = self.tmp / "state" / "protection.json"
+        store = osv.ProtectionStore(path, clock)
+        store.enable(self.record("2468"), {"name": "Camille", "email": ""})
+        self.assertEqual(oct(path.stat().st_mode & 0o777), "0o600")
+        again = osv.ProtectionStore(path, clock)
+        self.assertTrue(again.public()["enabled"])
+        with self.assertRaises(osv.ApiError):
+            again.verify("1111")
+        self.assertEqual(json.loads(path.read_text())["failures"], 1)
+        again.disable("2468")
+        self.assertFalse(path.exists())
+
+    def test_integrity(self):
+        root = self.tmp / "releases" / "c"
+        files = {"index.html": "<!doctype html>", "src/main.js": "export {};"}
+        listing = {}
+        for name, content in files.items():
+            write(root / name, content)
+            listing[f"./{name}"] = {"hash": hashlib.sha256(content.encode()).hexdigest(), "size": len(content)}
+        write(root / "version.json", json.dumps({"version": "0.1", "files": listing}))
+        self.assertEqual(osv.check_integrity(root)["status"], "ok")
+        write(root / "src" / "main.js", "export const pirate = 1;")
+        (root / "index.html").unlink()
+        result = osv.check_integrity(root)
+        self.assertEqual((result["status"], result["altered"], result["missing"]), ("altered", ["./src/main.js"], ["./index.html"]))
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -1174,6 +1252,23 @@ class SyncTest(unittest.TestCase):
         self.sync(allow_downgrade=True)
         self.assertEqual(self.current(), "1.0.9")
 
+    def test_sequence_orders_releases(self):
+        # 1.2.0 (sans numéro d'ordre) → 0.1 alpha (numéro d'ordre 4) : c'est une mise à jour.
+        self.publish("1.2.0")
+        self.sync()
+        self.publish("0.1", manifest_override={"channel": "alpha", "sequence": 4})
+        self.assertIn("installée", self.sync())
+        self.assertEqual(self.current(), "0.1")
+        # Plus ancienne d'après le numéro d'ordre, même avec un numéro affiché plus grand.
+        self.publish("2.0", manifest_override={"sequence": 3})
+        self.assertIn("plus ancienne", self.sync())
+        self.publish("1.9.0")
+        self.assertIn("plus ancienne", self.sync())
+        self.assertEqual(self.current(), "0.1")
+        self.publish("0.2", manifest_override={"channel": "alpha", "sequence": 5})
+        self.sync()
+        self.assertEqual(self.current(), "0.2")
+
     def test_republished_version_gets_a_new_directory(self):
         self.publish("1.0.0")
         self.sync()
@@ -1200,6 +1295,11 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(osv.compare_versions("1.10.0", "1.9.2"), 1)
         self.assertEqual(osv.compare_versions("1.1", "1.1.0"), 0)
         self.assertEqual(osv.compare_versions("1.0.0", "1.0.1"), -1)
+        self.assertEqual(osv.compare_releases({"version": "0.1", "sequence": 4}, {"version": "1.2.0"}), 1)
+        self.assertEqual(osv.compare_releases({"version": "1.2.0"}, {"version": "0.1", "sequence": 4}), -1)
+        self.assertEqual(osv.compare_releases({"version": "0.2", "sequence": 5}, {"version": "0.1", "sequence": 4}), 1)
+        self.assertEqual(osv.compare_releases({"version": "1.2.0"}, {"version": "1.1.0"}), 1)
+        self.assertEqual(osv.compare_releases({"version": "0.1", "sequence": True}, {"version": "1.2.0"}), -1)
 
 
 if __name__ == "__main__":

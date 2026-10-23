@@ -164,8 +164,9 @@ export class AccountRegistry {
  * le compte du propriétaire est créé ; son nom est complété par l'assistant.
  */
 export async function openSession(env = globalThis) {
+  const shared = await openBestBackend(env, { name: REGISTRY_DB });
   const registry = await new AccountRegistry({
-    store: new Namespace(await openBestBackend(env, { name: REGISTRY_DB }), 'accounts'),
+    store: new Namespace(shared, 'accounts'),
     locks: env.navigator?.locks ?? null,
     channel: env.BroadcastChannel ? new env.BroadcastChannel(REGISTRY_DB) : null,
   }).load();
@@ -175,7 +176,8 @@ export async function openSession(env = globalThis) {
   }
   const account = registry.current ?? registry.create({ owner: true });
   const backend = await openBestBackend(env, { name: account.db });
-  return { registry, account, backend };
+  // `shared` : données communes aux comptes de l'appareil (Store).
+  return { registry, account, backend, shared };
 }
 
 /**

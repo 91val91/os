@@ -1,6 +1,8 @@
 /**
  * Faux orion-server en mémoire pour les tests (mêmes routes que server/API.md).
  */
+import { createHash } from 'node:crypto';
+
 export function fakeBridge({ capabilities = { wifi: true, network: true, bluetooth: true, modem: true, gps: true, power: true } } = {}) {
   const state = {
     wifi: {
@@ -17,6 +19,7 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
     modem: { available: true, enabled: true, state: 'registered', operator: 'Orion Mobile', signal: 64, technology: 'lte', sim: true, number: '+33600000000', registration: 'home', data: false },
     calls: [],
     sms: [],
+    protection: {},
     gps: { available: true, fix: { lat: 48.8566, lon: 2.3522, alt: 35, speed: 0, heading: null, accuracy: 6, time: '2026-01-15T09:00:00Z', satellites: 9 } },
   };
   const requests = [];
@@ -120,7 +123,33 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       return ok();
     },
     'GET gps': () => ok({ ...state.gps }),
+    // Protection contre la réinitialisation gardée par le serveur (l'empreinte n'est jamais renvoyée).
+    'GET protection': () => ok(state.protection.record ? { enabled: true, owner: state.protection.owner, since: 1, wait: 0 } : { enabled: false, wait: 0 }),
+    'POST protection/enable': ({ record, owner }) => {
+      if (state.protection.record) return fail(409, 'Déjà activée');
+      Object.assign(state.protection, { record, owner, failures: 0 });
+      return routes['GET protection']();
+    },
+    'POST protection/verify': ({ code }) => (checkCode(code) ? ok() : fail(403, 'Code incorrect')),
+    'POST protection/disable': ({ code }) => {
+      if (!checkCode(code)) return fail(403, 'Code incorrect');
+      state.protection = {};
+      return ok();
+    },
+    'POST protection/update': ({ code, record }) => {
+      if (!checkCode(code)) return fail(403, 'Code incorrect');
+      state.protection.record = record;
+      return routes['GET protection']();
+    },
   };
+
+  function checkCode(code) {
+    const { record } = state.protection;
+    if (!record) return true;
+    const ok = createHash('sha256').update(`${record.salt}:${code}`).digest('hex') === record.hash;
+    state.protection.failures = ok ? 0 : (state.protection.failures ?? 0) + 1;
+    return ok;
+  }
 
   async function fetch(url, { method = 'GET', headers = {}, body } = {}) {
     const path = String(url).replace(/^api\//, '').replace(/\?.*$/, '');

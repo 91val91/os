@@ -27,6 +27,7 @@ Démarrage (GRUB en UEFI, isolinux en BIOS)
 | --- | --- |
 | Interface d'Orion (version en service) | `/var/lib/orion/current` → `/var/lib/orion/releases/<version>/` |
 | Serveur matériel | `/opt/orion-server/orion_server.py` (+ `API.md`) |
+| Protection contre la réinitialisation (empreinte du code du propriétaire) | `/var/lib/orion/protection.json` |
 | Lancement de l'interface | `/usr/local/bin/orion-kiosk`, appelé par `~/.bash_profile` sur tty1 |
 | Réglages (port, source des mises à jour, options de Chromium) | `/etc/default/orion` |
 | Droits de l'utilisateur `orion` (réseau, modem, alimentation) | `/etc/polkit-1/rules.d/50-orion.rules` |
@@ -55,7 +56,7 @@ installer/build-in-docker.sh
 
 La construction a lieu dans un conteneur Debian 12 privilégié ; les paquets téléchargés sont gardés dans le volume Docker `orion-os-build` pour les fois suivantes. Sur un Mac à puce Apple, le conteneur amd64 est émulé : comptez plusieurs heures.
 
-**Sur GitHub, sans rien installer** : l'action [`.github/workflows/installer.yml`](../.github/workflows/installer.yml) teste le serveur, construit l'image à chaque modification de `server/` ou `installer/`, et la dépose en artefact (onglet **Actions** → la dernière exécution → *orion-os-amd64-iso*). On peut aussi la lancer à la main (**Run workflow**). Pour une étiquette `v1.2.0` poussée sur GitHub, l'image est jointe à la publication correspondante (onglet **Releases**).
+**Sur GitHub, sans rien installer** : l'action [`.github/workflows/installer.yml`](../.github/workflows/installer.yml) teste le serveur, construit l'image à chaque modification de `server/` ou `installer/`, et la dépose en artefact (onglet **Actions** → la dernière exécution → *orion-os-amd64-iso*). On peut aussi la lancer à la main (**Run workflow**). Pour une étiquette `v0.1` poussée sur GitHub, l'image est jointe à la publication correspondante (onglet **Releases**).
 
 ## Essayer dans une machine virtuelle
 

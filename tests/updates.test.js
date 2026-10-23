@@ -2,12 +2,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bootKernel } from '../src/kernel/kernel.js';
 import { RELEASE } from '../src/kernel/version.js';
-import { UpdateManager, compareVersions } from '../src/system/updates.js';
+import { UpdateManager, compareReleases, compareVersions } from '../src/system/updates.js';
 
 test('comparaison de versions', () => {
   assert.equal(compareVersions('1.10.0', '1.9.9'), 1);
   assert.equal(compareVersions('1.1', '1.1.0'), 0);
   assert.equal(compareVersions('0.9.0', '1.0.0'), -1);
+});
+
+test('ordre des versions : le numéro d\'ordre prime sur le numéro affiché', () => {
+  const legacy = { version: '1.2.0' };
+  const alpha = { version: '0.1', channel: 'alpha', sequence: 4 };
+  assert.equal(compareReleases(alpha, legacy), 1);
+  assert.equal(compareReleases(legacy, alpha), -1);
+  assert.equal(compareReleases({ version: '0.2', sequence: 5 }, alpha), 1);
+  assert.equal(compareReleases({ version: '9.0', sequence: 3 }, alpha), -1);
+  assert.equal(compareReleases(alpha, { ...alpha }), 0);
+  assert.equal(compareReleases({ version: '1.2.0' }, { version: '1.1.0' }), 1);
+  assert.ok(Number.isInteger(RELEASE.sequence) && RELEASE.sequence > 3, 'la 0.1 vient après la 1.2.0 (3e publication)');
+});
+
+test('mises à jour : une version 1.x publiée (plus ancienne que la 0.1) n\'est pas proposée', async () => {
+  const { kernel, updates } = await system({ version: '1.9.0', build: 'OR1', notes: [] });
+  await updates.check();
+  assert.equal(updates.status, 'uptodate');
+  kernel.shutdown();
 });
 
 /** Système minimal : noyau réel, réseau simulé (version.json), sans service worker. */
@@ -20,7 +39,7 @@ async function system(published) {
 }
 
 test('mises à jour : rien à installer quand la version publiée est la même', async () => {
-  const { kernel, updates } = await system({ version: RELEASE.version });
+  const { kernel, updates } = await system({ version: RELEASE.version, sequence: RELEASE.sequence });
   await updates.check();
   assert.equal(updates.status, 'uptodate');
   assert.ok(kernel.settings.get('updates.lastCheck') > 0);
@@ -29,13 +48,14 @@ test('mises à jour : rien à installer quand la version publiée est la même',
 });
 
 test('mises à jour : nouvelle version annoncée, téléchargée puis installée', async () => {
-  const next = { version: '99.0.0', build: 'OR9', date: '2027-01-01', notes: ['Nouveautés'], size: 1234 };
+  const next = { version: '99.0.0', sequence: 99, build: 'OR9', date: '2027-01-01', notes: ['Nouveautés'], size: 1234 };
   const { kernel, updates, restarts } = await system(next);
   const statuses = [];
   kernel.events.on('update:change', ({ status }) => statuses.push(status));
   await updates.check();
   assert.equal(updates.status, 'available');
   assert.equal(updates.available.version, '99.0.0');
+  assert.equal(updates.available.label, '99.0.0');
   const [notification] = kernel.notifications.list({ appId: 'settings' });
   assert.match(notification.title, /Mise à jour disponible/);
   assert.deepEqual(notification.intent.data, { page: 'updates' });
@@ -67,7 +87,7 @@ function fakeWorker({ staged = null } = {}) {
     postMessage(message, [port]) {
       worker.received.push(message.type);
       const reply = (data) => queueMicrotask(() => port.postMessage(data));
-      if (message.type === 'status') reply({ current: { version: RELEASE.version }, staged: worker.staged });
+      if (message.type === 'status') reply({ current: { version: RELEASE.version, sequence: RELEASE.sequence }, staged: worker.staged });
       else if (message.type === 'estimate') reply({ size: 10 });
       else if (message.type === 'discard') {
         if (worker.staged?.version !== message.keep) worker.staged = null;
@@ -97,8 +117,8 @@ async function managed(published, worker, env, extra = {}) {
 }
 
 test('mises à jour : une version retirée par l\'éditeur n\'est jamais installée', async () => {
-  const { worker, env } = fakeWorker({ staged: { version: '99.0.0' } });
-  const { kernel, updates } = await managed({ version: RELEASE.version }, worker, env);
+  const { worker, env } = fakeWorker({ staged: { version: '99.0.0', sequence: 99 } });
+  const { kernel, updates } = await managed({ version: RELEASE.version, sequence: RELEASE.sequence }, worker, env);
   await updates.check();
   assert.equal(updates.status, 'uptodate');
   assert.ok(worker.received.includes('discard'));
@@ -107,10 +127,10 @@ test('mises à jour : une version retirée par l\'éditeur n\'est jamais install
 });
 
 test('mises à jour : une version prête reste installable hors ligne', async () => {
-  const { worker, env } = fakeWorker({ staged: { version: '99.0.0' } });
+  const { worker, env } = fakeWorker({ staged: { version: '99.0.0', sequence: 99 } });
   const { kernel, updates } = await managed(null, worker, env);
   updates.status = 'ready';
-  updates.available = { version: '99.0.0' };
+  updates.available = { version: '99.0.0', sequence: 99 };
   await updates.check();
   assert.equal(updates.status, 'ready');
   assert.match(updates.checkError, /connexion/);
@@ -120,12 +140,12 @@ test('mises à jour : une version prête reste installable hors ligne', async ()
 
 test('mises à jour : un téléchargement suivi depuis une autre fenêtre se termine bien', async () => {
   const { worker, env } = fakeWorker();
-  const { kernel, updates } = await managed({ version: '99.0.0' }, worker, env);
+  const { kernel, updates } = await managed({ version: '99.0.0', sequence: 99 }, worker, env);
   updates.start();
-  worker.broadcast({ type: 'update-progress', version: '99.0.0', done: 5, total: 10, downloaded: 100 });
+  worker.broadcast({ type: 'update-progress', version: '99.0.0', sequence: 99, done: 5, total: 10, downloaded: 100 });
   assert.equal(updates.status, 'downloading');
-  worker.staged = { version: '99.0.0', notes: [] };
-  worker.broadcast({ type: 'update-ready', version: '99.0.0' });
+  worker.staged = { version: '99.0.0', sequence: 99, notes: [] };
+  worker.broadcast({ type: 'update-ready', version: '99.0.0', sequence: 99 });
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(updates.status, 'ready');
   // Échec signalé par le service worker : l'erreur s'affiche au lieu d'un téléchargement sans fin.
@@ -140,9 +160,9 @@ test('mises à jour : un téléchargement suivi depuis une autre fenêtre se ter
 });
 
 test('mises à jour : l\'installation automatique attend un appareil vraiment au repos', async () => {
-  const { worker, env } = fakeWorker({ staged: { version: '99.0.0' } });
+  const { worker, env } = fakeWorker({ staged: { version: '99.0.0', sequence: 99 } });
   const installs = [];
-  const { kernel, ui, updates } = await managed({ version: '99.0.0' }, worker, env, { state: 'locked' });
+  const { kernel, ui, updates } = await managed({ version: '99.0.0', sequence: 99 }, worker, env, { state: 'locked' });
   kernel.settings.set('updates.autoInstall', true);
   updates.install = async () => installs.push(Date.now());
   updates.status = 'ready';

@@ -26,6 +26,7 @@ import { Banners } from './banners.js';
 import { CallScreen } from './call-screen.js';
 import { AlarmScreen } from './alarm-screen.js';
 import { SetupWizard } from './setup.js';
+import { DeviceProtection } from './protection.js';
 import { PowerManager, logo } from './power.js';
 import { platform } from './platform.js';
 import { DeveloperMode } from './developer.js';
@@ -162,11 +163,12 @@ export class SystemUI {
     if (platform.installed) {
       navigator.storage?.persisted?.().then((persisted) => persisted || navigator.storage.persist()).catch(() => {});
     }
-    this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, accountId: session?.account.id, manifests: MANIFESTS, onProgress: (_, p) => this.power.setBootProgress(p) });
+    this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, accountId: session?.account.id, manifests: MANIFESTS, shared: session?.shared ?? null, storeRuntime: () => import('./app-runtime.js'), protectionBackend: await openBestBackend(globalThis, { name: 'orion-protection' }).catch(() => null), onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
     this.#syncAccount();
     this.developer = new DeveloperMode(this);
     this.developer.migrate();
+    this.protection = new DeviceProtection(this);
     this.updates = new UpdateManager(this);
     await this.#watchOtherAlarms();
 
@@ -205,6 +207,7 @@ export class SystemUI {
     };
     k.permissions.prompter = (request) => this.dialogs.permission(request);
     this.#wireKernelEvents();
+    this.protection.start();
     this.#setupInput();
     this.#startTimers();
 
@@ -217,6 +220,8 @@ export class SystemUI {
 
     if (!k.settings.get('setupDone')) {
       this.setState('setup');
+      // Réinitialisé alors que la protection était activée : le code de l'ancien propriétaire d'abord.
+      if ((!k.accounts || k.account?.owner) && k.protection.frp.enabled) await this.protection.challenge();
       await new SetupWizard(this).run();
       this.lock.isLocked = false;
       this.lock.el.classList.remove('visible');

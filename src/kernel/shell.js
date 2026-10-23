@@ -813,7 +813,7 @@ const COMMANDS = {
     desc: 'Informations sur le système',
     usage: 'uname [-a]',
     run({ args, k }) {
-      if (args.includes('-a')) return `OrionOS ${this.env.HOSTNAME} ${k.os.version} ${k.os.build} ${k.os.kernel} web`;
+      if (args.includes('-a')) return `OrionOS ${this.env.HOSTNAME} ${k.os.version}${k.os.channel ? `-${k.os.channel}` : ''} ${k.os.build} ${k.os.kernel} web`;
       return 'OrionOS';
     },
   },
@@ -1248,7 +1248,7 @@ const COMMANDS = {
       const info = [
         `${paint('cyan', paint('bold', this.env.USER))}@${paint('cyan', paint('bold', this.env.HOSTNAME))}`,
         '─'.repeat(20),
-        `${paint('cyan', 'OS')}: ${k.os.name} ${k.os.version} « ${k.os.codename} »`,
+        `${paint('cyan', 'OS')}: ${k.os.name} ${k.os.label} « ${k.os.codename} »`,
         `${paint('cyan', 'Noyau')}: ${k.os.kernel}`,
         `${paint('cyan', 'Uptime')}: ${formatUptime(k.device.uptime())}`,
         `${paint('cyan', 'Paquets')}: ${k.packages.list().length} (pm)`,

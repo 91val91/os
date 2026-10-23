@@ -16,7 +16,7 @@ export default [
         AbortController: 'readonly', Blob: 'readonly', FileReader: 'readonly', Audio: 'readonly', Node: 'readonly',
         TextEncoder: 'readonly', MediaRecorder: 'readonly', ResizeObserver: 'readonly',
         getComputedStyle: 'readonly', getSelection: 'readonly', globalThis: 'readonly', self: 'readonly', caches: 'readonly',
-        history: 'readonly', Request: 'readonly', Response: 'readonly', process: 'readonly', crypto: 'readonly', MessageChannel: 'readonly', Image: 'readonly', setImmediate: 'readonly',
+        history: 'readonly', Request: 'readonly', Response: 'readonly', process: 'readonly', crypto: 'readonly', MessageChannel: 'readonly', MutationObserver: 'readonly', Image: 'readonly', setImmediate: 'readonly',
       },
     },
     rules: {

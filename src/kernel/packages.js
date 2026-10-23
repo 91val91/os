@@ -94,6 +94,20 @@ export class PackageManager {
     return pkg;
   }
 
+  /** Retire une app du catalogue (app du Store supprimée par son développeur). */
+  unregister(id) {
+    const pkg = this.get(id);
+    if (!pkg || pkg.system) return false;
+    const installed = this.#installed.delete(id);
+    this.#available.delete(id);
+    if (installed) {
+      delete this.installDates[id];
+      this.#persist();
+      this.events?.emit('package:uninstall', { id });
+    }
+    return true;
+  }
+
   async uninstall(id) {
     const pkg = this.get(id);
     if (!pkg) throw new Error(`Paquet introuvable : ${id}`);

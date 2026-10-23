@@ -2814,3 +2814,74 @@ html.android body.fullscreen .edge-zone {
 @keyframes touch-fade {
   to { opacity: 0; transform: scale(1.4); }
 }
+
+/* ───────────── Apps publiées sur le Store (iframe isolée) ───────────── */
+
+.app-runtime {
+  position: absolute;
+  inset: 0;
+  padding: var(--sat) 0 var(--sab);
+  background: var(--bg);
+}
+
+.app-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+  color-scheme: normal;
+}
+
+.app-runtime-stopped {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 32px;
+  text-align: center;
+  color: var(--fg-2);
+}
+
+.app-runtime-stopped strong {
+  color: var(--fg);
+  font-size: 19px;
+}
+
+/* Protection contre la réinitialisation (assistant) */
+.frp-logo {
+  background: linear-gradient(160deg, #ff6b61, #d70015);
+}
+
+.frp-owner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  font-weight: 600;
+}
+
+.frp-input {
+  max-width: 260px;
+  margin: 0 auto;
+  text-align: center;
+  letter-spacing: .3em;
+}
+
+.frp-input::placeholder {
+  letter-spacing: normal;
+}
+
+.frp-error {
+  min-height: 1.3em;
+  margin: 10px 0 0;
+  color: var(--red);
+  text-align: center;
+}
+
+/* Attente après trop d'erreurs : chiffres inactifs, « Urgence » et « Annuler » restent utilisables. */
+.lock-pin.blocked .pin-key {
+  opacity: .35;
+  pointer-events: none;
+}

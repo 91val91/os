@@ -97,7 +97,7 @@ export function mount(root, ctx) {
   function aboutPage() {
     const k = ctx.kernel;
     return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:28px 22px;color:#222;background:linear-gradient(180deg,#eef2ff,#fff)}h1{font-size:28px;margin:0 0 6px}p{color:#555}code{background:#eef;padding:2px 6px;border-radius:6px}li{margin:6px 0}</style>
-<h1>${k.os.name} ${k.os.version}</h1><p>« ${k.os.codename} » — build <code>${k.os.build}</code></p>
+<h1>${k.os.name} ${k.os.label}</h1><p>« ${k.os.codename} » — build <code>${k.os.build}</code></p>
 <p>Un système d'exploitation mobile web, inspiré d'iOS et d'Android.</p>
 <ul><li>Noyau JavaScript : processus, système de fichiers, paquets, intents</li><li>Notifications, alarmes, permissions, téléphonie simulée</li><li>${k.packages.list().length} applications installées</li><li>Stockage : ${k.backend}</li></ul>`;
   }

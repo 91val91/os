@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
+import hmac
 import http.client
 import json
 import logging
@@ -1879,6 +1880,180 @@ class SimulatedHardware:
 
 
 # --------------------------------------------------------------------------
+# Protection de l'appareil et intégrité de l'interface
+# --------------------------------------------------------------------------
+
+SALT_RE = re.compile(r"[0-9a-f]{8,64}")
+PASSCODE_RE = re.compile(r"\d{4,8}")
+FRP_FREE_ATTEMPTS = 5
+FRP_MAX_WAIT = 3600
+
+
+class ProtectionStore:
+    """Protection contre la réinitialisation, gardée hors des données de l'interface.
+
+    L'interface enregistre ici l'empreinte du code de verrouillage du
+    propriétaire (sel + SHA-256, comme hashPasscode()). Après un effacement des
+    données d'Orion ou du navigateur, ce code est redemandé et vérifié ici :
+    l'empreinte n'est jamais renvoyée, et les essais sont limités (attente
+    croissante, conservée sur le disque). Sans fichier (--simulate), tout reste
+    en mémoire.
+    """
+
+    def __init__(self, path: Path | None, clock: Callable[[], float] = time.time):
+        self.path = path
+        self.clock = clock
+        self._lock = threading.Lock()
+        self._memory: dict = {}
+
+    def _read(self) -> dict:
+        if self.path is None:
+            return json.loads(json.dumps(self._memory))
+        try:
+            data = json.loads(self.path.read_text("utf-8"))
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            LOG.warning("Protection : %s illisible", self.path)
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _write(self, data: dict) -> None:
+        if self.path is None:
+            self._memory = data
+            return
+        if not data:
+            with contextlib.suppress(FileNotFoundError):
+                self.path.unlink()
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        os.replace(tmp, self.path)
+
+    def _wait(self, data: dict) -> int:
+        try:
+            return max(0, math.ceil(float(data.get("blocked_until", 0)) - self.clock()))
+        except (TypeError, ValueError):
+            return 0
+
+    def public(self) -> dict:
+        with self._lock:
+            data = self._read()
+        if not isinstance(data.get("record"), dict):
+            return {"enabled": False, "wait": 0}
+        return {"enabled": True, "owner": data.get("owner") or {}, "since": data.get("since"), "wait": self._wait(data)}
+
+    def _matches(self, data: dict, code: str) -> bool:
+        """Vérifie le code ; compte l'échec et fixe l'attente suivante (à enregistrer)."""
+        wait = self._wait(data)
+        if wait:
+            raise ApiError(429, f"Trop d'essais : réessayez dans {wait} s")
+        record = data["record"]
+        digest = hashlib.sha256(f"{record.get('salt', '')}:{code}".encode()).hexdigest()
+        if hmac.compare_digest(digest, str(record.get("hash", ""))):
+            data["failures"] = 0
+            data["blocked_until"] = 0
+            return True
+        failures = int(data.get("failures", 0)) + 1
+        data["failures"] = failures
+        delay = min(FRP_MAX_WAIT, 30 * 2 ** (failures - FRP_FREE_ATTEMPTS)) if failures >= FRP_FREE_ATTEMPTS else 0
+        data["blocked_until"] = self.clock() + delay if delay else 0
+        return False
+
+    def _with_code(self, code: str, then: Callable[[dict], dict]) -> dict:
+        with self._lock:
+            data = self._read()
+            if not isinstance(data.get("record"), dict):
+                return {"ok": True}
+            ok = self._matches(data, code)
+            self._write(then(data) if ok else data)
+        if not ok:
+            raise ApiError(403, "Code incorrect")
+        return {"ok": True}
+
+    def enable(self, record: dict, owner: dict) -> dict:
+        with self._lock:
+            if isinstance(self._read().get("record"), dict):
+                raise ApiError(409, "La protection est déjà activée : désactivez-la d'abord avec le code")
+            self._write({"record": record, "owner": owner, "since": int(self.clock() * 1000), "failures": 0, "blocked_until": 0})
+        LOG.info("Protection contre la réinitialisation activée")
+        return self.public()
+
+    def verify(self, code: str) -> dict:
+        return self._with_code(code, lambda data: data)
+
+    def disable(self, code: str) -> dict:
+        result = self._with_code(code, lambda data: {})
+        LOG.info("Protection contre la réinitialisation désactivée")
+        return result
+
+    def update(self, code: str, record: dict) -> dict:
+        self._with_code(code, lambda data: {**data, "record": record})
+        return self.public()
+
+
+def _passcode(body: dict) -> str:
+    code = get_str(body, "code", max_len=8)
+    if not PASSCODE_RE.fullmatch(code):
+        raise ApiError(400, "Code invalide (4 à 8 chiffres)")
+    return code
+
+
+def _record(body: dict) -> dict:
+    record = body.get("record")
+    if not isinstance(record, dict):
+        raise ApiError(400, "Empreinte du code manquante")
+    salt, digest, length = record.get("salt"), record.get("hash"), record.get("length")
+    if not isinstance(salt, str) or not SALT_RE.fullmatch(salt) or not isinstance(digest, str) or not HASH_RE.fullmatch(digest):
+        raise ApiError(400, "Empreinte du code invalide")
+    if isinstance(length, bool) or not isinstance(length, int) or not 4 <= length <= 8:
+        raise ApiError(400, "Longueur du code invalide")
+    return {"salt": salt, "hash": digest, "length": length}
+
+
+def _owner(body: dict) -> dict:
+    owner = body.get("owner") or {}
+    if not isinstance(owner, dict):
+        raise ApiError(400, "Propriétaire invalide")
+    return {"name": get_str(owner, "name", required=False, max_len=80) or "", "email": get_str(owner, "email", required=False, max_len=120) or ""}
+
+
+def check_integrity(root: str | os.PathLike[str]) -> dict:
+    """Compare les fichiers de l'interface servie à version.json (taille et SHA-256)."""
+    base = Path(os.path.realpath(root))
+    try:
+        version, entries = parse_manifest(json.loads((base / "version.json").read_text("utf-8")))
+    except (OSError, ValueError, SyncError) as error:
+        raise ApiError(500, f"version.json illisible : {error}") from None
+    altered: list[str] = []
+    missing: list[str] = []
+    for key, parts, digest, size in entries:
+        path = base.joinpath(*parts)
+        try:
+            if path.is_symlink() or not path.is_file():
+                missing.append(key)
+            elif path.stat().st_size != size or sha256_file(path) != digest:
+                altered.append(key)
+        except OSError:
+            missing.append(key)
+    return {"status": "ok" if not altered and not missing else "altered", "version": version, "checked": len(entries), "altered": altered[:100], "missing": missing[:100]}
+
+
+def server_routes(protection: ProtectionStore, root: str) -> dict[str, dict[str, Handler]]:
+    return {
+        "/api/protection": {"GET": lambda hw, body, q: protection.public()},
+        "/api/protection/enable": {"POST": lambda hw, body, q: protection.enable(_record(body), _owner(body))},
+        "/api/protection/verify": {"POST": lambda hw, body, q: protection.verify(_passcode(body))},
+        "/api/protection/disable": {"POST": lambda hw, body, q: protection.disable(_passcode(body))},
+        "/api/protection/update": {"POST": lambda hw, body, q: protection.update(_passcode(body), _record(body))},
+        "/api/integrity": {"GET": lambda hw, body, q: check_integrity(root)},
+    }
+
+
+# --------------------------------------------------------------------------
 # API HTTP
 # --------------------------------------------------------------------------
 
@@ -2205,13 +2380,22 @@ class OrionHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address: tuple[str, int], root: str | os.PathLike[str], hardware: Any, allow_hosts: tuple[str, ...] = ()):
+    def __init__(self, address: tuple[str, int], root: str | os.PathLike[str], hardware: Any, allow_hosts: tuple[str, ...] = (), protection: ProtectionStore | None = None):
         if ":" in address[0]:
             self.address_family = socket.AF_INET6
         super().__init__(address, OrionHandler)
         self.root = str(root)
         self.hardware = hardware
+        self.protection = protection if protection is not None else ProtectionStore(None)
         self.routes = dict(API_ROUTES)
+        self.routes.update(server_routes(self.protection, self.root))
+        hardware_status = self.routes["/api/status"]["GET"]
+
+        def status(hw: Any, body: dict, query: dict) -> dict:
+            data = hardware_status(hw, body, query)
+            return {**data, "capabilities": {**data.get("capabilities", {}), "protection": True, "integrity": True}}
+
+        self.routes["/api/status"] = {"GET": status}
         if getattr(hardware, "simulated", False):
             self.routes.update(SIMULATE_ROUTES)
         port = self.server_address[1]
@@ -2224,8 +2408,8 @@ class OrionHTTPServer(ThreadingHTTPServer):
         self.allowed_hosts = frozenset(hosts)
 
 
-def make_server(root: str | os.PathLike[str], host: str, port: int, hardware: Any, allow_hosts: tuple[str, ...] = ()) -> OrionHTTPServer:
-    return OrionHTTPServer((host, port), root, hardware, allow_hosts)
+def make_server(root: str | os.PathLike[str], host: str, port: int, hardware: Any, allow_hosts: tuple[str, ...] = (), protection: ProtectionStore | None = None) -> OrionHTTPServer:
+    return OrionHTTPServer((host, port), root, hardware, allow_hosts, protection)
 
 
 # --------------------------------------------------------------------------
@@ -2266,6 +2450,23 @@ def compare_versions(a: Any, b: Any) -> int:
         if diff:
             return 1 if diff > 0 else -1
     return 0
+
+
+def compare_releases(a: dict, b: dict) -> int:
+    """Comme compareReleases() de l'interface : le numéro d'ordre (« sequence »)
+    décide, le numéro affiché pouvant repartir de zéro (1.2.0 → 0.1 alpha) ;
+    une version sans numéro d'ordre (avant la 0.1) est la plus ancienne."""
+
+    def sequence(manifest: dict) -> int | None:
+        value = manifest.get("sequence")
+        return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+    sa, sb = sequence(a), sequence(b)
+    if sa is not None and sb is not None:
+        return (sa > sb) - (sa < sb)
+    if (sa is None) != (sb is None):
+        return 1 if sa is not None else -1
+    return compare_versions(a.get("version"), b.get("version"))
 
 
 def manifest_parts(key: Any) -> list[str]:
@@ -2430,7 +2631,7 @@ def sync_release(source: str, data_dir: str | os.PathLike[str], *, allow_downgra
             installed = current_manifest.get("version")
             if installed == version and current_manifest.get("files") == manifest.get("files"):
                 return f"Orion OS {version} est à jour."
-            if compare_versions(version, installed) < 0 and not allow_downgrade:
+            if compare_releases(manifest, current_manifest) < 0 and not allow_downgrade:
                 return f"La version publiée ({version}) est plus ancienne que celle installée ({installed}) : rien n'est changé."
 
         name = version
@@ -2546,12 +2747,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-host", action="append", default=[], metavar="NOM", help="nom d'hôte supplémentaire accepté dans l'en-tête Host (avec --host)"
     )
+    parser.add_argument(
+        "--state", default=None, metavar="DOSSIER", help=f"données gardées par le serveur, dont la protection de l'appareil (défaut : {DEFAULT_DATA} ; en mémoire avec --simulate)"
+    )
     args = parser.parse_args(argv)
     if not os.path.isfile(os.path.join(os.path.realpath(args.root), "index.html")):
         LOG.warning("Pas d'index.html dans %s : l'interface ne sera pas servie", args.root)
     hardware: Any = SimulatedHardware() if args.simulate else RealHardware()
     try:
-        server = make_server(args.root, args.host, args.port, hardware, tuple(args.allow_host))
+        state = args.state or (None if args.simulate else DEFAULT_DATA)
+        protection = ProtectionStore(Path(state) / "protection.json" if state else None)
+        server = make_server(args.root, args.host, args.port, hardware, tuple(args.allow_host), protection)
     except OSError as error:
         LOG.error("Impossible d'écouter sur %s:%s : %s", args.host, args.port, error)
         return 1

@@ -40,14 +40,19 @@ import { BluetoothService } from './bluetooth.js';
 import { LocationService } from './location.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
-import { RELEASE } from './version.js';
+import { RELEASE, versionLabel } from './version.js';
+import { StoreService } from './store.js';
+import { ProtectionService } from './protection.js';
 
 export const OS = Object.freeze({
   name: 'Orion OS',
   version: RELEASE.version,
+  /** « 0.1 (alpha) » */
+  label: versionLabel(RELEASE),
+  channel: RELEASE.channel ?? null,
   codename: RELEASE.codename,
   build: RELEASE.build,
-  kernel: `orion-kernel ${RELEASE.version}-js`,
+  kernel: `orion-kernel ${RELEASE.version}${RELEASE.channel ? `-${RELEASE.channel}` : ''}-js`,
 });
 
 /**
@@ -56,9 +61,12 @@ export const OS = Object.freeze({
  * @param {import('./accounts.js').AccountRegistry} [options.accounts] registre des comptes
  * @param {string} [options.accountId] compte de cette session (le registre peut changer de compte courant)
  * @param {object[]} [options.manifests] manifestes des applications
+ * @param {object} [options.shared] pilote de stockage commun aux comptes de l'appareil (Store)
+ * @param {() => Promise<object>} [options.storeRuntime] module qui exécute les apps publiées sur le Store
+ * @param {object} [options.protectionBackend] base de la protection de l'appareil (gardée lors d'un effacement)
  * @param {(step: string, progress: number) => void} [options.onProgress]
  */
-export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null } = {}) {
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], shared = null, storeRuntime = null, protectionBackend = null, env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null } = {}) {
   const log = new SystemLog({ now, echo: echoLog });
   const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
   log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
@@ -88,6 +96,17 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
 
   const packages = new PackageManager({ store: ns('packages'), events, log, now });
   manifests.forEach((m) => packages.register(m));
+  // Apps publiées sur le Store de l'appareil : enregistrées avant de relire les apps installées.
+  const store = await new StoreService({
+    store: shared ? new Namespace(shared, 'store', await shared.getAll()) : ns('store'),
+    packages,
+    events,
+    log,
+    now,
+    account: () => accountId,
+    runtime: storeRuntime,
+    channel: shared && env.BroadcastChannel ? new env.BroadcastChannel('orion-store') : null,
+  }).load();
   await packages.load();
   log.info('pm', `${packages.list().length} applications installées`);
   onProgress('packages', 0.55);
@@ -108,6 +127,15 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
 
   const contacts = new ContactsProvider({ fs, events }).load();
   const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);
+  const protection = await new ProtectionService({
+    store: protectionBackend ? new Namespace(protectionBackend, 'protection', await protectionBackend.getAll()) : ns('protection'),
+    events,
+    bridge,
+    log,
+    now,
+    account: () => accountId,
+    isOwner,
+  }).load();
   const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers, env, bridge, isOwner }).load().start();
   // Le mode avion coupe aussi les radios pilotées par le pont.
   if (bluetooth.mode === 'bridge') network.radios.push({ name: 'bluetooth', get: () => bluetooth.enabled, set: (on) => bluetooth.setPowered(on) });
@@ -150,6 +178,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     settings,
     fs,
     packages,
+    store,
     processes,
     am,
     notifications,
@@ -158,6 +187,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     media,
     contacts,
     bridge,
+    protection,
     network,
     bluetooth,
     location,
@@ -174,6 +204,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
       network.shutdown();
       bluetooth.shutdown();
       location.shutdown();
+      store.close();
       processes.killAll('shutdown');
     },
   };

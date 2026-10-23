@@ -1,0 +1,325 @@
+/**
+ * Exécution des apps publiées sur le Store.
+ *
+ * Le code d'une app (un fichier HTML, CSS et JavaScript) s'exécute dans une
+ * iframe isolée : sandbox="allow-scripts" sans allow-same-origin (origine
+ * opaque : ni la page d'Orion, ni ses données, ni les cookies), sans
+ * fenêtres, téléchargements ni navigation de la page principale, et une
+ * politique de sécurité (CSP) qui interdit tout accès au réseau.
+ *
+ * L'app ne parle au système que par le SDK `orion` : des messages sur un
+ * MessagePort, chacun vérifié ici (méthodes autorisées, tailles, cadence).
+ *
+ *   orion.app                         { id, name, version }
+ *   orion.storage.get/set/remove/keys/clear   données de l'app (1 Mo)
+ *   orion.ui.toast/alert/confirm/prompt
+ *   orion.device.vibrate(motif) · orion.device.info()
+ *   orion.notify({ title, body })
+ *   orion.location.current()          autorisation « Localisation » déclarée
+ *   orion.on('pause' | 'resume' | 'theme', fn) · orion.onBack(fn) · orion.close()
+ *
+ * Limite connue : une boucle infinie dans l'app peut ralentir Orion (le
+ * navigateur décide si l'iframe a son propre processus).
+ */
+import { h } from '../lib/dom.js';
+
+export const styles = [];
+
+const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'";
+const MAX_STORAGE = 1_048_576;
+
+/** SDK injecté dans l'iframe, avant le code de l'app. */
+const SDK = `(() => {
+  'use strict';
+  let port = null;
+  let seq = 0;
+  const queue = [];
+  const pending = new Map();
+  const listeners = { pause: [], resume: [], theme: [] };
+  const backHandlers = [];
+  const app = {};
+  const send = (message) => (port ? port.postMessage(message) : queue.push(message));
+  const call = (method, ...args) => new Promise((resolve, reject) => {
+    const id = ++seq;
+    pending.set(id, { resolve, reject });
+    send({ id, method, args });
+  });
+  const theme = (value) => {
+    document.documentElement.dataset.theme = value;
+    document.documentElement.style.colorScheme = value;
+  };
+  async function back(id) {
+    let handled = false;
+    for (let i = backHandlers.length - 1; i >= 0 && !handled; i--) {
+      try { handled = Boolean(await backHandlers[i]()); } catch (error) { console.error(error); }
+    }
+    send({ back: id, handled });
+  }
+  addEventListener('message', (event) => {
+    if (port || event.source !== parent || !event.data || event.data.type !== 'orion:init') return;
+    port = event.ports[0];
+    Object.assign(app, event.data.app);
+    Object.freeze(app);
+    theme(event.data.theme);
+    port.onmessage = ({ data }) => {
+      if (data.event === 'back') return void back(data.id);
+      if (data.event) {
+        if (data.event === 'theme') theme(data.value);
+        for (const fn of listeners[data.event] || []) { try { fn(data.value); } catch (error) { console.error(error); } }
+        return;
+      }
+      const request = pending.get(data.id);
+      if (!request) return;
+      pending.delete(data.id);
+      if (data.error) request.reject(new Error(data.error));
+      else request.resolve(data.result);
+    };
+    queue.splice(0).forEach((message) => port.postMessage(message));
+  });
+  addEventListener('error', (event) => send({ id: 0, method: 'log', args: ['error', String(event.message)] }));
+  addEventListener('unhandledrejection', (event) => send({ id: 0, method: 'log', args: ['error', String(event.reason && event.reason.message || event.reason)] }));
+  window.orion = Object.freeze({
+    app,
+    storage: Object.freeze({
+      get: (key) => call('storage.get', key),
+      set: (key, value) => call('storage.set', key, value),
+      remove: (key) => call('storage.remove', key),
+      keys: () => call('storage.keys'),
+      clear: () => call('storage.clear'),
+    }),
+    ui: Object.freeze({
+      toast: (message) => call('ui.toast', String(message)),
+      alert: (options) => call('ui.alert', typeof options === 'string' ? { title: options } : options),
+      confirm: (options) => call('ui.confirm', typeof options === 'string' ? { title: options } : options),
+      prompt: (options) => call('ui.prompt', typeof options === 'string' ? { title: options } : options),
+    }),
+    device: Object.freeze({
+      vibrate: (pattern) => call('device.vibrate', pattern),
+      info: () => call('device.info'),
+    }),
+    location: Object.freeze({ current: () => call('location.current') }),
+    notify: (options) => call('notify', options),
+    close: () => call('app.close'),
+    on(event, fn) {
+      if (!listeners[event] || typeof fn !== 'function') throw new Error('Événement inconnu : ' + event);
+      listeners[event].push(fn);
+      return () => listeners[event].splice(listeners[event].indexOf(fn) >>> 0, 1);
+    },
+    onBack(fn) {
+      backHandlers.push(fn);
+      return () => backHandlers.splice(backHandlers.indexOf(fn) >>> 0, 1);
+    },
+  });
+})();`;
+
+/** Document de l'iframe : CSP et SDK d'abord (l'app ne peut que les durcir), puis le code de l'app. */
+export function appDocument(code) {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${CSP}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html{color-scheme:light}html[data-theme=dark]{color-scheme:dark}body{margin:0;background:Canvas;color:CanvasText;font-family:system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent}</style><script>${SDK}</script></head><body>${code}</body></html>`;
+}
+
+const text = (value, max) => String(value ?? '').slice(0, max);
+const cloneable = (value) => {
+  const json = JSON.stringify(value);
+  return json === undefined ? null : JSON.parse(json);
+};
+
+/**
+ * Services offerts à l'app, à partir du contexte d'une app d'Orion.
+ * `test` : essai depuis la console développeur (données en mémoire, pas de notification).
+ */
+export function hostFromContext(ctx, { test = false } = {}) {
+  const memory = new Map();
+  const storage = test
+    ? { get: (k) => memory.get(k) ?? null, set: (k, v) => memory.set(k, v), remove: (k) => memory.delete(k), all: () => Object.fromEntries(memory), clear: () => memory.clear() }
+    : {
+        get: (k) => ctx.storage.get(k),
+        set: (k, v) => ctx.storage.set(k, v),
+        remove: (k) => ctx.storage.remove(k),
+        all: () => ctx.fs.readJSON(`${ctx.dataDir}/storage.json`, {}),
+        // Clé par clé : le stockage de l'app garde une copie en mémoire.
+        clear: () => Object.keys(ctx.fs.readJSON(`${ctx.dataDir}/storage.json`, {})).forEach((key) => ctx.storage.remove(key)),
+      };
+  return {
+    storage,
+    ui: ctx.ui,
+    vibrate: (pattern) => ctx.device.vibrate(pattern),
+    info: () => ({ battery: ctx.device.battery?.level ?? null, online: ctx.device.connectivity?.online ?? true, locale: 'fr-FR' }),
+    notify: test ? (options) => ctx.ui.toast(`Notification (essai) : ${options.title}`) : (options) => ctx.notify(options),
+    location: () => (test ? Promise.reject(new Error('Position indisponible pendant un essai')) : ctx.location.current()),
+    close: () => (test ? null : ctx.exit()),
+    log: (message) => ctx.log(message),
+  };
+}
+
+/**
+ * Lance une app dans `root`. Renvoie { back(), emit(event, value), dispose() }.
+ * @param {HTMLElement} root
+ * @param {{ app: { id: string, name: string, version: string }, code: string, host: ReturnType<typeof hostFromContext>, onStop?: (reason: string) => void }} options
+ */
+export function runApp(root, { app, code, host, onStop = null }) {
+  const frame = h('iframe.app-frame', { title: app.name });
+  frame.setAttribute('sandbox', 'allow-scripts');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  frame.setAttribute('allow', '');
+  const shell = h('div.app-runtime', frame);
+  root.append(shell);
+  const channel = new MessageChannel();
+  const port = channel.port1;
+  const currentTheme = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  let loads = 0;
+  let stopped = false;
+  let dialog = false;
+  let lastToast = 0;
+  let lastNotify = 0;
+  let backSeq = 0;
+  const backReplies = new Map();
+
+  function stop(reason) {
+    if (stopped) return;
+    stopped = true;
+    port.close();
+    frame.remove();
+    shell.append(h('div.app-runtime-stopped', h('strong', `${app.name} a été arrêtée`), h('p', reason)));
+    host.log?.(`arrêtée : ${reason}`);
+    onStop?.(reason);
+  }
+
+  frame.addEventListener('load', () => {
+    loads++;
+    if (loads === 1) {
+      frame.contentWindow.postMessage({ type: 'orion:init', app: { id: app.id, name: app.name, version: app.version }, theme: currentTheme() }, '*', [channel.port2]);
+    } else {
+      // L'app a rechargé ou quitté sa page : le SDK n'y est plus, elle est arrêtée.
+      stop('Elle a tenté d\'ouvrir une autre page, ce qui est interdit aux apps du Store.');
+    }
+  });
+
+  const storageSize = (data) => new Blob([JSON.stringify(data)]).size;
+
+  async function modal(fn) {
+    if (dialog) throw new Error('Une boîte de dialogue est déjà ouverte');
+    dialog = true;
+    try {
+      return await fn();
+    } finally {
+      dialog = false;
+    }
+  }
+
+  const METHODS = {
+    'storage.get': (key) => host.storage.get(text(key, 200)),
+    'storage.set': (key, value) => {
+      const data = { ...host.storage.all(), [text(key, 200)]: cloneable(value) };
+      if (storageSize(data) > MAX_STORAGE) throw new Error('Espace de stockage de l\'app plein (1 Mo)');
+      host.storage.set(text(key, 200), cloneable(value));
+      return true;
+    },
+    'storage.remove': (key) => {
+      host.storage.remove(text(key, 200));
+      return true;
+    },
+    'storage.keys': () => Object.keys(host.storage.all()),
+    'storage.clear': () => {
+      host.storage.clear();
+      return true;
+    },
+    'ui.toast': (message) => {
+      if (Date.now() - lastToast < 800) return false;
+      lastToast = Date.now();
+      host.ui.toast(text(message, 160));
+      return true;
+    },
+    'ui.alert': (o = {}) => modal(() => host.ui.alert({ title: text(o.title, 80) || app.name, message: text(o.message, 600) })).then(() => true),
+    'ui.confirm': (o = {}) => modal(() => host.ui.confirm({ title: text(o.title, 80) || app.name, message: text(o.message, 600), confirmLabel: text(o.confirmLabel, 24) || 'OK' })).then(Boolean),
+    // Le nom de l'app accompagne toute saisie : elle ne peut pas se faire passer pour Orion.
+    'ui.prompt': (o = {}) => modal(() => host.ui.prompt({ title: text(o.title, 80) || app.name, message: [text(o.message, 600), `Demandé par l'app « ${app.name} »`].filter(Boolean).join(' — '), placeholder: text(o.placeholder, 80), value: text(o.value, 2000) })).then((v) => (v == null ? null : text(v, 2000))),
+    'device.vibrate': (pattern) => {
+      const list = (Array.isArray(pattern) ? pattern : [pattern]).slice(0, 10).map((n) => Math.max(0, Math.min(1000, Number(n) || 0)));
+      host.vibrate(list.length === 1 ? list[0] : list);
+      return true;
+    },
+    'device.info': () => ({ ...host.info(), theme: currentTheme() }),
+    notify: (o = {}) => {
+      if (Date.now() - lastNotify < 5000) throw new Error('Trop de notifications : attendez quelques secondes');
+      lastNotify = Date.now();
+      host.notify({ title: text(o.title, 80) || app.name, body: text(o.body, 300) });
+      return true;
+    },
+    'location.current': async () => {
+      const fix = await host.location();
+      return fix && { lat: fix.lat, lon: fix.lon, accuracy: fix.accuracy ?? null, altitude: fix.alt ?? null, time: fix.time ?? null };
+    },
+    'app.close': () => {
+      host.close();
+      return true;
+    },
+    log: (level, message) => {
+      host.log?.(`${level === 'error' ? 'erreur' : 'journal'} : ${text(message, 300)}`);
+      return true;
+    },
+  };
+
+  port.onmessage = async ({ data }) => {
+    if (stopped || !data || typeof data !== 'object') return;
+    if ('back' in data) {
+      backReplies.get(data.back)?.(Boolean(data.handled));
+      return;
+    }
+    const method = Object.hasOwn(METHODS, data.method) ? METHODS[data.method] : null;
+    let reply;
+    try {
+      if (!method) throw new Error(`Fonction inconnue : ${String(data.method).slice(0, 40)}`);
+      reply = { id: data.id, result: cloneable(await method(...(Array.isArray(data.args) ? data.args : []))) };
+    } catch (error) {
+      reply = { id: data.id, error: text(error?.message ?? error, 300) };
+    }
+    if (!stopped && data.id) port.postMessage(reply);
+  };
+  port.start?.();
+
+  // Thème d'Orion suivi en direct.
+  const observer = new MutationObserver(() => !stopped && port.postMessage({ event: 'theme', value: currentTheme() }));
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  frame.srcdoc = appDocument(code);
+
+  return {
+    frame,
+    /** Retour : l'app répond si elle l'a traité (300 ms au plus). */
+    back() {
+      if (stopped || loads === 0) return Promise.resolve(false);
+      const id = ++backSeq;
+      return new Promise((resolve) => {
+        const done = (handled) => {
+          backReplies.delete(id);
+          resolve(handled);
+        };
+        backReplies.set(id, done);
+        setTimeout(() => backReplies.has(id) && done(false), 300);
+        port.postMessage({ event: 'back', id });
+      });
+    },
+    emit(event, value = null) {
+      if (!stopped) port.postMessage({ event, value });
+    },
+    dispose() {
+      observer.disconnect();
+      if (!stopped) {
+        stopped = true;
+        port.close();
+      }
+      shell.remove();
+    },
+  };
+}
+
+/** Point d'entrée d'une app publiée (paquet du Store) lancée par le gestionnaire de fenêtres. */
+export function mount(root, ctx) {
+  const app = ctx.app;
+  root.classList.add('store-app');
+  const run = runApp(root, { app, code: app.code, host: hostFromContext(ctx) });
+  ctx.onBack(() => run.back());
+  ctx.on('pause', () => run.emit('pause'));
+  ctx.on('resume', () => run.emit('resume'));
+  ctx.on('destroy', () => run.dispose());
+}

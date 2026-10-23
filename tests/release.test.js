@@ -19,7 +19,7 @@ function bootModules(file, seen = new Set()) {
 
 test('version.json décrit exactement la version du dépôt (sinon : npm run release)', async () => {
   const manifest = await buildManifest(root);
-  for (const key of ['version', 'build', 'codename', 'date']) assert.equal(published[key], RELEASE[key], key);
+  for (const key of ['version', 'channel', 'sequence', 'build', 'codename', 'date']) assert.equal(published[key], RELEASE[key], key);
   assert.deepEqual(published.notes, [...RELEASE.notes]);
   assert.deepEqual(published.files, manifest.files, 'version.json périmé : lancez npm run release');
   assert.equal(published.size, manifest.size);

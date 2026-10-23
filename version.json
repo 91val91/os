@@ -1,19 +1,19 @@
 {
- "version": "1.2.0",
- "build": "OR1B.261022.001",
- "codename": "Bételgeuse",
- "date": "2026-10-22",
+ "version": "0.1",
+ "channel": "alpha",
+ "sequence": 4,
+ "build": "OR0A.261023.001",
+ "codename": "Rigel",
+ "date": "2026-10-23",
  "notes": [
-  "Wi‑Fi, Bluetooth et réseau mobile refaits : Orion affiche l'état réel de la connexion. Installé sur un PC, une tablette ou une machine virtuelle, il pilote le vrai Wi‑Fi, le Bluetooth et un modem 4G (appels, SMS, données).",
-  "Sur un téléphone, appels et SMS sont de vrais appels et de vrais SMS : Orion les confie aux apps Téléphone et Messages du système.",
-  "Bluetooth sur Android (Chrome) : connexion aux montres, capteurs et autres appareils basse consommation, avec leur niveau de batterie.",
-  "Nouveau : service de localisation (GPS) et app Plans — carte, position en direct, recherche de lieux, itinéraires et trajets enregistrés (GPX).",
-  "Barre d'état et réglages rapides fidèles à la réalité : force du Wi‑Fi, signal, localisation en cours.",
-  "Mises à jour plus sûres : une version retirée n'est plus installée, un téléchargement interrompu ne bloque plus, la copie hors ligne est protégée.",
-  "Les applications n'ont plus accès aux données internes du système.",
-  "Premier jet d'une image installable pour PC et machine virtuelle (orion-server pilote le Wi‑Fi, le Bluetooth, le modem et le GPS)."
+  "Orion OS passe en 0.1 (alpha) : la numérotation repart de zéro jusqu'à la première version stable. Vos données, comptes et réglages sont conservés.",
+  "Programme développeur du Store : publiez vos propres apps, gratuites ou payantes, et suivez vos ventes dans la console développeur (Store → Compte).",
+  "Le Store affiche les apps des développeurs, avec achat, reçus et remboursement (paiements fictifs pendant l'alpha : solde de test) ; les apps publiées s'exécutent isolées du système, sans accès à Internet.",
+  "Nouveau : Protection de l'appareil — bilan de sécurité, vérification de l'intégrité du système, analyse des apps, protection contre la réinitialisation, effacement après trop d'échecs du code et verrouillage en cas de vol.",
+  "Les erreurs de code de verrouillage sont comptées même après un redémarrage ; achats et réglages sensibles demandent le code.",
+  "Image installable : orion-server garde la protection contre la réinitialisation et vérifie les fichiers servis ; le mode sans échec démarre aussi Orion."
  ],
- "size": 1176502,
+ "size": 1304829,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -40,8 +40,8 @@
    "size": 819
   },
   "./src/apps/browser/index.js": {
-   "hash": "335d4cee1869441c51a73c291db78af62574bb58adec6462202a9101f258e424",
-   "size": 8186
+   "hash": "1be2b9169442551071b7307cbfad3eaf2513509ad289a15ffe6f4b8f8b408b51",
+   "size": 8184
   },
   "./src/apps/browser/style.css": {
    "hash": "7dd44ddc8c28118b1957ca9a4f1311b158db701598604bac45c167e675a5f730",
@@ -180,12 +180,12 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "ac56b6a9be1f30453146f99d1838bd05c6002e581abf766ead6f1a8b6b90c687",
-   "size": 79885
+   "hash": "8ad09c77d8c1bc15e995b25fcc7d8a88c61c44fde1c2fb628adb2e3e82e29131",
+   "size": 92346
   },
   "./src/apps/settings/style.css": {
-   "hash": "0cbbe7fb12c0e84d7b39e62e70201d8bf2fffe43a45e598ae163b0be0ca6573a",
-   "size": 8836
+   "hash": "1aa69d3ff97ca0773b53a8a68121f813a8dfccc84b6d492d3b14d3f33dbfb4c8",
+   "size": 9183
   },
   "./src/apps/snake/index.js": {
    "hash": "b3fb224253a05a9a97646c80f7a2e3f925dd83953fa78cf2ea3a52022edde337",
@@ -195,17 +195,21 @@
    "hash": "868dc1788c0f10fc054b14b6432c1c0a7b495278d65394cae3d17e61988d6432",
    "size": 1368
   },
+  "./src/apps/store/console.js": {
+   "hash": "6934369bdc9538343886d45699d8788abe83d9ddafc5c184c5ad6b7715433ff8",
+   "size": 18962
+  },
   "./src/apps/store/index.js": {
-   "hash": "72d3ded20dc6431d19c2c3fdca85c0796d6113d991089ced1adb9294977da354",
-   "size": 9298
+   "hash": "b791da9e04fb795c3e1ff59693d5f006217a043f28786f28476fced42a824629",
+   "size": 22949
   },
   "./src/apps/store/style.css": {
-   "hash": "da7cdb71a9f5061740463b45138139cd4ae2bd59c2fb39a89f5bd593f2e43dcc",
-   "size": 3376
+   "hash": "3d42f5571c906731d7bf3c5bdfa4245ccabc90f2eb54bbfa18cc7deceff51033",
+   "size": 9908
   },
   "./src/apps/terminal/index.js": {
-   "hash": "2325e590d03bc058bcc1812a2667c08adf001add69c35c6a52fa196e3c177b07",
-   "size": 6474
+   "hash": "bd3436b29456b9b743df5051cbb855aa303fb887665e368ec782e5f87df659fb",
+   "size": 6472
   },
   "./src/apps/terminal/style.css": {
    "hash": "7e4af1b2494d540e57d6e783048d906d8817d024c76f224bb9bdf118aa9b4d53",
@@ -220,12 +224,16 @@
    "size": 4113
   },
   "./src/kernel/accounts.js": {
-   "hash": "5d89e3167eb0b3c86d9c8668d6e748d85e3bb803c8cf87e89407b67e4079a01c",
-   "size": 7980
+   "hash": "843b16344903a021283cf2bce2b005fcfc4204fa85c33d46dc73572630010e36",
+   "size": 8082
   },
   "./src/kernel/alarms.js": {
    "hash": "9113361c3521b2db198fca328e87b70d86ef2d1be93f33cf46376ab829a440ec",
    "size": 5628
+  },
+  "./src/kernel/app-scan.js": {
+   "hash": "a07bba6365bea4396ec88437583a94b5893a591bcb1aea7e93f3a929205290d0",
+   "size": 3221
   },
   "./src/kernel/bluetooth.js": {
    "hash": "3981693df8bde9b8ce751a6183be07836c051d9ac8435c5372fb7ec5635c7209",
@@ -256,8 +264,8 @@
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "167d07a9ff8fd93ecd5ecfaab1dbaa661b8781f0a267d07e530e5e6f2aa37666",
-   "size": 8150
+   "hash": "d47562289a30e063ba65a0c8db2b5c798e3059bedac90be5df991f0197b53ce0",
+   "size": 9551
   },
   "./src/kernel/location.js": {
    "hash": "abcca202a3bb8459dd36456b469ebf2cfbbc8c54e791fc680ae64b8d6114e730",
@@ -280,8 +288,8 @@
    "size": 3111
   },
   "./src/kernel/packages.js": {
-   "hash": "4e88bce8821de34d72ec0ba392b7f300bb01b7005015b7ef0b4d870390efe2fd",
-   "size": 3320
+   "hash": "2850ddcb83d47ccbd6a3e30bf6153871db97983f2f15c3418ed3f285ac4e781b",
+   "size": 3740
   },
   "./src/kernel/permissions.js": {
    "hash": "4e2da9e4ac8e4d88e8b0e950f90b8ffb323ebb311bf506dae3a36c49c60c1c5a",
@@ -291,29 +299,37 @@
    "hash": "d6ec4418e32d916ea282bf11a14c126b4fa11db6e2cd8ce114ded4e4d385cf85",
    "size": 3509
   },
+  "./src/kernel/protection.js": {
+   "hash": "8ee57f3445aa7205a92eb1d7355eae24c9d82281a9e3ee65462eef53634d02f9",
+   "size": 10440
+  },
   "./src/kernel/seed.js": {
-   "hash": "af626be1735b9ec7f3caf2651d22a7a94ce0b9e2b4d915c5e6a49741d735d454",
-   "size": 3209
+   "hash": "2489c3ab9a0f75ce4246dc8adc0bb770df2b995d912cc3b917481c4fe7aa5961",
+   "size": 3273
   },
   "./src/kernel/settings.js": {
    "hash": "80b9355486f8dc33069520a985835787ec957006870738a6cac14025d25264f3",
    "size": 4795
   },
   "./src/kernel/shell.js": {
-   "hash": "8a2f3f56d9e566c8edfda9dbada1cdcb510adcd6e36a14f9cc735a32f2046cb4",
-   "size": 46955
+   "hash": "783bcb5359111ae00558788b8c272a7d86f732eab35d2e6268c8721365c0aa99",
+   "size": 46994
   },
   "./src/kernel/storage.js": {
    "hash": "7c7e48a64f97c3e9edd03c6e492377316e3ef24e840fabe47ce5d6730c969f87",
    "size": 5861
+  },
+  "./src/kernel/store.js": {
+   "hash": "e5bb73cde139b137fae30f90e67eb10b68e7ccedc901f87c0224279aabddf161",
+   "size": 22265
   },
   "./src/kernel/telephony.js": {
    "hash": "131bbba14cecea607ad625b48a4b01172c8e977b6a90867bfce8fc546c1e5518",
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "b9cf0d6f78a508e2fd7f371c60b8f17fb3ecd7432883c0ed54ee64033f045808",
-   "size": 1590
+   "hash": "333ecbcfae387622d04502512d170e3a379058ff706639c36f284f9f8614223b",
+   "size": 1994
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
@@ -348,8 +364,8 @@
    "size": 2109
   },
   "./src/lib/ui.js": {
-   "hash": "5708eabbf3f80a3544de454c6b8b9d485aaa3a845e6a0350b493d2ad9378a426",
-   "size": 14596
+   "hash": "c5a7606928f5850d659ec6dd8b0e466521289b427491b1d84136fe9051a9c5c8",
+   "size": 14624
   },
   "./src/lib/weather-codes.js": {
    "hash": "e8e61bb494722e3835a0de42c875eb4d2966630249645efd432d98c4299e774a",
@@ -368,8 +384,8 @@
    "size": 13635
   },
   "./src/styles/system.css": {
-   "hash": "1c08f929efdbd13eaf69070aa19a5936661bed50aa6adbc0c22458b18323aef7",
-   "size": 52428
+   "hash": "e6bef5b731808ef86ac81eeccc1a1817c83274f03ce9a5221a72083be4d2fd50",
+   "size": 53731
   },
   "./src/system/alarm-screen.js": {
    "hash": "59255c094d3012ef1fc95cfb41231f6d67fbb7c8cd1715dd66fadc85fe6b3133",
@@ -386,6 +402,10 @@
   "./src/system/app-icon.js": {
    "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
    "size": 4624
+  },
+  "./src/system/app-runtime.js": {
+   "hash": "60f9826a17d220843babd7251c06d89876ec742662aa31e1099015c7736d9d3c",
+   "size": 14018
   },
   "./src/system/banners.js": {
    "hash": "563899c6c61665d7d4f42df91761ee2c08ff81f019b4a3de78faff4cf749a9fe",
@@ -415,9 +435,13 @@
    "hash": "0b737964a3870d96ccd1364f37e03b2ec3cefcc187eb957dd10ce2488329f4de",
    "size": 20583
   },
+  "./src/system/integrity.js": {
+   "hash": "0eaa99931c402e2ccf4667b1c45c28ae94848e84414256fc9e3a5c5c928843ca",
+   "size": 3408
+  },
   "./src/system/lockscreen.js": {
-   "hash": "86a3d55bc07ac0a15afa6bfbc4f74f2de19c630ab56840e043b71d2b6ddbb8b3",
-   "size": 10984
+   "hash": "425642f5ee7d7f1aec656b172287052d1247241e862f25c10fd9444909750f34",
+   "size": 12316
   },
   "./src/system/navigation.js": {
    "hash": "1a3f29558747887846d869947e7361f51ee9b2d3939abee46be47555f00702fe",
@@ -430,6 +454,10 @@
   "./src/system/power.js": {
    "hash": "aa0d760b768f8b3335803454ed3ba5d00b2e0f252fe7e42b1d12395b5eb9e829",
    "size": 5465
+  },
+  "./src/system/protection.js": {
+   "hash": "9962f00cf3e0830b89e0de6266ad9bbab0023f4b74f6f72965db0423cbb4b9de",
+   "size": 16621
   },
   "./src/system/pull-panel.js": {
    "hash": "ca2c38c61accdf51702820f2dea5aa767723cb7958ac69bf634b49ba32e3b424",
@@ -456,16 +484,16 @@
    "size": 6076
   },
   "./src/system/system-ui.js": {
-   "hash": "98d712ec3dfc52294bf9132e0b2616695c2203dc1e9abe3ad4300ac3d6cb0971",
-   "size": 26959
+   "hash": "837d38cbd36c1a5a60538f670729fd8c2d236d1db3e987d68d634f2756c2d97e",
+   "size": 27490
   },
   "./src/system/theme.js": {
    "hash": "99c6e8f2aebd4204d53844df1bc0b4d30a6574766e529b237d5238742d01a618",
    "size": 2235
   },
   "./src/system/updates.js": {
-   "hash": "40f5c1ac627a80f78c80162b4be1eca73a44d3ba1f464f0ae4f709708faa1736",
-   "size": 10538
+   "hash": "2f93d3a736fc14942c9ac2de0c229d14225ab4fe9cbe6929f9aeb30d937e0520",
+   "size": 11319
   },
   "./src/system/wallpapers.js": {
    "hash": "dffd49888bdd864365f125ecf38eaba8d4e8d75fa45382a0972822c2ca9bf6f9",

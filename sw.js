@@ -11,6 +11,11 @@
  *   2. « install » : elle devient la version servie, l'ancienne est effacée,
  *      et Orion redémarre dessus.
  * Une session ne mélange donc jamais deux versions du système.
+ *
+ * Les versions sont ordonnées par leur numéro d'ordre (sequence), le numéro
+ * affiché ayant pu repartir de zéro (1.2.0 → 0.1 alpha). Une installation
+ * d'avant la 0.1 ne voit pas la 0.1 comme plus récente : ce service worker
+ * la prépare à son installation et l'applique à son activation (redémarrage).
  */
 const PREFIX = 'orion-os-';
 const META = `${PREFIX}meta`;
@@ -31,13 +36,18 @@ async function readState() {
   return state;
 }
 
+const json = (value) => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+
 async function writeState(next) {
   state = next;
-  await (await caches.open(META)).put('state', new Response(JSON.stringify(next), { headers: { 'content-type': 'application/json' } }));
+  await (await caches.open(META)).put('state', json(next));
 }
 
 /** Ce que la page affiche d'une version (sans la liste des fichiers). */
-const summary = (manifest) => manifest && { version: manifest.version, build: manifest.build, date: manifest.date, notes: manifest.notes, size: manifest.size };
+const summary = (manifest) => manifest && { version: manifest.version, channel: manifest.channel, sequence: manifest.sequence, build: manifest.build, date: manifest.date, notes: manifest.notes, size: manifest.size };
+
+/** Version d'avant la 0.1 (1.0.0 à 1.2.0) : sans numéro d'ordre. */
+const legacy = (manifest) => Boolean(manifest) && !Number.isInteger(manifest.sequence);
 
 async function sha256(buffer) {
   const digest = await crypto.subtle.digest('SHA-256', buffer);
@@ -77,7 +87,7 @@ async function download(manifest, onProgress = () => {}) {
       downloaded += file.size;
     }
     await target.put(url, response);
-    onProgress({ version: manifest.version, done: ++done, total: entries.length, downloaded });
+    onProgress({ version: manifest.version, channel: manifest.channel, sequence: manifest.sequence, done: ++done, total: entries.length, downloaded });
   }
   // La racine de l'application affiche index.html.
   await target.put(at('./'), await target.match(at('./index.html')));
@@ -100,6 +110,53 @@ function prepareLatest() {
   return downloading;
 }
 
+/**
+ * Installation d'avant la 0.1 : son interface ne proposerait jamais la 0.1
+ * (numéro plus petit). La dernière version est téléchargée à l'installation de
+ * ce service worker (à côté de l'installée, qui reste servie) et appliquée à
+ * son activation, c'est-à-dire au prochain redémarrage d'Orion. Si le
+ * téléchargement échoue, l'installation de ce service worker échoue : le
+ * navigateur réessaiera plus tard.
+ */
+async function prepareMigration(current) {
+  const manifest = await fetchManifest();
+  if (legacy(manifest) || manifest.version === current.version) return null;
+  await download(manifest);
+  await (await caches.open(META)).put('migration', json(manifest));
+  return manifest;
+}
+
+/** À l'activation : la version préparée devient l'installée (nouvel essai si son cache a disparu entre-temps). */
+async function applyMigration() {
+  const meta = await caches.open(META);
+  const saved = await meta.match('migration');
+  let manifest = saved ? await saved.json() : null;
+  const { current } = await readState();
+  if (legacy(current) && (await complete(current))) {
+    if (!(await complete(manifest))) manifest = await prepareMigration(current).catch(() => null);
+    if (await complete(manifest)) await writeState({ current: manifest, staged: null });
+  }
+  await meta.delete('migration');
+}
+
+/** Remet en état le cache d'une version : renvoie le nombre de fichiers retéléchargés. */
+async function repair(manifest) {
+  const cache = await caches.open(releaseCache(manifest.version));
+  let repaired = 0;
+  for (const [path, file] of Object.entries(manifest.files)) {
+    const url = at(path);
+    const local = await cache.match(url);
+    if (local && (await sha256(await local.arrayBuffer())) === file.hash) continue;
+    const fresh = await fetch(url, { cache: 'reload' });
+    if (!fresh.ok) throw new Error(`${path} : erreur ${fresh.status}`);
+    if ((await sha256(await fresh.clone().arrayBuffer())) !== file.hash) throw new Error('Le fichier publié ne correspond plus à la version installée : installez la dernière mise à jour.');
+    await cache.put(url, fresh);
+    repaired++;
+  }
+  await cache.put(at('./'), await cache.match(at('./index.html')));
+  return repaired;
+}
+
 /** Une version installée ou prête n'est utilisable que si son cache est complet. */
 async function complete(manifest) {
   if (!manifest || !(await caches.has(releaseCache(manifest.version)))) return false;
@@ -115,7 +172,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const { current } = await readState();
-      if (await complete(current)) return;
+      if (await complete(current)) {
+        if (legacy(current)) await prepareMigration(current);
+        return;
+      }
       const manifest = await fetchManifest();
       await download(manifest);
       await writeState({ ...(await readState()), current: manifest, staged: null });
@@ -131,6 +191,7 @@ self.addEventListener('activate', (event) => {
     (async () => {
       // Relu ici : le service worker précédent a pu télécharger ou installer une version depuis.
       state = null;
+      await applyMigration().catch(() => {});
       const { current, staged } = await readState();
       const keep = new Set([META, current && releaseCache(current.version), staged && releaseCache(staged.version)]);
       // Seuls les anciens caches d'Orion sont supprimés : l'origine github.io est partagée avec d'autres sites.
@@ -178,6 +239,20 @@ self.addEventListener('message', (event) => {
           if (s.staged.version !== s.current?.version) await caches.delete(releaseCache(s.staged.version));
         }
         reply({ ok: true });
+      })(),
+    );
+  } else if (type === 'repair') {
+    // Protection de l'appareil : les fichiers de la version installée qui ne correspondent
+    // plus à leur empreinte sont retéléchargés et vérifiés.
+    event.waitUntil(
+      (async () => {
+        const { current } = await readState();
+        if (!current) return reply({ ok: false, error: 'Aucune version installée' });
+        try {
+          reply({ ok: true, repaired: await repair(current) });
+        } catch (error) {
+          reply({ ok: false, error: error.message });
+        }
       })(),
     );
   } else if (type === 'install') {

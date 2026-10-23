@@ -6,7 +6,7 @@ import { icon } from '../../lib/icons.js';
 import { formatBytes, formatDuration, relativeTime } from '../../lib/format.js';
 import { navStack, page, listGroup, listItem, toggle, slider, segmented, avatar, button, spinner } from '../../lib/ui.js';
 import { PERMISSIONS } from '../../kernel/permissions.js';
-import { createPasscode, verifyPasscode } from '../../kernel/settings.js';
+import { createPasscode } from '../../kernel/settings.js';
 import { displayName } from '../../kernel/contacts.js';
 import { WALLPAPERS, wallpaperCss } from '../../system/wallpapers.js';
 import { appIcon } from '../../system/app-icon.js';
@@ -15,6 +15,7 @@ import { logo } from '../../system/power.js';
 import { quickTiles } from '../../system/quick-settings.js';
 import { unsupportedReason } from '../../kernel/bluetooth.js';
 import { formatCoordinates } from '../../kernel/location.js';
+import { repairIntegrity } from '../../system/integrity.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
@@ -101,7 +102,7 @@ export function mount(root, ctx) {
         }),
         // Comme sur iOS : une mise à jour disponible est proposée en tête des Réglages.
         ['available', 'downloading', 'ready'].includes(ui.updates?.status)
-          ? listGroup({ items: [row({ icon: 'download', iconColor: '#0a84ff', title: ui.updates.status === 'ready' ? 'Mise à jour prête à installer' : 'Mise à jour disponible', subtitle: `Orion OS ${ui.updates.available?.version ?? ''}`, detail: h('span.update-badge', '1'), chevron: true, onClick: updatesPage })] })
+          ? listGroup({ items: [row({ icon: 'download', iconColor: '#0a84ff', title: ui.updates.status === 'ready' ? 'Mise à jour prête à installer' : 'Mise à jour disponible', subtitle: `Orion OS ${ui.updates.available?.label ?? ui.updates.available?.version ?? ''}`, detail: h('span.update-badge', '1'), chevron: true, onClick: updatesPage })] })
           : null,
         listGroup({
           items: [
@@ -128,6 +129,7 @@ export function mount(root, ctx) {
         listGroup({
           items: [
             row({ icon: 'hand', iconColor: '#0a84ff', title: 'Confidentialité et sécurité', chevron: true, onClick: privacyPage }),
+            row({ icon: 'shield', iconColor: '#30d158', title: 'Protection de l\'appareil', detail: protectionSummary(), chevron: true, onClick: protectionPage }),
             row({ icon: 'lock', iconColor: '#ff3b30', title: 'Code de verrouillage', detail: s.get('passcode') ? 'Activé' : 'Désactivé', chevron: true, onClick: passcodePage }),
             row({ icon: 'battery', iconColor: '#30d158', title: 'Batterie', detail: `${Math.round(k.device.battery.level * 100)} %`, chevron: true, onClick: batteryPage }),
             row({ icon: 'storage', iconColor: '#8e8e93', title: 'Stockage', detail: formatBytes(k.fs.du('/')), chevron: true, onClick: storagePage }),
@@ -958,14 +960,9 @@ export function mount(root, ctx) {
     return first;
   }
 
+  /** Code actuel (échecs comptés par la Protection de l'appareil). */
   async function checkCurrentCode() {
-    const record = s.get('passcode');
-    if (!record) return true;
-    const code = await ctx.ui.prompt({ title: 'Code actuel', type: 'password', placeholder: '••••' });
-    if (code == null) return false;
-    if (await verifyPasscode(record, code)) return true;
-    await ctx.ui.alert({ title: 'Code incorrect' });
-    return false;
+    return (await ui.protection.askCode({ title: 'Code actuel' })) != null;
   }
 
   // ───────────── Mise à jour logicielle ─────────────
@@ -981,7 +978,7 @@ export function mount(root, ctx) {
         const progress = up.progress?.total ? up.progress.done / up.progress.total : 0;
         card = h(
           'div.update-card',
-          h('div.update-head', h('div.update-logo', logo(44)), h('div', h('strong', `Orion OS ${a.version}`), h('span', [a.date && new Date(a.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }), up.status === 'available' && a.download != null ? `${formatBytes(a.download)} à télécharger` : a.size ? formatBytes(a.size) : null].filter(Boolean).join(' · ')))),
+          h('div.update-head', h('div.update-logo', logo(44)), h('div', h('strong', `Orion OS ${a.label ?? a.version}`), h('span', [a.date && new Date(a.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }), up.status === 'available' && a.download != null ? `${formatBytes(a.download)} à télécharger` : a.size ? formatBytes(a.size) : null].filter(Boolean).join(' · ')))),
           a.notes?.length ? notes(a.notes) : null,
           up.status === 'downloading'
             ? h('div.update-progress', h('div.update-bar', h('span', { style: { width: `${Math.round(progress * 100)}%` } })), h('small', up.progress?.total ? `Téléchargement… ${Math.round(progress * 100)} % (${up.progress.done} fichiers sur ${up.progress.total}, ${formatBytes(up.progress.downloaded ?? 0)} reçus)` : 'Préparation du téléchargement…'))
@@ -997,7 +994,7 @@ export function mount(root, ctx) {
         card = h(
           'div.update-card.center',
           h('div.update-logo', logo(56)),
-          h('strong', `Orion OS ${up.installed.version}`),
+          h('strong', `Orion OS ${k.os.label}`),
           up.status === 'checking'
             ? h('p', spinner(16), ' Recherche de mises à jour…')
             : up.status === 'error'
@@ -1016,7 +1013,7 @@ export function mount(root, ctx) {
           ],
         }),
         listGroup({
-          header: `Nouveautés d'Orion OS ${up.installed.version}`,
+          header: `Nouveautés d'Orion OS ${k.os.label}`,
           items: [h('div.list-item.update-current', notes(up.installed.notes))],
           footer: `Build ${up.installed.build}${up.installed.date ? ` du ${new Date(up.installed.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.`,
         }),
@@ -1161,6 +1158,173 @@ export function mount(root, ctx) {
     ];
   }
 
+  // ───────────── Protection de l'appareil ─────────────
+
+  /** Code de verrouillage (vérifié) puis délai de sécurité d'un réglage sensible. Renvoie le code, '' sans code, ou null. */
+  async function sensitiveCode(title, action) {
+    const code = await ui.protection.askCode({ title });
+    if (code == null) return null;
+    return (await ui.protection.allowSensitive(action)) ? code : null;
+  }
+
+  const LEVEL = { ok: ['check-circle', '#30d158'], warning: ['info', '#ff9f0a'], danger: ['shield', '#ff3b30'] };
+
+  function protectionSummary() {
+    const issues = ui.protection.checkup().filter((i) => i.level !== 'ok').length;
+    return issues ? `${issues} action${issues > 1 ? 's' : ''}` : 'Protégé';
+  }
+
+  function protectionPage() {
+    const prot = ui.protection;
+    const svc = k.protection;
+    let progress = null;
+    let lastPaint = 0;
+    const ACTIONS = {
+      passcode: passcodePage,
+      autolock: displayPage,
+      updates: updatesPage,
+      developer: () => {
+        ui.developer.lock();
+        ctx.ui.toast('Mode développeur verrouillé');
+      },
+    };
+    const p = open('Protection de l\'appareil', (refresh) => {
+      const items = prot.checkup();
+      const issues = items.filter((i) => i.level !== 'ok');
+      const level = issues.some((i) => i.level === 'danger') ? 'danger' : issues.length ? 'warning' : 'ok';
+      const last = svc.lastScan;
+      const owner = Boolean(me().owner);
+      const opts = svc.options;
+      const frp = svc.frp;
+      const integrity = last?.integrity;
+      const changed = integrity?.status === 'altered' ? [...(integrity.altered ?? []).map((f) => [f, 'modifié']), ...(integrity.missing ?? []).map((f) => [f, 'absent'])] : [];
+      const threats = last?.apps?.threats ?? [];
+      const scan = async () => {
+        progress = 0;
+        refresh();
+        await prot.scan({
+          onProgress: (x) => {
+            progress = x;
+            if (Date.now() - lastPaint > 200) {
+              lastPaint = Date.now();
+              refresh();
+            }
+          },
+        });
+        progress = null;
+        refresh();
+      };
+      const optionRow = (key, title, subtitle, { onEnable = null, onDisable = null, disabled = false } = {}) =>
+        row({
+          title,
+          subtitle,
+          trailing: toggle(opts[key], async (on) => {
+            const ok = on ? (onEnable ? await onEnable() : true) : onDisable ? await onDisable() : true;
+            if (ok) {
+              try {
+                svc.setOption(key, on);
+              } catch (error) {
+                ctx.ui.alert({ title: 'Réglage impossible', message: error.message });
+              }
+            }
+            refresh();
+          }, { label: title, disabled: disabled || !owner }),
+        });
+      const offWithCode = () => sensitiveCode('Désactiver une protection', 'protection').then((code) => code != null);
+      return [
+        h(
+          'div.settings-hero.protect-hero',
+          h(`div.hero-icon.protect-${level}`, icon('shield', { size: 34 })),
+          h('h2', level === 'ok' ? 'Votre appareil est protégé' : level === 'danger' ? 'Votre appareil est exposé' : 'Des actions sont recommandées'),
+          h('p', progress != null ? `Analyse en cours… ${Math.round(progress * 100)} %` : last ? `Dernière analyse : ${relativeTime(last.at, Date.now()).replace(/^./, (c) => c.toLowerCase())}` : 'Aucune analyse pour le moment'),
+        ),
+        button(progress != null ? 'Analyse en cours…' : 'Analyser maintenant', { block: true, disabled: progress != null, icon: 'refresh', onClick: scan }),
+        listGroup({
+          header: 'Bilan de sécurité',
+          items: items.map((item) => {
+            const action = item.id === 'integrity' && !integrity ? scan : ACTIONS[item.id];
+            return row({ icon: LEVEL[item.level][0], iconColor: LEVEL[item.level][1], title: item.title, subtitle: item.detail, chevron: Boolean(action) && item.level !== 'ok', onClick: action && item.level !== 'ok' ? action : null });
+          }),
+        }),
+        changed.length
+          ? listGroup({
+              header: 'Fichiers système modifiés',
+              items: [
+                ...changed.slice(0, 8).map(([file, state]) => row({ title: file.replace(/^\.\//, ''), detail: state })),
+                row({ icon: 'download', iconColor: '#0a84ff', title: 'Réparer', subtitle: 'Retélécharger et vérifier ces fichiers', onClick: async () => {
+                  const result = await repairIntegrity();
+                  if (!result?.ok) return ctx.ui.alert({ title: 'Réparation impossible', message: result?.error ?? 'Erreur inconnue' });
+                  ctx.ui.toast(`${result.repaired} fichier(s) réparé(s)`);
+                  await scan();
+                } }),
+              ],
+              footer: integrity.source === 'orion-server' ? 'Fichiers servis par orion-server : lancez « systemctl start orion-update » pour réinstaller la version.' : 'Ces fichiers ne correspondent pas à la version publiée d\'Orion (extension du navigateur, stockage endommagé ou logiciel malveillant).',
+            })
+          : null,
+        threats.length
+          ? listGroup({
+              header: 'Apps à surveiller',
+              items: threats.map((t) => row({ icon: 'info', iconColor: t.level === 'danger' ? '#ff3b30' : '#ff9f0a', title: t.name, subtitle: t.findings.map((f) => f.message).join(' · '), chevron: true, onClick: () => appPage(t.id) })),
+            })
+          : null,
+        svc.pendingDelays().length
+          ? listGroup({
+              header: 'Délai de sécurité en cours',
+              items: svc.pendingDelays().map(({ action, readyAt }) => row({ icon: 'clock', iconColor: '#5e5ce6', title: { passcode: 'Code de verrouillage', erase: 'Effacement', frp: 'Protection contre la réinitialisation', protection: 'Désactiver une protection' }[action] ?? action, detail: readyAt > Date.now() ? `à ${new Date(readyAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Possible maintenant' })),
+            })
+          : null,
+        listGroup({
+          header: 'Protections',
+          items: [
+            row({
+              title: 'Protection contre la réinitialisation',
+              subtitle: frp.enabled ? `Après un effacement, le code de ${frp.owner?.name || 'son propriétaire'} est demandé${frp.remote ? ' · gardée par orion-server' : ''}` : 'Après un effacement, le code du propriétaire est demandé',
+              trailing: toggle(frp.enabled, async (on) => {
+                try {
+                  if (on) {
+                    if (!s.get('passcode')) {
+                      await ctx.ui.alert({ title: 'Code nécessaire', message: 'Définissez d\'abord un code de verrouillage : c\'est lui qui sera demandé après une réinitialisation.' });
+                    } else if ((await ui.protection.askCode({ title: 'Activer la protection' })) != null) {
+                      await svc.enableFrp({ record: s.get('passcode'), owner: { name: me().name, email: me().email } });
+                      ctx.ui.toast('Protection contre la réinitialisation activée');
+                    }
+                  } else {
+                    const code = await sensitiveCode('Désactiver la protection', 'frp');
+                    if (code != null) {
+                      const result = await svc.disableFrp(code);
+                      if (!result.ok) await ctx.ui.alert({ title: 'Toujours activée', message: result.wait ? `Réessayez dans ${result.wait} s.` : 'Code incorrect.' });
+                    }
+                  }
+                } catch (error) {
+                  await ctx.ui.alert({ title: 'Réglage impossible', message: error.message });
+                }
+                refresh();
+              }, { label: 'Protection contre la réinitialisation', disabled: !owner }),
+            }),
+            optionRow('wipe', 'Effacer après 10 tentatives', 'Après 10 codes faux, l\'appareil est effacé (un autre compte : ses données seulement)', {
+              onEnable: () => ctx.ui.confirm({ title: 'Effacer après 10 tentatives ?', message: 'Si quelqu\'un se trompe 10 fois de code, toutes les données seront effacées. Les attentes entre les essais restent actives.', confirmLabel: 'Activer' }),
+              onDisable: offWithCode,
+            }),
+            optionRow('sensitive', 'Protection des données sensibles', 'Code et délai d\'une heure pour changer le code, effacer ou désactiver une protection', { onDisable: offWithCode }),
+            optionRow('theftLock', 'Verrouillage en cas de vol', prot.motionSupported ? 'Verrouille aussitôt si l\'appareil est arraché de la main' : 'Nécessite un capteur de mouvement (téléphone ou tablette)', {
+              onEnable: async () => {
+                if (await prot.requestMotionPermission()) return true;
+                await ctx.ui.alert({ title: 'Capteur indisponible', message: 'Le navigateur ne donne pas accès aux capteurs de mouvement.' });
+                return false;
+              },
+              disabled: !prot.motionSupported,
+            }),
+            optionRow('offlineLock', 'Verrouillage hors ligne', 'Verrouille si la connexion est perdue plus de 10 secondes'),
+          ],
+          footer: owner
+            ? 'Ces protections valent pour tout l\'appareil. Dans un navigateur, effacer les données du site les efface aussi ; sur Orion installé, la protection contre la réinitialisation est également gardée par orion-server. Les apps du Store sont analysées avant chaque installation.'
+            : `Ces protections valent pour tout l'appareil et sont réglées par ${accounts?.owner?.name || 'le propriétaire'}.`,
+        }),
+      ];
+    });
+    p.protection = true;
+  }
+
   function passcodePage() {
     open('Code de verrouillage', (refresh) => {
       const enabled = Boolean(s.get('passcode'));
@@ -1169,8 +1333,38 @@ export function mount(root, ctx) {
         listGroup({
           items: enabled
             ? [
-                row({ title: 'Modifier le code', onClick: async () => { if (!(await checkCurrentCode())) return; const code = await askNewCode(); if (code) { s.set('passcode', await createPasscode(code)); ctx.ui.toast('Code modifié'); refresh(); } } }),
-                row({ title: 'Désactiver le code', destructive: true, onClick: async () => { if (!(await checkCurrentCode())) return; s.set('passcode', null); ctx.ui.toast('Code désactivé'); refresh(); } }),
+                row({ title: 'Modifier le code', onClick: async () => {
+                  const old = await sensitiveCode('Modifier le code', 'passcode');
+                  if (old == null) return;
+                  const code = await askNewCode();
+                  if (!code) return;
+                  const record = await createPasscode(code);
+                  // La protection contre la réinitialisation suit le nouveau code.
+                  if (me().owner) {
+                    try {
+                      await k.protection.updateFrpRecord(record, old);
+                    } catch (error) {
+                      await ctx.ui.alert({ title: 'Code non modifié', message: `La protection contre la réinitialisation n'a pas pu être mise à jour : ${error.message}` });
+                      return;
+                    }
+                  }
+                  s.set('passcode', record);
+                  ctx.ui.toast('Code modifié');
+                  refresh();
+                } }),
+                row({ title: 'Désactiver le code', destructive: true, onClick: async () => {
+                  const frp = me().owner && k.protection.frp.enabled;
+                  if (frp && !(await ctx.ui.confirm({ title: 'Désactiver le code ?', message: 'La protection contre la réinitialisation sera aussi désactivée : elle repose sur votre code.', confirmLabel: 'Désactiver', destructive: true }))) return;
+                  const old = await sensitiveCode('Désactiver le code', 'passcode');
+                  if (old == null) return;
+                  if (frp && !(await k.protection.disableFrp(old).catch((e) => ({ ok: false, error: e.message }))).ok) {
+                    await ctx.ui.alert({ title: 'Code toujours actif', message: 'La protection contre la réinitialisation n\'a pas pu être désactivée.' });
+                    return;
+                  }
+                  s.set('passcode', null);
+                  ctx.ui.toast('Code désactivé');
+                  refresh();
+                } }),
               ]
             : [row({ title: 'Activer le code', onClick: async () => { const code = await askNewCode(); if (code) { s.set('passcode', await createPasscode(code)); ctx.ui.toast('Code activé'); refresh(); } } })],
         }),
@@ -1324,11 +1518,21 @@ export function mount(root, ctx) {
           me().owner
             ? row({ title: 'Effacer contenu et réglages', destructive: true, onClick: async () => {
                 const others = (accounts?.list().length ?? 1) > 1;
-                if (!(await ctx.ui.confirm({ title: 'Tout effacer ?', message: `Toutes les données (photos, notes, messages, réglages${others ? ' et tous les comptes' : ''}) seront supprimées et l'appareil redémarrera.`, confirmLabel: 'Tout effacer', destructive: true }))) return;
+                const frp = k.protection.frp.enabled;
+                if (!(await ctx.ui.confirm({ title: 'Tout effacer ?', message: `Toutes les données (photos, notes, messages, réglages${others ? ' et tous les comptes' : ''}) seront supprimées et l'appareil redémarrera.${frp ? ' Effacé par vous, l\'appareil ne demandera pas votre code ensuite : la protection contre la réinitialisation est levée.' : ''}`, confirmLabel: 'Tout effacer', destructive: true }))) return;
+                const code = await sensitiveCode('Effacer contenu et réglages', 'erase');
+                if (code == null) return;
+                if (frp && code && !(await k.protection.disableFrp(code).catch(() => ({ ok: false }))).ok) {
+                  await ctx.ui.alert({ title: 'Effacement annulé', message: 'La protection contre la réinitialisation n\'a pas pu être levée.' });
+                  return;
+                }
+                k.protection.resetAfterWipe();
                 await ui.eraseDevice();
               } })
             : row({ title: 'Effacer le contenu de mon compte', destructive: true, onClick: async () => {
                 if (!(await ctx.ui.confirm({ title: 'Effacer votre contenu ?', message: 'Vos apps, fichiers, messages et réglages seront supprimés ; votre compte sera reconfiguré au redémarrage.', confirmLabel: 'Effacer', destructive: true }))) return;
+                if ((await sensitiveCode('Effacer mon contenu', 'erase')) == null) return;
+                k.protection.resetAfterWipe(me().id);
                 await ui.eraseDevice();
               } }),
         ],
@@ -1341,11 +1545,11 @@ export function mount(root, ctx) {
     const p = open('Informations', () => {
       const info = k.device.info();
       return [
-        h('div.settings-hero', h('div.hero-logo', logo(72)), h('h2', `${k.os.name} ${k.os.version}`), h('p', `« ${k.os.codename} »`)),
+        h('div.settings-hero', h('div.hero-logo', logo(72)), h('h2', `${k.os.name} ${k.os.label}`), h('p', `« ${k.os.codename} »`)),
         listGroup({
           items: [
             row({ title: 'Nom', detail: s.get('deviceName') }),
-            row({ title: 'Version', detail: k.os.version }),
+            row({ title: 'Version', detail: k.os.label }),
             row({
               title: 'Numéro de build',
               detail: k.os.build,
@@ -1498,7 +1702,7 @@ export function mount(root, ctx) {
 
   // ───────────── Intents ─────────────
 
-  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, cellular: cellularPage, location: locationPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, about: aboutPage, sound: soundPage, developer: developerPage };
+  const PAGES = { updates: updatesPage, camera: cameraPage, account: accountPage, users: () => accounts && usersPage(), wallpaper: wallpaperPage, battery: batteryPage, display: displayPage, wifi: wifiPage, bluetooth: bluetoothPage, cellular: cellularPage, location: locationPage, notifications: notificationsPage, privacy: privacyPage, storage: storagePage, apps: appsPage, passcode: passcodePage, protection: protectionPage, about: aboutPage, sound: soundPage, developer: developerPage };
 
   function handleIntent(intent) {
     const data = intent?.data;
@@ -1529,6 +1733,8 @@ export function mount(root, ctx) {
   };
   const isRoot = () => nav.depth === 1;
   for (const type of ['settings:change', 'package:install', 'package:uninstall', 'network:change', 'bluetooth:change']) ctx.subscribe(type, () => redraw(isRoot));
+  // Protection de l'appareil (autre fenêtre, analyse, délai) : sa page et le résumé de l'accueil suivent.
+  ctx.subscribe('protection:change', () => redraw((top) => top?.protection || isRoot()));
   // Mises à jour : la page suit la vérification et le téléchargement en direct.
   ctx.subscribe('update:change', ({ status }) => {
     const wanted = (top) => top?.updates || isRoot();

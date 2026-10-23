@@ -61,12 +61,13 @@ export function seedFilesystem(fs, now = Date.now()) {
 export function writeSystemFiles(fs, os, commands) {
   const sys = { system: true };
   fs.mkdir('/system/bin', { recursive: true, ...sys });
-  fs.writeFile('/system/version', `${os.name} ${os.version} (${os.build})\n`, sys);
+  fs.writeFile('/system/version', `${os.name} ${os.label ?? os.version} (${os.build})\n`, sys);
   fs.writeFile(
     '/system/build.prop',
     [
       `ro.build.id=${os.build}`,
       `ro.build.version=${os.version}`,
+      `ro.build.channel=${os.channel ?? 'stable'}`,
       `ro.build.codename=${os.codename}`,
       `ro.product.name=${os.name}`,
       `ro.kernel=${os.kernel}`,

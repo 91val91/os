@@ -68,7 +68,8 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 
 **Système**
 - **Comptes et utilisateurs** : l'assistant crée votre compte (nom, e-mail facultatif) ; d'autres personnes peuvent avoir le leur sur le même téléphone (**Réglages → Compte → Utilisateurs**). Chaque compte a ses apps, fichiers, photos, contacts, messages, réglages et code ; on change d'utilisateur depuis l'écran verrouillé ou le volet de notifications. Les comptes sont enregistrés sur l'appareil uniquement (pas de synchronisation en ligne).
-- Écran verrouillé avec horloge, notifications, lecture en cours, lampe et appareil photo ; code PIN haché (SHA-256 salé), blocage après 5 essais, appel d'urgence.
+- Écran verrouillé avec horloge, notifications, lecture en cours, lampe et appareil photo ; code PIN haché (SHA-256 salé), appel d'urgence. Les erreurs de code sont comptées même après un redémarrage (attente d'1 min après 5 erreurs, puis 5 min, 15 min, 1 h).
+- **Protection de l'appareil** : voir [Protection de l'appareil](#protection-de-lappareil).
 - Accueil à pages avec dock, widgets (horloge, météo), badges, icônes vivantes (date du Calendrier, aiguilles de l'Horloge), mode édition par glisser-déposer.
 - Multitâche : une instance par app, apps en arrière-plan conservées, écran des récentes, arrêt automatique des plus anciennes (« low memory killer »).
 - Notifications en bannière, volet groupé, « Ne pas déranger », autorisation par app.
@@ -100,9 +101,9 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 | Musique | Morceaux génératifs synthétisés en temps réel, import de fichiers audio, contrôle système |
 | Navigateur | Barre d'adresse, favoris, historique, partage |
 | Fichiers | Explorateur de votre espace personnel (Documents, Photos, Musique…), import/export, renommage, déplacement. Les fichiers système n'y sont pas accessibles |
-| Réglages | Wi‑Fi (réseaux, mot de passe, test de débit), Bluetooth, réseau mobile, localisation, notifications, sons, affichage, fonds d'écran, confidentialité, code, batterie, stockage, apps |
+| Réglages | Wi‑Fi (réseaux, mot de passe, test de débit), Bluetooth, réseau mobile, localisation, notifications, sons, affichage, fonds d'écran, confidentialité, protection de l'appareil, code, batterie, stockage, apps |
 | Terminal | Shell `osh` avec tubes, redirections, complétion et plus de 60 commandes. Caché : il s'ouvre depuis les options pour les développeurs et se ferme au verrouillage |
-| Store | Catalogue, installation et désinstallation d'applications |
+| Store | Catalogue des apps d'Orion et de celles publiées par les développeurs, apps gratuites ou payantes (solde de test, reçus, remboursement sous 2 h), notes, compte. Voir [Publier une app sur le Store](#publier-une-app-sur-le-store) |
 | 2048, Snake, Dessin, Dictaphone | À installer depuis le Store |
 
 ![Terminal, Musique, Météo, Store](docs/screenshots/applications.jpg)
@@ -120,6 +121,7 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 │ accounts · processes · intents/activités · packages · vfs · settings        │
 │ notifications · alarms · permissions · media · contacts · telephony · shell │
 │ network · bluetooth · location · bridge (pont matériel orion-server)        │
+│ store (Store et développeurs) · protection (protection de l'appareil)       │
 ├────────────────────────── Stockage ─────────────────────────────────────────┤
 │ une base par compte : IndexedDB  →  localStorage  →  mémoire                │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -181,6 +183,52 @@ Le contexte `ctx` donne accès au système :
 
 Les apps système reçoivent en plus `ctx.kernel` et `ctx.system`.
 
+## Publier une app sur le Store
+
+Tout compte de l'appareil peut devenir développeur : **Store → Compte → Publier vos apps sur le Store**.
+
+1. **Inscription** au programme développeur : nom public, e-mail de contact, acceptation du contrat de distribution et **25 €** payés une fois.
+2. **Console développeur** : revenus nets, ventes, installations et note moyenne ; « Nouvelle app » crée un brouillon à partir d'un modèle prêt à essayer.
+3. **Édition** : nom, sous-titre, description, catégorie, prix (gratuit ou de 0,99 € à 9,99 €), icône (pictogramme et couleurs), autorisation de localisation, version et notes de version, et le **code** : un seul fichier HTML (avec ses `<style>` et `<script>`). **Essayer** lance le brouillon isolé, avec des données jetables.
+4. **Examen automatique** avant chaque publication : fiche complète, numéro de version supérieur au précédent, taille du code (256 Ko au plus) et **analyse de sécurité** (tentative de sortir de l'environnement isolé, mineur de cryptomonnaie, imitation des écrans d'Orion pour voler un code : refusés ; accès réseau, `eval`, code masqué : signalés).
+5. **Publication** : l'app apparaît dans le Store des autres comptes (« Nouveautés des développeurs », catégories, recherche). Une modification reste un brouillon jusqu'à « Publier la mise à jour ». « Retirer de la vente » la cache du Store ; ceux qui l'ont installée la gardent.
+
+Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du développeur. Un acheteur peut être remboursé pendant 2 heures (l'app est alors désinstallée et la vente annulée).
+
+**Paiements fictifs** : Orion n'a pas encore de service de paiement. Chaque compte a un **solde de test** (Store → Compte → « Ajouter des fonds de test », 500 € au plus) : aucun moyen de paiement réel n'est demandé ni débité. De même, sans serveur du Store, le catalogue est partagé par les comptes **de cet appareil**.
+
+**Exécution isolée** : une app publiée tourne dans une `iframe` `sandbox="allow-scripts"` sans origine (ni la page d'Orion, ni ses données, ni le stockage du navigateur) et sans accès au réseau (politique de sécurité `default-src 'none'`). Elle ne parle au système que par le SDK `orion`, dont chaque appel est vérifié :
+
+```html
+<button id="b">+1</button>
+<script>
+  document.getElementById('b').onclick = async () => {
+  const n = (await orion.storage.get('n')) ?? 0;      // données de l'app (1 Mo), dans /data/<app>
+  await orion.storage.set('n', n + 1);
+  orion.ui.toast('Bonjour');                          // aussi alert, confirm, prompt
+  orion.device.vibrate(10);                           // et device.info()
+  orion.notify({ title: 'Rappel', body: '…' });       // une toutes les 5 s au plus
+  const pos = await orion.location.current();         // si l'app déclare la localisation et que l'utilisateur l'accepte
+  };
+  orion.onBack(() => false);                          // bouton Retour (true : traité par l'app) ; orion.on('pause' | 'resume' | 'theme', fn) ; orion.close()
+</script>
+```
+
+## Protection de l'appareil
+
+**Réglages → Protection de l'appareil** fait le **bilan de sécurité** de l'appareil et regroupe ses protections :
+
+- **Bilan** : code de verrouillage, verrouillage automatique, mises à jour, intégrité du système, apps du Store installées, mode développeur ouvert, protection contre la réinitialisation. Chaque point à corriger mène au bon réglage.
+- **Intégrité du système** (« Analyser maintenant ») : chaque fichier d'Orion gardé sur l'appareil est comparé à son empreinte SHA-256 publiée dans `version.json` ; un fichier modifié (extension du navigateur, stockage endommagé, logiciel malveillant) est signalé et **« Réparer »** le fait retélécharger et vérifier. Sur Orion installé, `orion-server` vérifie aussi les fichiers qu'il sert.
+- **Analyse des apps** : les apps du Store sont analysées avant leur publication, avant chaque installation et à chaque analyse ; une app dangereuse ne s'installe pas.
+- **Protection contre la réinitialisation** : si l'appareil est effacé autrement que par son propriétaire depuis les Réglages (trop d'erreurs de code, vol), il demande le code de l'ancien propriétaire avant de pouvoir resservir. Elle est gardée dans une base à part, que l'effacement d'Orion ne touche pas, et sur Orion installé par `orion-server` (`/var/lib/orion/protection.json`), qui vérifie le code sans jamais renvoyer son empreinte et limite les essais.
+- **Effacer après 10 tentatives** (facultatif) : au dixième code faux, l'appareil est effacé (pour un autre compte que le propriétaire : ses seules données) ; un avertissement s'affiche à partir de la septième erreur.
+- **Protection des données sensibles** (facultative) : changer ou désactiver le code, tout effacer ou désactiver une protection demande le code, puis n'est possible qu'**une heure plus tard** (pendant une heure) ; un voleur qui a vu votre code ne peut pas verrouiller votre appareil pour lui.
+- **Verrouillage en cas de vol** (téléphone ou tablette) : un mouvement brusque, comme un appareil arraché de la main, le verrouille aussitôt. **Verrouillage hors ligne** : l'appareil se verrouille si la connexion est perdue plus de 10 secondes.
+- Achats sur le Store et inscription au programme développeur : **vérification d'identité** par le code de verrouillage.
+
+Limites : dans un navigateur ordinaire, « Effacer les données du site » efface aussi la protection contre la réinitialisation (le navigateur ne laisse rien survivre à cela) ; seule une installation avec `orion-server` y résiste. Le délai de sécurité s'applique partout (Orion ne connaît pas encore vos lieux familiers).
+
 ## Le shell `osh`
 
 Accessible depuis le Terminal, en mode développeur (**Réglages → Mode développeur → Terminal**).
@@ -240,18 +288,20 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 - **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil est verrouillé et que rien n'est en cours : appel, réveil, musique).
 - **Version retirée** : si l'éditeur retire une version déjà téléchargée, elle est abandonnée et n'est jamais installée.
 
-**Publier une version** : changez le numéro et les nouveautés dans `src/kernel/version.js`, ajoutez vos fichiers à git (`git add`), lancez `npm run release` (qui régénère `version.json` à partir de l'index git : version, notes, empreinte et taille de chaque fichier tel que GitHub Pages le servira ; il refuse de tourner s'il reste des changements non ajoutés), puis `git add version.json`, commitez et poussez. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
+**Numérotation** : Orion OS est en **0.1 (alpha)**. Chaque publication porte aussi un numéro d'ordre (`sequence`, +1 à chaque version) : c'est lui qui dit quelle version est la plus récente. Les appareils encore en 1.2.0 (ancienne numérotation) passent donc bien à la 0.1 : le nouveau service worker la télécharge en arrière-plan et l'applique au redémarrage suivant d'Orion.
+
+**Publier une version** : changez le numéro, le numéro d'ordre (`sequence` + 1) et les nouveautés dans `src/kernel/version.js`, ajoutez vos fichiers à git (`git add`), lancez `npm run release` (qui régénère `version.json` à partir de l'index git : version, notes, empreinte et taille de chaque fichier tel que GitHub Pages le servira ; il refuse de tourner s'il reste des changements non ajoutés), puis `git add version.json`, commitez et poussez. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
 
 ## Tests
 
 ```bash
-npm test            # 88 tests unitaires (noyau, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 112 tests unitaires (noyau, Store, protection, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
 npm run lint        # ESLint
 npm run screenshots # régénère les captures du README
 npm run release     # régénère version.json avant de publier une version
-python3 -m unittest discover -s server   # tests d'orion-server (pont matériel, synchronisation)
+python3 -m unittest discover -s server   # 78 tests d'orion-server (pont matériel, protection, synchronisation)
 ```
 
 ## Structure du projet
@@ -276,7 +326,7 @@ installer/                                image ISO installable (live-build), ma
 Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, et s'appuie sur le navigateur (donc sur Android ou iOS) ou sur `orion-server` (Orion installé) pour le matériel. Concrètement :
 
 - **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi (Orion installé), plein écran et hors ligne ;
-- **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie.
+- **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie, et les **paiements du Store** (solde de test : pas encore de service de paiement ni de serveur du Store).
 
 Installé avec l'image prévue pour cela, Orion devient le système principal de la machine, à la manière de Firefox OS (B2G) ou KaiOS : un noyau Linux, un navigateur en mode kiosque lancé au démarrage et `orion-server` pour le matériel.
 

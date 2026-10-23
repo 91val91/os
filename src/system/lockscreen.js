@@ -8,6 +8,7 @@ import { drag } from '../lib/gesture.js';
 import { formatDate, formatTime } from '../lib/format.js';
 import { avatar } from '../lib/ui.js';
 import { verifyPasscode } from '../kernel/settings.js';
+import { formatWait } from './protection.js';
 
 const LETTERS = { 2: 'ABC', 3: 'DEF', 4: 'GHI', 5: 'JKL', 6: 'MNO', 7: 'PQRS', 8: 'TUV', 9: 'WXYZ' };
 
@@ -212,6 +213,9 @@ export class LockScreen {
     this.entered = '';
     const account = this.k.account;
     if (!this.failures) this.pinTitle.textContent = this.#accounts && account?.name ? `Code de ${account.name}` : 'Saisissez le code';
+    // Échecs comptés par la Protection de l'appareil : un rechargement ne remet pas l'attente à zéro.
+    const { wait } = this.k.protection.lockout();
+    if (wait) this.#block(wait);
     this.#renderDots();
     this.pin.classList.add('visible');
     this.content.classList.add('blurred');
@@ -240,6 +244,25 @@ export class LockScreen {
     }
   }
 
+  /** Saisie bloquée pendant `seconds`, avec le temps restant affiché (et `note`, un avertissement). */
+  #block(seconds, note = '') {
+    clearInterval(this.blockTimer);
+    this.blockedUntil = Date.now() + seconds * 1000;
+    const tick = () => {
+      const left = Math.ceil((this.blockedUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        clearInterval(this.blockTimer);
+        this.pinTitle.textContent = 'Saisissez le code';
+        this.pin.classList.remove('blocked');
+        return;
+      }
+      this.pinTitle.textContent = `Orion est verrouillé · réessayez dans ${formatWait(left)}${note}`;
+    };
+    this.pin.classList.add('blocked');
+    tick();
+    this.blockTimer = setInterval(tick, 1000);
+  }
+
   async #press(digit) {
     if (Date.now() < this.blockedUntil) return;
     const record = this.k.settings.get('passcode');
@@ -252,21 +275,27 @@ export class LockScreen {
     if (this.entered.length < length) return;
     if (await verifyPasscode(record, this.entered)) {
       this.failures = 0;
+      this.k.protection.recordSuccess();
       this.pinTitle.textContent = 'Saisissez le code';
       await this.#dismiss();
       return;
     }
     this.failures++;
+    const result = this.k.protection.recordFailure();
     this.k.device.vibrate([60, 40, 60]);
     await animate(this.dots, [{ transform: 'translateX(0)' }, { transform: 'translateX(-14px)' }, { transform: 'translateX(12px)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(0)' }], { duration: 380 });
     this.entered = '';
-    if (this.failures >= 5) {
-      this.blockedUntil = Date.now() + 30_000;
-      this.pinTitle.textContent = 'Réessayez dans 30 secondes';
-      setTimeout(() => (this.pinTitle.textContent = 'Saisissez le code'), 30_000);
-    } else {
-      this.pinTitle.textContent = 'Code incorrect';
+    if (result.wipe) {
+      // Effacement après trop d'échecs (Protection de l'appareil).
+      this.blockedUntil = Infinity;
+      this.pinTitle.textContent = 'Trop de tentatives : effacement…';
+      this.#renderDots();
+      await this.ui.protection.wipeAfterFailures();
+      return;
     }
+    const warning = result.left != null && result.left <= 3 ? ` · encore ${result.left} essai${result.left > 1 ? 's' : ''} avant l'effacement` : '';
+    if (result.wait) this.#block(result.wait, warning);
+    else this.pinTitle.textContent = `Code incorrect${warning}`;
     this.#renderDots();
   }
 }

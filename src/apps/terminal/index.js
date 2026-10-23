@@ -167,7 +167,7 @@ export function mount(root, ctx) {
 
   root.classList.add('terminal');
   root.append(screen, keys);
-  print(`\x1b[1m${ctx.kernel.os.name} ${ctx.kernel.os.version}\x1b[0m — osh 1.0\nTapez \x1b[36mhelp\x1b[0m pour la liste des commandes, \x1b[36mneofetch\x1b[0m pour un résumé.\n`);
+  print(`\x1b[1m${ctx.kernel.os.name} ${ctx.kernel.os.label}\x1b[0m — osh 1.0\nTapez \x1b[36mhelp\x1b[0m pour la liste des commandes, \x1b[36mneofetch\x1b[0m pour un résumé.\n`);
   renderPrompt();
   setTimeout(() => input.focus(), 400);
   return {

@@ -10,7 +10,7 @@
  * Sans service worker (page http sur le réseau local, ?nosw), installer
  * revient à recharger la page depuis le serveur.
  */
-import { RELEASE } from '../kernel/version.js';
+import { RELEASE, versionLabel } from '../kernel/version.js';
 
 const CHECK_EVERY = 6 * 3_600_000;
 /** Sans nouvelles du téléchargement pendant ce délai, on demande au service worker où il en est. */
@@ -27,7 +27,33 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-const summary = (manifest, download = manifest.size) => ({ version: manifest.version, build: manifest.build, date: manifest.date, notes: manifest.notes ?? [], size: manifest.size ?? 0, download: download ?? 0 });
+const ordered = (release) => Number.isInteger(release?.sequence);
+
+/**
+ * Laquelle de deux versions est la plus récente : négatif, nul ou positif.
+ * Le numéro d'ordre (sequence) décide, le numéro affiché pouvant repartir de
+ * zéro (1.2.0 → 0.1 alpha). Les versions d'avant la 0.1 n'en ont pas : elles
+ * sont plus anciennes que toutes celles qui en ont un.
+ */
+export function compareReleases(a, b) {
+  if (ordered(a) && ordered(b)) return Math.sign(a.sequence - b.sequence);
+  if (ordered(a) !== ordered(b)) return ordered(a) ? 1 : -1;
+  return compareVersions(a?.version, b?.version);
+}
+
+const newer = (release) => compareReleases(release, RELEASE) > 0;
+
+const summary = (manifest, download = manifest.size) => ({
+  version: manifest.version,
+  channel: manifest.channel ?? null,
+  sequence: manifest.sequence ?? null,
+  label: versionLabel(manifest),
+  build: manifest.build,
+  date: manifest.date,
+  notes: manifest.notes ?? [],
+  size: manifest.size ?? 0,
+  download: download ?? 0,
+});
 
 export class UpdateManager {
   #watchdog = null;
@@ -64,8 +90,8 @@ export class UpdateManager {
     // Une mise à jour déjà téléchargée (avant un redémarrage) attend d'être installée ;
     // elle est revérifiée auprès de version.json (l'éditeur a pu la retirer).
     this.#ask({ type: 'status' }).then((status) => {
-      if (status?.staged && compareVersions(status.staged.version, RELEASE.version) > 0 && this.status === 'idle') {
-        this.#set('ready', { available: status.staged });
+      if (status?.staged && newer(status.staged) && this.status === 'idle') {
+        this.#set('ready', { available: summary(status.staged) });
         this.check();
       }
     });
@@ -97,8 +123,8 @@ export class UpdateManager {
     if (this.status !== 'downloading') return;
     const staged = (await this.#ask({ type: 'status' }))?.staged;
     if (this.status !== 'downloading') return;
-    if (staged && compareVersions(staged.version, RELEASE.version) > 0) {
-      this.#set('ready', { available: staged, progress: null });
+    if (staged && newer(staged)) {
+      this.#set('ready', { available: summary(staged), progress: null });
       this.#notify();
     } else {
       this.#set('error', { error, progress: null });
@@ -144,7 +170,7 @@ export class UpdateManager {
       return;
     }
     this.k.settings.set('updates.lastCheck', Date.now());
-    if (compareVersions(manifest.version, RELEASE.version) <= 0) {
+    if (!newer(manifest)) {
       // Version retirée par l'éditeur : celle qui était prête ne doit pas être installée.
       await this.#ask({ type: 'discard' });
       this.#set('uptodate', { available: null });
@@ -183,13 +209,13 @@ export class UpdateManager {
       this.#set('uptodate', { available: null });
       return;
     }
-    this.#set('ready', { available: result.staged, progress: null });
+    this.#set('ready', { available: summary(result.staged), progress: null });
     this.#notify();
   }
 
   async install() {
     if (this.status !== 'ready') return;
-    const version = this.available.version;
+    const version = this.available.label ?? this.available.version;
     this.#set('installing');
     if (this.#worker) {
       const result = await this.#ask({ type: 'install' });
@@ -203,9 +229,9 @@ export class UpdateManager {
   }
 
   #onMessage(message) {
-    if (message.type === 'update-progress' && compareVersions(message.version, RELEASE.version) > 0) {
+    if (message.type === 'update-progress' && newer(message)) {
       if (['installing', 'checking'].includes(this.status)) return;
-      if (this.status !== 'downloading') this.available = this.available?.version === message.version ? this.available : { version: message.version, notes: [], size: 0 };
+      if (this.status !== 'downloading') this.available = this.available?.version === message.version ? this.available : summary({ version: message.version, channel: message.channel, sequence: message.sequence, size: 0 });
       this.#set('downloading', { progress: message });
       this.#watch();
     } else if (message.type === 'update-ready' && this.status === 'downloading') {
@@ -216,7 +242,7 @@ export class UpdateManager {
     } else if (message.type === 'update-installed' && !this.installing && !this.ui.poweredOff) {
       // Installée depuis une autre fenêtre d'Orion : celle-ci redémarre aussi.
       this.installing = true;
-      this.ui.power.restart(`Orion OS ${message.version} a été installé…`);
+      this.ui.power.restart(`Orion OS ${versionLabel(message)} a été installé…`);
     }
   }
 
@@ -226,7 +252,7 @@ export class UpdateManager {
       appId: 'settings',
       tag: 'update',
       title: ready ? 'Mise à jour prête à installer' : 'Mise à jour disponible',
-      body: `Orion OS ${this.available.version} — ${ready ? 'touchez pour l\'installer.' : 'touchez pour en savoir plus.'}`,
+      body: `Orion OS ${this.available.label ?? this.available.version} — ${ready ? 'touchez pour l\'installer.' : 'touchez pour en savoir plus.'}`,
       intent: { app: 'settings', action: 'view', data: { page: 'updates' } },
     });
   }

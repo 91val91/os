@@ -109,8 +109,8 @@ export function listItem({ icon: iconName, iconColor = 'var(--accent)', leading 
   return row;
 }
 
-export function toggle(checked, onChange, { label = '' } = {}) {
-  const input = h('input', { type: 'checkbox', checked: Boolean(checked), 'aria-label': label });
+export function toggle(checked, onChange, { label = '', disabled = false } = {}) {
+  const input = h('input', { type: 'checkbox', checked: Boolean(checked), 'aria-label': label, disabled });
   input.addEventListener('change', () => onChange?.(input.checked));
   const el = h('label.switch', { onclick: (e) => e.stopPropagation() }, input, h('span.switch-track'));
   el.input = input;
