@@ -68,6 +68,7 @@ Prévoir **3 à 4 Go de mémoire** et 2 processeurs. La souris tient lieu de doi
 sudo apt install qemu-system-x86 ovmf     # macOS : brew install qemu
 installer/run-vm.sh                        # dernière image de installer/out/
 installer/run-vm.sh --bios                 # démarrage BIOS au lieu d'UEFI
+installer/run-vm.sh --gpu virgl            # accélération 3D (Linux, OpenGL) : interface Wayland, plus fluide
 installer/run-vm.sh --gpu std              # si l'écran reste noir
 ```
 
@@ -153,7 +154,7 @@ Deux mécanismes complémentaires :
 
 ## Dépannage
 
-- **Écran noir ou interface qui ne s'affiche pas** : **Ctrl+Alt+F2** ouvre une console (en démarrage sur clé, déjà connectée ; sur un système installé, utilisateur `orion` et son mot de passe ; le mot de passe du système live est `live`). **Ctrl+Alt+F1** revient à l'interface. Après trois échecs de démarrage, l'interface passe d'elle‑même au rendu logiciel, puis, si la carte graphique n'est pas prise en charge par le compositeur Wayland (carte standard de QEMU, Hyper‑V, affichage UEFI générique sans pilote), à un affichage X11 de secours (`journalctl -t orion-kiosk` dit lequel est utilisé). En machine virtuelle, préférez une carte *virtio* (`run-vm.sh`, GNOME Boxes, virt-manager) ou, dans VirtualBox, le contrôleur graphique *VMSVGA*.
+- **Écran noir ou interface qui ne s'affiche pas** : **Ctrl+Alt+F2** ouvre une console (en démarrage sur clé, déjà connectée ; sur un système installé, utilisateur `orion` et son mot de passe ; le mot de passe du système live est `live`). **Ctrl+Alt+F1** revient à l'interface. Si le compositeur Wayland plante ou échoue trois fois, l'interface passe d'elle‑même au rendu logiciel, puis, s'il échoue encore (carte standard de QEMU, Hyper‑V, affichage UEFI générique sans pilote, carte *virtio* sans accélération 3D), à un affichage X11 de secours, en plein écran lui aussi (`journalctl -t orion-kiosk` dit lequel est utilisé). En machine virtuelle, préférez une carte *virtio* **avec l'accélération 3D** (virt-manager : *Vidéo virtio* + *3D acceleration* et *Affichage Spice* → *OpenGL* ; GNOME Boxes : *Accélération 3D*) ou, dans VirtualBox, le contrôleur graphique *VMSVGA*.
 - **Journaux** :
   ```bash
   journalctl -b -u orion-server      # serveur et pont matériel
@@ -177,7 +178,7 @@ Deux mécanismes complémentaires :
 | `build.sh` | Construit l'ISO avec live-build (Debian 12) |
 | `build-in-docker.sh`, `Dockerfile` | Même chose dans un conteneur Debian 12 |
 | `run-vm.sh` | Démarre l'ISO (ou un disque installé) dans QEMU |
-| `boot-test.sh` | Démarre l'ISO dans QEMU sans écran et vérifie qu'orion-server démarre et que l'interface s'affiche (capture d'écran), avec une carte graphique virtio (Wayland) puis la carte standard de QEMU (secours X11) ; lancé par l'action GitHub après chaque construction |
+| `boot-test.sh` | Démarre l'ISO dans QEMU sans écran et vérifie qu'orion-server démarre et que l'interface s'affiche (capture d'écran), avec une carte graphique virtio puis la carte standard de QEMU (sans accélération 3D, toutes deux finissent sur l'affichage de secours X11 ; le journal montre les tentatives Wayland) ; lancé par l'action GitHub après chaque construction |
 | `config/package-lists/orion.list.chroot` | Paquets de l'image |
 | `config/hooks/normal/9000-orion.hook.chroot` | Réglages appliqués dans l'image (langue, services…) |
 | `config/includes.chroot/` | Fichiers copiés tels quels dans l'image (services, polkit, Chromium, kiosque…) |

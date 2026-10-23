@@ -27,7 +27,10 @@ Usage : $0 [options]
   --uefi | --bios    micrologiciel (défaut : UEFI si OVMF est installé, sinon BIOS)
   --memory Mo        mémoire (défaut : $MEMORY, entre 2048 et 4096 conseillé)
   --cpus N           processeurs (défaut : $CPUS)
-  --gpu virtio|std   carte graphique (défaut : virtio ; std : carte standard, affichage X11 de secours)
+  --gpu virtio|virgl|std
+                     carte graphique : virtio (défaut, sans accélération 3D : affichage X11 de secours),
+                     virgl (virtio avec accélération 3D par OpenGL de l'ordinateur : interface Wayland)
+                     ou std (carte standard de QEMU, affichage X11 de secours)
 EOF
 }
 
@@ -118,8 +121,9 @@ fi
 
 case "$GPU" in
 	virtio) ARGS+=(-vga none -device virtio-vga) ;;
+	virgl) ARGS+=(-vga none -device virtio-vga-gl -display "gtk,gl=on") ;;
 	std) ARGS+=(-vga std) ;;
-	*) die "--gpu : virtio ou std" ;;
+	*) die "--gpu : virtio, virgl ou std" ;;
 esac
 
 # Tablette USB : pointeur absolu, comme un écran tactile.

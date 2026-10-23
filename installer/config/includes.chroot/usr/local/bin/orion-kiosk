@@ -154,18 +154,23 @@ while :; do
 	status=$?
 	elapsed=$(($(date +%s) - started))
 	log "L'interface s'est arrêtée (code $status, après ${elapsed} s)"
+	crashed=0
 	if [ "$elapsed" -lt 20 ]; then
 		failures=$((failures + 1))
+		# Arrêt par un signal (SIGSEGV : 139…) sauf SIGTERM (arrêt de la machine) : un
+		# plantage du pilote graphique, qui se reproduira à chaque essai.
+		if [ "$status" -gt 128 ] && [ "$status" -ne 143 ]; then crashed=1; fi
 	else
 		failures=0
 	fi
-	# Cage qui échoue tout de suite : souvent un pilote graphique absent. Rendu logiciel.
-	if [ "$failures" -ge 3 ] && [ "$display" = wayland ] && [ -z "${WLR_RENDERER:-}" ]; then
-		log "Échecs répétés : passage au rendu logiciel (pixman)"
+	# Cage qui échoue tout de suite : souvent un pilote graphique absent ou inutilisable
+	# (carte virtuelle sans accélération 3D : le rendu de secours de Mesa y plante). Rendu logiciel.
+	if [ "$display" = wayland ] && [ -z "${WLR_RENDERER:-}" ] && { [ "$failures" -ge 3 ] || [ "$crashed" = 1 ]; }; then
+		log "Échec du rendu matériel : passage au rendu logiciel (pixman)"
 		export WLR_RENDERER=pixman
 		gpu_flags=(--disable-gpu)
 		failures=0
-	elif [ "$failures" -ge 3 ] && [ "$display" = wayland ] && [ -x /usr/bin/Xorg ] && command -v xinit >/dev/null 2>&1; then
+	elif [ "$failures" -ge 2 ] && [ "$display" = wayland ] && [ -x /usr/bin/Xorg ] && command -v xinit >/dev/null 2>&1; then
 		log "Échecs répétés de Wayland (carte graphique non prise en charge par cage) : passage à X11"
 		display=x11
 		failures=0
