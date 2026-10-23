@@ -80,6 +80,28 @@ export async function buildManifest(root = ROOT) {
   return { ...RELEASE, size, files: list };
 }
 
+/**
+ * Version déjà publiée : version.json de la branche suivie (celle que GitHub
+ * Pages sert : tout ce qui y est poussé est publié). null sans branche suivie.
+ */
+export function publishedManifest(root = ROOT) {
+  try {
+    return JSON.parse(git(root, ['show', '@{upstream}:version.json']).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mêmes numéros qu'une version déjà publiée, mais d'autres fichiers : les
+ * appareils ne proposeraient pas la mise à jour (ils comparent `sequence`) et
+ * garderaient l'ancienne version en cache.
+ */
+export function republished(published, manifest) {
+  if (!published || published.sequence !== manifest.sequence || published.version !== manifest.version) return false;
+  return JSON.stringify(published.files) !== JSON.stringify(manifest.files);
+}
+
 /** Changements des sources pas encore dans l'index : ils ne seraient pas publiés. */
 export function unstaged(root = ROOT) {
   try {
@@ -100,6 +122,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     process.exit(1);
   }
   const manifest = await buildManifest();
+  if (republished(publishedManifest(), manifest) && !process.argv.includes('--force')) {
+    console.error(
+      `Orion OS ${manifest.version} (n° ${manifest.sequence}) est déjà publiée avec d'autres fichiers : les appareils ne verraient pas cette mise à jour.\n` +
+        'Changez version, sequence (+ 1), build et notes dans src/kernel/version.js, puis relancez npm run release.\n' +
+        '(--force pour passer outre, si cette version n\'a jamais été poussée.)',
+    );
+    process.exit(1);
+  }
   await writeFile(join(ROOT, 'version.json'), `${JSON.stringify(manifest, null, 1)}\n`);
   console.log(`version.json : Orion OS ${manifest.version} (${manifest.build}), ${Object.keys(manifest.files).length} fichiers, ${(manifest.size / 1024).toFixed(0)} Ko`);
 }

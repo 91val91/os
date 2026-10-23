@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildManifest } from '../scripts/release.mjs';
+import { buildManifest, republished } from '../scripts/release.mjs';
 import { RELEASE } from '../src/kernel/version.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,4 +29,12 @@ test('la version publiée contient tout le démarrage (pas d\'écran noir hors l
   const missing = [...bootModules(resolve(root, 'src/main.js'))].map((file) => `./${relative(root, file)}`).filter((path) => !published.files[path]);
   assert.deepEqual(missing, []);
   for (const path of ['./index.html', './manifest.webmanifest', './assets/icon-192.png']) assert.ok(published.files[path], path);
+});
+
+test('une version déjà publiée ne peut pas être republiée avec d\'autres fichiers sous le même numéro', () => {
+  const published = { version: '0.1', sequence: 4, files: { './a.js': { hash: '1', size: 1 } } };
+  assert.equal(republished(published, { version: '0.1', sequence: 4, files: { './a.js': { hash: '2', size: 1 } } }), true);
+  assert.equal(republished(published, { version: '0.1', sequence: 4, files: { './a.js': { hash: '1', size: 1 } } }), false);
+  assert.equal(republished(published, { version: '0.1.1', sequence: 5, files: {} }), false);
+  assert.equal(republished(null, { version: '0.1', sequence: 4, files: {} }), false);
 });

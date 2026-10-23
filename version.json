@@ -1,21 +1,17 @@
 {
- "version": "0.1",
+ "version": "0.1.1",
  "channel": "alpha",
- "sequence": 4,
- "build": "OR0A.261023.001",
+ "sequence": 5,
+ "build": "OR0A.261023.002",
  "codename": "Rigel",
  "date": "2026-10-23",
  "notes": [
-  "Orion OS passe en 0.1 (alpha) : la numérotation repart de zéro jusqu'à la première version stable. Vos données, comptes et réglages sont conservés.",
-  "Programme développeur du Store : publiez vos propres apps, gratuites ou payantes, et suivez vos ventes dans la console développeur (Store → Compte).",
-  "Nouveau : messagerie sur Orion installé. Ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie (configuration automatique, connexion chiffrée) ; orion-server les relève et envoie le courrier.",
-  "Exemple pour les développeurs : Courrier, une app d'e-mail complète qui utilise vos comptes (autorisation « E-mails ») ou fonctionne sans compte, à charger dans la console avec « Modèles » puis à publier.",
-  "Le Store affiche les apps des développeurs, avec achat, reçus et remboursement (paiements fictifs pendant l'alpha : solde de test) ; les apps publiées s'exécutent isolées du système, sans accès à Internet.",
-  "Nouveau : Protection de l'appareil — bilan de sécurité, vérification de l'intégrité du système, analyse des apps, protection contre la réinitialisation, effacement après trop d'échecs du code et verrouillage en cas de vol.",
-  "Les erreurs de code de verrouillage sont comptées même après un redémarrage ; achats et réglages sensibles demandent le code.",
-  "Image installable : orion-server garde la protection contre la réinitialisation et vérifie les fichiers servis ; le mode sans échec démarre aussi Orion."
+  "Messagerie : sur Orion installé (ordinateur ou machine virtuelle), ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie. Les serveurs sont trouvés d'après l'adresse, la connexion est chiffrée et orion-server relève et envoie le courrier.",
+  "Nouvelle autorisation « E-mails » : une app ne lit et n'envoie vos e-mails que si vous l'acceptez, et ne voit jamais votre mot de passe (Réglages → Applications pour la retirer).",
+  "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → Compte → console développeur → nouvelle app → Modèles). Elle utilise vos comptes, ou fonctionne sans compte.",
+  "Image installable : Orion s'affiche en plein écran et démarre plus vite sur les cartes graphiques sans accélération 3D."
  ],
- "size": 1425001,
+ "size": 1424281,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -338,8 +334,8 @@
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "d46a60171f17efcea7cf9a343fb82050eaeea5308c014f57c244e4b687b24e95",
-   "size": 2432
+   "hash": "ac0190db465765cf37cffe14262422313a948118cd647feaf096413e3b264eb5",
+   "size": 1712
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
