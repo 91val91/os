@@ -32,7 +32,9 @@ trap cleanup EXIT
 # Noyau, initrd et ligne de commande de la première entrée du menu (système live) ;
 # la console série y est ajoutée.
 xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$WORK/grub.cfg" >/dev/null 2>&1
-LINUX_LINE="$(grep -m1 -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg")"
+# Entrée du système live sur le CD (pas celle de l'ISO lancée depuis un fichier : findiso=…).
+LINUX_LINE="$(grep -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg" | grep -v 'findiso' | head -n 1)"
+[ -n "$LINUX_LINE" ] || LINUX_LINE="$(grep -m1 -E '^\s*linux\s+\S*/live/\S+.*boot=live' "$WORK/grub.cfg")"
 KERNEL="$(echo "$LINUX_LINE" | awk '{print $2}')"
 INITRD="$(grep -m1 -E '^\s*initrd\s+\S*/live/' "$WORK/grub.cfg" | awk '{print $2}')"
 if [ -z "$KERNEL" ] || [ -z "$INITRD" ]; then
@@ -41,7 +43,8 @@ if [ -z "$KERNEL" ] || [ -z "$INITRD" ]; then
 	exit 2
 fi
 xorriso -osirrox on -indev "$ISO" -extract "$KERNEL" "$WORK/vmlinuz" -extract "$INITRD" "$WORK/initrd.img" >/dev/null 2>&1
-ARGS="$(echo "$LINUX_LINE" | sed -E 's/^\s*linux\s+\S+\s*//; s/(^| )(quiet|splash)( |$)/ /g')"
+# Paramètres du menu, sans « quiet », « splash » ni variables de GRUB (${…}, findiso=…).
+ARGS="$(echo "$LINUX_LINE" | awk '{ for (i = 3; i <= NF; i++) if ($i != "quiet" && $i != "splash" && $i !~ /^findiso=/ && $i !~ /\$\{/) printf "%s ", $i }')"
 APPEND="$ARGS console=tty1 console=ttyS0,115200 systemd.journald.forward_to_console=1"
 echo "==> Ligne de commande : $APPEND"
 
@@ -77,6 +80,11 @@ elapsed() { echo $(( $(date +%s) - start )); }
 status=""
 until status="$(curl -fsS --max-time 5 "http://127.0.0.1:$PORT/api/status" 2>/dev/null)"; do
 	kill -0 "$QEMU_PID" 2>/dev/null || { echo "Erreur : QEMU s'est arrêté" >&2; tail -50 "$OUT/serial.log" >&2; exit 1; }
+	if grep -qE "BOOT FAILED|Kernel panic|emergency mode" "$OUT/serial.log" 2>/dev/null; then
+		echo "Erreur : le démarrage a échoué" >&2
+		tail -80 "$OUT/serial.log" >&2
+		exit 1
+	fi
 	if [ "$(elapsed)" -ge "$DEADLINE" ]; then
 		echo "Erreur : orion-server ne répond pas après ${DEADLINE} s" >&2
 		tail -80 "$OUT/serial.log" >&2
