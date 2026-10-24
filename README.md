@@ -190,15 +190,15 @@ Tout compte de l'appareil peut devenir développeur : **Store → Compte → Pub
 
 1. **Inscription** au programme développeur : nom public, e-mail de contact, acceptation du contrat de distribution et **25 €** payés une fois.
 2. **Console développeur** : revenus nets, ventes, installations et note moyenne ; « Nouvelle app » crée un brouillon à partir d'un modèle prêt à essayer.
-3. **Édition** : nom, sous-titre, description, catégorie, prix (gratuit ou de 0,99 € à 9,99 €), icône (pictogramme et couleurs), autorisation de localisation, version et notes de version, et le **code** : un seul fichier HTML (avec ses `<style>` et `<script>`). **Essayer** lance le brouillon isolé, avec des données jetables.
-4. **Examen automatique** avant chaque publication : fiche complète, numéro de version supérieur au précédent, taille du code (256 Ko au plus) et **analyse de sécurité** (tentative de sortir de l'environnement isolé, mineur de cryptomonnaie, imitation des écrans d'Orion pour voler un code : refusés ; accès réseau, `eval`, code masqué : signalés).
+3. **Édition** : nom, sous-titre, description, catégorie, prix (gratuit ou de 0,99 € à 9,99 €), icône (pictogramme et couleurs), autorisations (localisation, e-mails, Internet), version et notes de version, et le **code** : un seul fichier HTML (avec ses `<style>` et `<script>`). **Essayer** lance le brouillon isolé, avec des données jetables.
+4. **Examen automatique** avant chaque publication : fiche complète, numéro de version supérieur au précédent, taille du code (256 Ko au plus) et **analyse de sécurité** (tentative de sortir de l'environnement isolé, mineur de cryptomonnaie, imitation des écrans d'Orion pour voler un code : refusés ; accès réseau direct au lieu d'`orion.net`, `eval`, code masqué : signalés).
 5. **Publication** : l'app apparaît dans le Store des autres comptes (« Nouveautés des développeurs », catégories, recherche). Une modification reste un brouillon jusqu'à « Publier la mise à jour ». « Retirer de la vente » la cache du Store ; ceux qui l'ont installée la gardent.
 
 Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du développeur. Un acheteur peut être remboursé pendant 2 heures (l'app est alors désinstallée et la vente annulée).
 
 **Paiements fictifs** : Orion n'a pas encore de service de paiement. Chaque compte a un **solde de test** (Store → Compte → « Ajouter des fonds de test », 500 € au plus) : aucun moyen de paiement réel n'est demandé ni débité. De même, sans serveur du Store, le catalogue est partagé par les comptes **de cet appareil**.
 
-**Exécution isolée** : une app publiée tourne dans une `iframe` `sandbox="allow-scripts"` sans origine (ni la page d'Orion, ni ses données, ni le stockage du navigateur) et sans accès au réseau (politique de sécurité `default-src 'none'`). Elle ne parle au système que par le SDK `orion`, dont chaque appel est vérifié :
+**Exécution isolée** : une app publiée tourne dans une `iframe` `sandbox="allow-scripts"` sans origine (ni la page d'Orion, ni ses données, ni le stockage du navigateur) et sans accès direct au réseau (politique de sécurité `default-src 'none'`). Elle ne parle au système que par le SDK `orion`, dont chaque appel est vérifié :
 
 ```html
 <button id="b">+1</button>
@@ -210,12 +210,30 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
   orion.device.vibrate(10);                           // et device.info()
   orion.notify({ title: 'Rappel', body: '…' });       // une toutes les 5 s au plus
   const pos = await orion.location.current();         // si l'app déclare la localisation et que l'utilisateur l'accepte
-  const [compte] = await orion.mail.accounts();       // e-mails (Orion installé) : autorisation « E-mails » déclarée et acceptée
+  const [compte] = await orion.mail.accounts();       // e-mails : autorisation « E-mails » déclarée et acceptée
   const { messages } = await orion.mail.messages(compte.id, 'INBOX', { limit: 20 });   // aussi folders, message, setFlags, move, remove, send
+  const r = await orion.net.request('https://api.exemple.fr/v1/data', { responseType: 'json' });   // Internet : autorisation « Internet »
   };
   orion.onBack(() => false);                          // bouton Retour (true : traité par l'app) ; orion.on('pause' | 'resume' | 'theme', fn) ; orion.close()
 </script>
 ```
+
+### Accès à Internet (`orion.net`)
+
+Une app du Store qui déclare l'autorisation **« Internet »** (console développeur → « Accède à Internet ») fait ses requêtes par Orion, après l'accord de l'utilisateur (demandé au premier usage, révocable dans Réglages → Applications) :
+
+```js
+const r = await orion.net.request(url, { method: 'POST', headers: { Authorization: 'Bearer …' }, body: JSON.stringify(data), responseType: 'json' });
+// r : { ok, status, url, headers: { 'content-type', link, location, etag… }, body } ; responseType 'text' | 'json' | 'base64' (images, fichiers)
+const params = await orion.net.authorize(`https://service.exemple/oauth/authorize?client_id=…&redirect_uri=${encodeURIComponent(await orion.net.redirectUri())}`);
+// connexion OAuth : la page du service s'ouvre dans une fenêtre ; params = { code } (ou access_token, error…) au retour
+const { available, permission, proxied } = await orion.net.status();
+```
+
+- **Jamais le réseau local** (box, imprimantes, autres machines), ni Orion lui-même ni `orion-server` : seulement `http(s)` vers Internet. Les adresses sont vérifiées par Orion, puis par `orion-server` après la résolution du nom (connexion épinglée sur l'adresse vérifiée, redirections revérifiées).
+- **Sans cookies ni référent** ; en-têtes sensibles (`Cookie`, `Host`, `Origin`…) retirés. Corps de 1 Mo au plus, réponse de 8 Mo au plus, 300 requêtes par minute et 6 à la fois par app.
+- Sur un **téléphone**, c'est le navigateur qui fait la requête : le site doit accepter les demandes d'un navigateur (CORS), comme les API de Mastodon, de Google ou de Microsoft. Sur **Orion installé**, `orion-server` la fait (`POST /api/net/request`), sans cette limite.
+- Les images d'Internet s'affichent en les téléchargeant (`responseType: 'base64'`) puis en `data:` : la page de l'app ne charge rien elle-même.
 
 **Exemple complet : Courrier**, une app d'e-mail ([`src/apps/store/examples/courrier.html`](src/apps/store/examples/courrier.html), environ 95 Ko). Dans l'éditeur d'une app, **Modèles → Exemple : Courrier** remplace le code et complète la fiche (sous-titre, description, catégorie Productivité, icône, autorisation « E-mails ») ; il ne reste qu'à l'essayer et le publier. Elle montre l'usage du SDK dans une vraie app :
 
@@ -225,9 +243,9 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
 - recherche sans tenir compte des accents, filtre « non lus », sélection multiple, **balayage vers la gauche** (corbeille ou archive) avec « Annuler » ;
 - réglages (nom, adresse, signature, lignes d'aperçu, confirmation avant suppression), thème clair ou sombre d'Orion, bouton Retour d'Orion (`orion.onBack`).
 
-Sur Orion installé, **« Utiliser mes comptes e-mail »** relève et envoie vos vrais e-mails par `orion.mail` (voir [Messagerie](#messagerie)) : dossiers du serveur, pages de 40 messages, recherche faite par le serveur, relève toutes les minutes. Comme toute app du Store, Courrier n'a pas accès à Internet par lui-même : c'est Orion qui passe ses demandes à `orion-server`. Sans compte (téléphone, navigateur, ou au choix), les messages restent dans l'app (`orion.storage`) : ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message. Pendant un « Essayer » de la console, l'app n'est pas installée : elle n'a pas accès aux vrais comptes.
+**« Utiliser mes comptes e-mail »** relève et envoie vos vrais e-mails par `orion.mail` (voir [Messagerie](#messagerie)) : comptes d'Orion installé, ou **Gmail et Outlook par Internet**, aussi sur un téléphone. Dossiers du compte, pages de 40 messages, recherche faite par le fournisseur, relève toutes les minutes. Courrier n'a pas besoin de l'autorisation « Internet » : c'est Orion qui joint `orion-server`, Gmail ou Outlook. Sans compte (téléphone, navigateur, ou au choix), les messages restent dans l'app (`orion.storage`) : ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message. Pendant un « Essayer » de la console, l'app n'est pas installée : elle n'a pas accès aux vrais comptes.
 
-**Exemple complet : Agora**, un réseau social ([`src/apps/store/examples/agora.html`](src/apps/store/examples/agora.html), environ 130 Ko, aucune autorisation). **Modèles → Exemple : Agora** remplace le code et complète la fiche (catégorie Divertissement).
+**Exemple complet : Agora**, un réseau social ([`src/apps/store/examples/agora.html`](src/apps/store/examples/agora.html), environ 185 Ko, autorisation « Internet »). **Modèles → Exemple : Agora** remplace le code et complète la fiche (catégorie Divertissement, autorisation « Internet »).
 
 - **Fil** « Abonnements » et « Pour vous », avec « Nouvelles publications » quand on a fait défiler. Une publication partagée n'y apparaît qu'une fois.
 - **Publications** : mots-dièse et mentions cliquables, suggestions de membres en tapant `@`, fond coloré, **sondage** (2 à 4 choix, 1 h à 3 jours) ou **citation** d'une autre publication. On peut les modifier, les supprimer avec leurs réponses ou les épingler sur son profil.
@@ -238,7 +256,9 @@ Sur Orion installé, **« Utiliser mes comptes e-mail »** relève et envoie vos
 - **Messages privés** avec indicateur « en train d'écrire ».
 - **Réglages** : notifications, mots et comptes masqués, signalement d'une publication, espace utilisé, effacement.
 
-Les apps du Store n'ont pas accès à Internet : tout reste sur l'appareil (`orion.storage`). Les plus anciennes publications de la communauté sont oubliées pour tenir dans 1 Mo ; les vôtres sont toutes gardées.
+**Sur le fédivers** : « Se connecter à Mastodon » (accueil ou réglages d'Agora) relie Agora à votre compte sur **n'importe quelle instance** (mastodon.social, piaille.fr, framapiaf.org…) par `orion.net`. Agora s'inscrit auprès de l'instance (`/api/v1/apps`, rien à configurer à l'avance) et la connexion se fait dans la page de l'instance (OAuth avec PKCE) : le mot de passe ne passe jamais par Agora, qui ne garde que l'accès (révoqué à la déconnexion). Vous y retrouvez les vraies personnes : fil d'accueil et tendances, discussions, réponses (le destinataire est mentionné), publications et sondages, j'aime, partages, signets, abonnements (comptes privés : demande envoyée), recherche sur l'instance et au-delà, profils, notifications, **messages privés** (publications « mentionnées seulement »), avertissements de contenu, médias sensibles floutés, **photos, vidéos et GIF** dans une visionneuse (téléchargés par Orion, 8 Mo au plus). Nouvelles publications et notifications relevées chaque minute (toutes les 3 minutes en arrière-plan, avec une notification d'Orion). La photo et la couverture du profil se changent sur le site de l'instance.
+
+Sans connexion, tout reste sur l'appareil (`orion.storage`) : les plus anciennes publications de la communauté sont oubliées pour tenir dans 1 Mo ; les vôtres sont toutes gardées.
 
 Les autres membres forment une **communauté de démonstration**, signalée par l'étiquette « démo » et expliquée dès l'accueil. Ses neuf membres (photographe, développeur, cheffe, randonneur…) publient de temps en temps et répondent sur leur sujet ou quand on les mentionne. Ils aiment, partagent, votent, s'abonnent en retour et répondent aux messages privés.
 
@@ -309,10 +329,10 @@ Orion n'a pas de serveur de comptes : l'adresse est vérifiée **par le fourniss
 **Activer « Continuer avec Google / Microsoft »** sur votre copie d'Orion (GitHub Pages ou autre) : créez un identifiant client et inscrivez-le dans [`src/config/identity.js`](src/config/identity.js), puis publiez une version.
 
 - Google : [console.cloud.google.com](https://console.cloud.google.com) → API et services → Identifiants → « ID client OAuth », type **Application Web** ;
-- Microsoft : [entra.microsoft.com](https://entra.microsoft.com) → Inscriptions d'applications → Nouvelle inscription (« Comptes Microsoft personnels et professionnels »), plateforme **Web**, cocher **Jetons d'ID** ;
+- Microsoft : [entra.microsoft.com](https://entra.microsoft.com) → Inscriptions d'applications → Nouvelle inscription (« Comptes Microsoft personnels et professionnels »), plateforme **Application monopage (SPA)**, cocher **Jetons d'ID** ;
 - **URI de redirection** autorisée dans les deux cas : l'adresse d'Orion suivie de `src/auth.html` (par exemple `https://votre-nom.github.io/os/src/auth.html`).
 
-Un identifiant client n'est pas un secret : il peut être publié. Apple (« Se connecter avec Apple ») et Yahoo demandent un serveur pour ce type de connexion : leurs adresses sont vérifiées par la messagerie.
+Un identifiant client n'est pas un secret : il peut être publié. Apple (« Se connecter avec Apple ») et Yahoo demandent un serveur pour ce type de connexion : leurs adresses sont vérifiées par la messagerie. Les mêmes identifiants servent à **Gmail et Outlook par Internet** (voir [Messagerie](#messagerie)), avec quelques réglages de plus.
 
 ## Messagerie
 
@@ -325,6 +345,21 @@ Sur Orion installé, **Réglages → Comptes de messagerie** ajoute vos comptes 
 - **Courrier**, l'exemple d'app du Store, s'en sert : « Utiliser mes comptes e-mail » relève Réception toutes les minutes (notification quand l'app est en arrière-plan), parcourt les dossiers du serveur, cherche, répond, transfère, déplace et supprime. Sans orion-server, il fonctionne sans compte.
 
 Avec `python3 server/orion_server.py --simulate`, la messagerie est imitée en mémoire (tout mot de passe est accepté sauf `faux`) ; l'API est décrite dans [`server/API.md`](server/API.md#messagerie-ajout).
+
+### Gmail et Outlook par Internet (téléphone, sans orion-server)
+
+Un navigateur ne parle ni IMAP ni SMTP : sur un téléphone, Orion relève et envoie le courrier de **Gmail** (API Gmail) et d'**Outlook, Hotmail, Live** (Microsoft Graph) par leurs services web ([`src/kernel/webmail.js`](src/kernel/webmail.js)). **Réglages → Comptes de messagerie → Ajouter un compte → Gmail / Outlook** : la page de Google ou de Microsoft s'ouvre, vous vous y connectez, et le compte apparaît dans les apps d'e-mail comme les autres (dossiers, lecture, drapeaux, déplacement, corbeille, envoi, réponses dans la même conversation).
+
+- **Aucun mot de passe** ne passe par Orion ; l'accès est gardé sur l'appareil, dans les données de l'utilisateur d'Orion, et retiré quand on supprime le compte.
+- **Google** n'accorde à une application web (sans serveur, donc sans secret) qu'un accès d'**une heure** : passé ce délai, une notification « Gmail : reconnexion nécessaire » mène à **Se reconnecter** (la page de Google se referme seule). **Microsoft** renouvelle l'accès seul pendant **24 heures**.
+- Une page de 40 messages coûte deux requêtes (liste, puis lecture groupée), pas une par message.
+
+**À activer par l'éditeur de cette copie d'Orion**, avec les identifiants clients de [`src/config/identity.js`](src/config/identity.js) (voir [Compte en ligne](#compte-en-ligne)) :
+
+- Google : activer l'**API Gmail** dans le projet, ajouter le champ d'application `https://mail.google.com/` à l'écran de consentement OAuth. Tant que l'application est « en test », seuls les **utilisateurs de test** déclarés (100 au plus) peuvent s'y connecter ; au-delà, Google exige une validation de l'application (champ d'application restreint).
+- Microsoft : plateforme **Application monopage (SPA)** avec l'URI de redirection `…/src/auth.html` (indispensable : le jeton s'obtient depuis le navigateur, sans secret), autorisations déléguées `Mail.ReadWrite`, `Mail.Send`, `User.Read` et `offline_access`.
+
+Yahoo, iCloud et les autres fournisseurs n'ont pas d'API web de ce genre : ils passent par IMAP, donc par Orion installé.
 
 ## Installer Orion sur un PC ou une machine virtuelle
 
@@ -388,7 +423,7 @@ installer/                                image ISO installable (live-build), ma
 
 Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, et s'appuie sur le navigateur (donc sur Android ou iOS) ou sur `orion-server` (Orion installé) pour le matériel. Concrètement :
 
-- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi et e-mails (Orion installé), vérification du compte en ligne (Google/Microsoft une fois activés, ou messagerie d'Orion installé), plein écran et hors ligne ;
+- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi (Orion installé), e-mails (Orion installé, ou Gmail et Outlook par Internet), accès des apps à Internet (`orion.net`), vérification du compte en ligne (Google/Microsoft une fois activés, ou messagerie d'Orion installé), plein écran et hors ligne ;
 - **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie, et les **paiements du Store** (solde de test : pas encore de service de paiement ni de serveur du Store).
 
 Installé avec l'image prévue pour cela, Orion devient le système principal de la machine, à la manière de Firefox OS (B2G) ou KaiOS : un noyau Linux, un navigateur en mode kiosque lancé au démarrage et `orion-server` pour le matériel.

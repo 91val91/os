@@ -16,8 +16,9 @@ import { quickTiles } from '../../system/quick-settings.js';
 import { unsupportedReason } from '../../kernel/bluetooth.js';
 import { formatCoordinates } from '../../kernel/location.js';
 import { repairIntegrity } from '../../system/integrity.js';
-import { providerBadge } from '../../system/sign-in.js';
+import { providerBadge, authorizeInWindow, redirectUri } from '../../system/sign-in.js';
 import { provider as identityProvider } from '../../kernel/identity.js';
+import { WEB_PROVIDERS } from '../../kernel/webmail.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
@@ -163,7 +164,24 @@ export function mount(root, ctx) {
   const securityLabel = (value) => ({ ssl: 'SSL/TLS', starttls: 'STARTTLS', none: 'sans chiffrement (local)' })[value] ?? value;
   const serverText = (server) => `${server.host}:${server.port} · ${securityLabel(server.security)}`;
 
-  /** Comptes e-mail (IMAP/SMTP) relevés par orion-server ; les apps y accèdent avec l'autorisation « E-mails ». */
+  /** Gmail ou Outlook par Internet : connexion dans la page du fournisseur (ou reconnexion de `account`). */
+  async function connectWebMail(provider, { account = null, onDone = null } = {}) {
+    try {
+      const { url, pending } = await k.mail.web.begin(provider, { redirectUri: redirectUri(), account });
+      const params = await authorizeInWindow(url, { confirm: (options) => ctx.ui.confirm(options) });
+      const added = await k.mail.web.complete(pending, params);
+      onDone?.();
+      ctx.ui.toast(account ? 'Compte reconnecté' : `${added.address} ajouté`);
+      return added;
+    } catch (e) {
+      if (!/annulée/.test(e.message)) ctx.ui.alert({ title: 'Connexion impossible', message: e.message });
+      return null;
+    }
+  }
+  const webName = (a) => `${WEB_PROVIDERS[a.provider]?.name ?? 'E-mail'} · par Internet`;
+  const webColor = (provider) => identityProvider(provider)?.color ?? '#0a84ff';
+
+  /** Comptes e-mail : IMAP/SMTP relevés par orion-server, Gmail et Outlook par Internet ; les apps y accèdent avec l'autorisation « E-mails ». */
   function mailPage() {
     let list = null;
     let error = null;
@@ -184,28 +202,34 @@ export function mount(root, ctx) {
     const p = open('Messagerie', (refresh) => {
       if (!k.mail.available) {
         return listGroup({
-          items: [row({ icon: 'mail', iconColor: '#8e8e93', title: 'Indisponible sur cet appareil', subtitle: 'Demande Orion installé (ordinateur ou machine virtuelle)' })],
-          footer: 'Un navigateur ne peut pas se connecter à un serveur de messagerie : sur Orion installé, c\'est orion-server qui relève et envoie le courrier (IMAP et SMTP). Ici, les apps d\'e-mail fonctionnent sans compte, sur l\'appareil.',
+          items: [row({ icon: 'mail', iconColor: '#8e8e93', title: 'Indisponible sur cet appareil', subtitle: 'Demande Orion installé, ou les identifiants clients de Google et Microsoft' })],
+          footer: 'Un navigateur ne peut pas se connecter à un serveur de messagerie (IMAP et SMTP) : sur Orion installé, c\'est orion-server qui relève et envoie le courrier. Partout ailleurs, Gmail et Outlook passent par leurs services web, une fois les identifiants clients d\'Orion renseignés par son éditeur (src/config/identity.js). Ici, les apps d\'e-mail fonctionnent sans compte, sur l\'appareil.',
         });
       }
       if (stale && !loading) load(refresh);
       const items = list
         ? list.map((a) =>
             row({
-              leading: avatar(a.name || a.address, { size: 40, color: '#0a84ff' }),
+              leading: avatar(a.name || a.address, { size: 40, color: a.web ? webColor(a.provider) : '#0a84ff' }),
               title: a.name || a.address,
-              subtitle: a.name ? a.address : a.imap.host,
+              subtitle: a.web ? `${a.address} · ${a.expired ? 'reconnexion nécessaire' : WEB_PROVIDERS[a.provider]?.name}` : a.name ? a.address : a.imap.host,
               chevron: true,
               onClick: () => mailAccountPage(a, () => (stale = true)),
             }),
           )
         : [h('div.list-item.mail-loading', spinner(22), h('span', 'Chargement des comptes…'))];
+      const notes = [
+        k.mail.server ? 'Le mot de passe d\'une adresse IMAP est gardé par orion-server sur cet appareil, dans un fichier réservé au service ; il n\'est jamais montré aux apps.' : null,
+        k.mail.web?.enabled ? 'Gmail et Outlook : connexion dans la page de Google ou de Microsoft, sans mot de passe pour Orion ; l\'accès reste sur cet appareil.' : null,
+        'Une app d\'e-mail du Store doit obtenir l\'autorisation « E-mails » (Réglages → Applications).',
+        k.mail.simulated ? 'Messagerie simulée (orion-server --simulate) : tout mot de passe est accepté, sauf « faux ».' : null,
+      ];
       return [
         error ? listGroup({ items: [row({ icon: 'info', iconColor: '#ff3b30', title: 'orion-server injoignable', subtitle: error })] }) : null,
         listGroup({
           header: 'Comptes',
-          items: [...(list?.length === 0 ? [row({ title: 'Aucun compte', subtitle: 'Ajoutez votre adresse e-mail pour la relever dans les apps d\'e-mail' })] : items), row({ icon: 'plus', iconColor: '#30d158', title: 'Ajouter un compte', onClick: () => addMailAccountPage(() => (stale = true)) })],
-          footer: `Le mot de passe est gardé par orion-server sur cet appareil, dans un fichier réservé au service ; il n'est jamais montré aux apps. Une app d'e-mail du Store doit obtenir l'autorisation « E-mails » (Réglages → Applications).${k.mail.simulated ? ' Messagerie simulée (orion-server --simulate) : tout mot de passe est accepté, sauf « faux ».' : ''}`,
+          items: [...(list?.length === 0 ? [row({ title: 'Aucun compte', subtitle: 'Ajoutez votre adresse e-mail pour la relever dans les apps d\'e-mail' })] : items), row({ icon: 'plus', iconColor: '#30d158', title: 'Ajouter un compte', onClick: () => addMailChooser(() => (stale = true)) })],
+          footer: notes.filter(Boolean).join(' '),
         }),
       ];
     });
@@ -216,7 +240,69 @@ export function mount(root, ctx) {
     };
   }
 
+  /** Gmail, Outlook (par Internet) ou une autre adresse (IMAP, orion-server). */
+  function addMailChooser(onAdded) {
+    const web = ['google', 'microsoft'].filter((p) => k.mail.web?.configured(p));
+    if (!web.length) return addMailAccountPage(onAdded);
+    const done = () => {
+      onAdded();
+      nav.pop();
+    };
+    open('Ajouter un compte', () => [
+      listGroup({
+        header: 'Par Internet',
+        items: web.map((p) => row({ leading: providerBadge(identityProvider(p)), title: WEB_PROVIDERS[p].name, subtitle: p === 'google' ? 'Compte Google' : 'Outlook, Hotmail, Live (Microsoft)', chevron: true, onClick: () => connectWebMail(p, { onDone: done }) })),
+        footer: [web.includes('google') ? 'Google limite l\'accès d\'une application web à une heure : passé ce délai, Orion vous propose de vous reconnecter d\'un toucher.' : null, web.includes('microsoft') ? 'Microsoft renouvelle l\'accès seul pendant 24 heures.' : null].filter(Boolean).join(' '),
+      }),
+      listGroup({
+        header: 'Autre adresse',
+        items: [
+          k.mail.server
+            ? row({ icon: 'mail', iconColor: '#8e8e93', title: 'Autre adresse (IMAP)', subtitle: 'Orange, Free, iCloud, Yahoo…', chevron: true, onClick: () => addMailAccountPage(onAdded) })
+            : row({ icon: 'mail', iconColor: '#8e8e93', title: 'Autre adresse (IMAP)', subtitle: 'Demande Orion installé (orion-server) : un navigateur ne parle pas IMAP' }),
+        ],
+      }),
+    ], { back: 'Messagerie' });
+  }
+
+  function webMailAccountPage(a, onChange) {
+    const p = WEB_PROVIDERS[a.provider];
+    open(a.address, () => [
+      listGroup({
+        header: 'Compte',
+        items: [row({ title: 'Nom affiché', detail: a.name || '—' }), row({ title: 'Adresse', detail: a.address }), row({ title: 'Service', detail: webName(a) })],
+      }),
+      listGroup({
+        header: 'Connexion',
+        items: [
+          row({ title: a.expired ? 'Expirée' : 'Active', subtitle: a.provider === 'google' ? 'Google limite l\'accès à une heure ; Orion vous propose ensuite de vous reconnecter.' : 'Renouvelée automatiquement pendant 24 heures.' }),
+          row({ icon: 'refresh', iconColor: '#0a84ff', title: 'Se reconnecter', onClick: () => connectWebMail(a.provider, { account: a.id, onDone: () => { onChange(); nav.pop(); } }) }),
+        ],
+      }),
+      listGroup({
+        items: [
+          row({
+            title: 'Supprimer le compte',
+            destructive: true,
+            onClick: async () => {
+              if (!(await ctx.ui.confirm({ title: `Supprimer ${a.address} ?`, message: `Orion oublie l'accès à ce compte. Vos e-mails restent chez ${p.company}.`, confirmLabel: 'Supprimer', destructive: true }))) return;
+              try {
+                await k.mail.removeAccount(a.id);
+                onChange();
+                ctx.ui.toast('Compte supprimé');
+                nav.pop();
+              } catch (e) {
+                ctx.ui.alert({ title: 'Suppression impossible', message: e.message });
+              }
+            },
+          }),
+        ],
+      }),
+    ], { back: 'Messagerie' });
+  }
+
   function mailAccountPage(a, onChange) {
+    if (a.web) return webMailAccountPage(a, onChange);
     open(a.address, () => [
       listGroup({
         header: 'Compte',

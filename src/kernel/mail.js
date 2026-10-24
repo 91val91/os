@@ -1,11 +1,12 @@
 /**
- * Messagerie : comptes e-mail (IMAP pour recevoir, SMTP pour envoyer).
+ * Messagerie : comptes e-mail.
  *
  * Un navigateur ne peut pas ouvrir de connexion IMAP ou SMTP : c'est
  * orion-server (Orion installé) qui relève et envoie le courrier, avec la
  * bibliothèque standard de Python (voir server/orion_mail.py). Le noyau ne
- * fait qu'appeler son API, par le pont matériel. Sans pont (téléphone,
- * GitHub Pages), la messagerie est indisponible.
+ * fait qu'appeler son API, par le pont matériel. Partout (téléphone, GitHub
+ * Pages), Gmail et Outlook passent aussi par leurs API web (voir webmail.js),
+ * si Orion a leurs identifiants clients.
  *
  * Les comptes sont ajoutés dans les Réglages ; le mot de passe va au serveur
  * et n'en revient jamais. Chaque utilisateur d'Orion ne voit que ses comptes
@@ -25,16 +26,22 @@ export class MailError extends Error {}
 export class MailService {
   #accounts = null; // comptes de l'utilisateur (cache), sans mot de passe
 
-  constructor({ bridge = null, events = null, log = null, account = () => null } = {}) {
+  constructor({ bridge = null, events = null, log = null, account = () => null, web = null } = {}) {
     this.bridge = bridge;
     this.events = events;
     this.log = log;
     this.owner = () => account() ?? null;
+    this.web = web; // Gmail et Outlook par Internet (WebMail)
   }
 
-  /** La messagerie demande orion-server. */
-  get available() {
+  /** IMAP et SMTP : orion-server. */
+  get server() {
     return Boolean(this.bridge?.has('mail'));
+  }
+
+  /** Messagerie possible : orion-server, ou Gmail et Outlook par Internet. */
+  get available() {
+    return this.server || Boolean(this.web?.enabled);
   }
 
   get simulated() {
@@ -42,7 +49,7 @@ export class MailService {
   }
 
   #require() {
-    if (!this.available) throw new MailError('La messagerie demande Orion installé sur un ordinateur ou une machine virtuelle (orion-server)');
+    if (!this.server) throw new MailError('La messagerie demande Orion installé sur un ordinateur ou une machine virtuelle (orion-server)');
   }
 
   async #call(method, path, body, timeout = READ_TIMEOUT) {
@@ -63,15 +70,28 @@ export class MailService {
 
   // ───────────── Comptes ─────────────
 
-  /** Comptes de l'utilisateur d'Orion en cours. */
+  /** Comptes de l'utilisateur d'Orion en cours (ceux d'orion-server, puis Gmail et Outlook par Internet). */
   async accounts({ refresh = false } = {}) {
-    if (!this.available) return [];
+    const web = this.web?.list() ?? [];
+    if (!this.server) return web;
     if (!this.#accounts || refresh) {
       const owner = this.owner();
-      const data = await this.#call('GET', `mail?${MailService.#query({ owner })}`);
-      this.#accounts = (data.accounts ?? []).filter((a) => !a.owner || a.owner === owner);
+      try {
+        const data = await this.#call('GET', `mail?${MailService.#query({ owner })}`);
+        this.#accounts = (data.accounts ?? []).filter((a) => !a.owner || a.owner === owner);
+      } catch (error) {
+        // orion-server injoignable : les comptes par Internet restent utilisables.
+        if (!web.length) throw error;
+        this.log?.warn('mail', error.message);
+        return web;
+      }
     }
-    return structuredClone(this.#accounts);
+    return [...structuredClone(this.#accounts), ...web];
+  }
+
+  /** Compte Gmail ou Outlook par Internet (sinon : orion-server). */
+  #web(id) {
+    return Boolean(this.web?.owns(id));
   }
 
   /** Serveurs de réception et d'envoi proposés pour une adresse (fournisseurs connus, sinon devinés). */
@@ -98,6 +118,7 @@ export class MailService {
   }
 
   async removeAccount(id) {
+    if (this.#web(id)) return this.web.removeAccount(id);
     await this.#own(id);
     await this.#call('POST', 'mail/accounts/remove', { id });
     this.#accounts = null;
@@ -116,47 +137,65 @@ export class MailService {
   // ───────────── Courrier ─────────────
 
   async folders(account) {
+    if (this.#web(account)) return this.web.folders(account);
     await this.#own(account);
     return (await this.#call('GET', `mail/folders?${MailService.#query({ account })}`)).folders;
   }
 
   /** Messages d'un dossier, du plus récent au plus ancien ; `before` : uid de la page suivante. */
   async messages(account, folder, { before = null, limit = 40, query = '', filter = '' } = {}) {
+    if (this.#web(account)) return this.web.messages(account, folder, { before, limit, query, filter });
     await this.#own(account);
     return this.#call('GET', `mail/messages?${MailService.#query({ account, folder, before, limit, q: query, filter })}`);
   }
 
   async message(account, folder, uid) {
+    if (this.#web(account)) return this.web.message(account, folder, uid);
     await this.#own(account);
     return this.#call('GET', `mail/message?${MailService.#query({ account, folder, uid })}`);
   }
 
   async setFlags(account, folder, uids, { add = [], remove = [] } = {}) {
-    await this.#own(account);
-    await this.#call('POST', 'mail/flags', { account, folder, uids, add, remove });
+    if (this.#web(account)) await this.web.setFlags(account, folder, uids, { add, remove });
+    else {
+      await this.#own(account);
+      await this.#call('POST', 'mail/flags', { account, folder, uids, add, remove });
+    }
     this.events?.emit('mail:change', { account, folder });
   }
 
   /** Déplace vers un dossier (son identifiant) ou un rôle (« archive », « inbox »…). */
   async move(account, folder, uids, to) {
-    await this.#own(account);
-    const result = await this.#call('POST', 'mail/move', { account, folder, uids, to });
+    let moved;
+    if (this.#web(account)) moved = await this.web.move(account, folder, uids, to);
+    else {
+      await this.#own(account);
+      moved = (await this.#call('POST', 'mail/move', { account, folder, uids, to })).folder;
+    }
     this.events?.emit('mail:change', { account, folder });
-    return result.folder;
+    return moved;
   }
 
   /** Corbeille ; suppression définitive si le message y est déjà. */
   async remove(account, folder, uids) {
-    await this.#own(account);
-    const result = await this.#call('POST', 'mail/delete', { account, folder, uids });
+    let left;
+    if (this.#web(account)) left = await this.web.remove(account, folder, uids);
+    else {
+      await this.#own(account);
+      left = (await this.#call('POST', 'mail/delete', { account, folder, uids })).folder;
+    }
     this.events?.emit('mail:change', { account, folder });
-    return result.folder;
+    return left;
   }
 
-  /** Envoie par le serveur SMTP du compte. `to`, `cc`, `bcc` : [{ name, address }] ou adresses. */
+  /** Envoie par le serveur SMTP du compte (ou l'API de Gmail, d'Outlook). `to`, `cc`, `bcc` : [{ name, address }] ou adresses. */
   async send(account, { to = [], cc = [], bcc = [], subject = '', text = '', inReplyTo = '', references = '' }) {
-    await this.#own(account);
-    const result = await this.#call('POST', 'mail/send', { account, to, cc, bcc, subject, text, inReplyTo, references }, ADD_TIMEOUT);
+    let result;
+    if (this.#web(account)) result = await this.web.send(account, { to, cc, bcc, subject, text, inReplyTo, references });
+    else {
+      await this.#own(account);
+      result = await this.#call('POST', 'mail/send', { account, to, cc, bcc, subject, text, inReplyTo, references }, ADD_TIMEOUT);
+    }
     this.log?.info('mail', `message envoyé (${to.length + cc.length + bcc.length} destinataire(s))`);
     this.events?.emit('mail:sent', { account });
     return result;

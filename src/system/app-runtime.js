@@ -18,7 +18,7 @@
  *   orion.location.current()          autorisation « Localisation » déclarée
  *   orion.mail.status() · accounts() · folders() · messages() · message()
  *     · setFlags() · move() · remove() · send()   autorisation « E-mails » déclarée
- *                                     (comptes des Réglages, relevés par orion-server)
+ *                                     (comptes des Réglages : orion-server, ou Gmail et Outlook par Internet)
  *   orion.net.request(url, options) · authorize(url) · redirectUri() · status()
  *                                     autorisation « Internet » déclarée : Orion fait
  *                                     les requêtes (jamais vers lui ni le réseau local)

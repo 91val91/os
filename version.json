@@ -1,11 +1,14 @@
 {
  "version": "0.1",
  "channel": "alpha",
- "sequence": 7,
- "build": "OR0A.261024.002",
+ "sequence": 8,
+ "build": "OR0A.261024.003",
  "codename": "Rigel",
  "date": "2026-10-24",
  "notes": [
+  "Les apps du Store peuvent accéder à Internet, avec votre accord (autorisation « Internet », révocable dans Réglages → Applications) : jamais à votre réseau local ni à l'appareil lui-même.",
+  "Agora se connecte à Mastodon et au fédivers, sur n'importe quelle instance : fil, discussions, publications, messages privés, notifications, photos et vidéos. Le mot de passe se saisit sur la page de l'instance, jamais dans Agora.",
+  "E-mails sur téléphone : Gmail et Outlook s'ajoutent dans Réglages → Comptes de messagerie et fonctionnent sans Orion installé, quand cette copie d'Orion a ses identifiants Google et Microsoft. Gmail demande de se reconnecter toutes les heures (une notification y mène).",
   "Pour les développeurs : Agora, un réseau social complet prêt à publier (Store → console développeur → nouvelle app → Modèles). Fil, publications avec sondage, fond coloré ou citation, j'aime d'un double toucher, partages, commentaires, profils, abonnements, tendances, notifications et messages privés ; tout reste sur l'appareil, avec une communauté de démonstration qui réagit.",
   "Compte en ligne obligatoire : votre profil est associé à un compte Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo ou à une autre adresse e-mail. L'assistant le demande ; un profil qui n'en a pas encore le reçoit juste après le déverrouillage.",
   "L'adresse est vérifiée par le fournisseur : « Continuer avec Google / Microsoft » quand cette copie d'Orion l'a activé, ou connexion à votre messagerie sur Orion installé. Sinon, elle est enregistrée « non vérifiée » (Réglages → Compte).",
@@ -14,7 +17,7 @@
   "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → console développeur → nouvelle app → Modèles).",
   "Corrections : les horloges (barre d'état, écran verrouillé) changent à la minute pile, le chronomètre et le minuteur ne consomment plus rien en arrière-plan, et la fenêtre de connexion fermée trop tôt ne bloque plus le bouton."
  ],
- "size": 1601692,
+ "size": 1724327,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -181,8 +184,8 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "0793e8e1623ae1d79c672a44e97d12869f2515607ce6d1d1b28d0305d77d88ea",
-   "size": 103476
+   "hash": "683743361e621da6eaee08e91ce79f70637bf0493a9532a21052413467095c10",
+   "size": 108329
   },
   "./src/apps/settings/style.css": {
    "hash": "2bdf749e1c805f2b6a707fb04b338fbd59aa8603b4b592135212bdd60d95565a",
@@ -197,12 +200,12 @@
    "size": 1368
   },
   "./src/apps/store/console.js": {
-   "hash": "5e06be310d559afac3effbddef63df3365a251727ca6ff77f0d9970492ebf2e5",
-   "size": 23028
+   "hash": "641763e50f5c98b88515719e5de206a1365a042ca0dddcead6a33ed5d370d7c8",
+   "size": 23368
   },
   "./src/apps/store/examples/agora.html": {
-   "hash": "9d6e98fbd74451b3a4262a49fd9f1cdb26bf5de8315ca4e6c2183e74245da51b",
-   "size": 130514
+   "hash": "3319b3600d489f54f9f1c9bf38ad9d5bfa7a35c361ff1611c41b46371d93ddf5",
+   "size": 187884
   },
   "./src/apps/store/examples/courrier.html": {
    "hash": "752e49b830402e89b4ac33c1977e7d559ffd486f66deb447e29eefc300ec69f8",
@@ -233,16 +236,16 @@
    "size": 4113
   },
   "./src/auth-callback.js": {
-   "hash": "cf9ec6e9445c398c7a72d34120bb2b13b9168726c9cf97b224ec118af1eb11e2",
-   "size": 1424
+   "hash": "36116bbc181c2a934bbc37f917cfcd05783af95c2e32b79e83bcb933d2d50071",
+   "size": 1727
   },
   "./src/auth.html": {
    "hash": "f6952c7daa51286184e1bfcaf9bdb34669b7f15caf9ad6f2483c5f664068cc76",
    "size": 686
   },
   "./src/config/identity.js": {
-   "hash": "dd045b3f642c7119df3e83b27692f13048b1e6bfa68f9c91d2dee3b7394914cf",
-   "size": 1191
+   "hash": "69aeabee5964cf30cf19cfef8563c0889ed71879a916af63cb95f0f495084f00",
+   "size": 1877
   },
   "./src/kernel/accounts.js": {
    "hash": "5a924a060ca8f9ecfae5acb2e9a17fa14dd8b2d49f0ea691e52480d91368b877",
@@ -253,8 +256,8 @@
    "size": 5628
   },
   "./src/kernel/app-scan.js": {
-   "hash": "a07bba6365bea4396ec88437583a94b5893a591bcb1aea7e93f3a929205290d0",
-   "size": 3221
+   "hash": "e88b61dd5222483ead37b2eceb9d59c4afb526f0b65b4f441e280bc7f2f633d7",
+   "size": 3248
   },
   "./src/kernel/bluetooth.js": {
    "hash": "3981693df8bde9b8ce751a6183be07836c051d9ac8435c5372fb7ec5635c7209",
@@ -289,8 +292,8 @@
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "84443d8a53ea661ae05e6c34fb343c9c80fbafbd7627b733e9e4aeaea41c047b",
-   "size": 10093
+   "hash": "798c44b8b9893d6dc25bf29bac144654dafb888e51654f6a3fd613b48055a458",
+   "size": 10890
   },
   "./src/kernel/location.js": {
    "hash": "abcca202a3bb8459dd36456b469ebf2cfbbc8c54e791fc680ae64b8d6114e730",
@@ -301,12 +304,16 @@
    "size": 1630
   },
   "./src/kernel/mail.js": {
-   "hash": "bf04a9f9b1e9f07a799d0bb9b85a77fa5235e9651a61aa4966858ae36f3febf4",
-   "size": 6724
+   "hash": "6e72fe8936ed973212e98557f02f03877b35800e0669b8404b59f8ca468a2ed0",
+   "size": 8274
   },
   "./src/kernel/media.js": {
    "hash": "f50db07a450900ffc7f16241797bbfae88139da388ffcfaf6060975304dfa20c",
    "size": 1381
+  },
+  "./src/kernel/net.js": {
+   "hash": "2a811ce74934f3b70379dfb2236004f12373e83e781618fd0366e9ac7510e88e",
+   "size": 9164
   },
   "./src/kernel/network.js": {
    "hash": "e8aeba01ddaf878316e4d725c330117f37466e595f3581f233a64c66c67dce48",
@@ -321,8 +328,8 @@
    "size": 3740
   },
   "./src/kernel/permissions.js": {
-   "hash": "034d6cd53e98e886ddf8620c695b18f5fe901aae0e984f679b762a68707dc3ed",
-   "size": 3335
+   "hash": "421d0833882a1e791ac3bf7bef3284b8db5e2693d26e370bae34b17548328ecf",
+   "size": 3475
   },
   "./src/kernel/processes.js": {
    "hash": "d6ec4418e32d916ea282bf11a14c126b4fa11db6e2cd8ce114ded4e4d385cf85",
@@ -349,20 +356,24 @@
    "size": 5861
   },
   "./src/kernel/store.js": {
-   "hash": "bae45e5c18b106a4aa01a2f67cc2a94102e1666eca934dd1e90b148d467955b9",
-   "size": 22281
+   "hash": "d453db53ccf84ed8bd284a4154e899416ae2c7bed2f7df959181bcbd4df7cfa0",
+   "size": 22293
   },
   "./src/kernel/telephony.js": {
    "hash": "131bbba14cecea607ad625b48a4b01172c8e977b6a90867bfce8fc546c1e5518",
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "3dba1ccd4574e604a09c594a1ecea5aa648157f0415bdf2d76ae682b118a9a3c",
-   "size": 2656
+   "hash": "160f6455bba1c097143500b128bb5511720f9b370ed648e77b62261b70b9d54f",
+   "size": 3403
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
    "size": 13097
+  },
+  "./src/kernel/webmail.js": {
+   "hash": "4688ae08be7fcc47fabce1e5a0343d787cd86e6581a74fc7c004fcc1f84411fd",
+   "size": 40090
   },
   "./src/lib/artwork.js": {
    "hash": "58821c67ff142f202de09af6dc6d7f3775e75e2c3a937a7a22cdbab69ceecd61",
@@ -425,16 +436,16 @@
    "size": 19754
   },
   "./src/system/app-context.js": {
-   "hash": "d7ea03fe78d47bf3ce1d868b6b37e14ddb42095e1c71a2c97a07c694c1cb9060",
-   "size": 9729
+   "hash": "faebd905e9717f01b293ab720c47ac7b5064f1a15875c638bf5ec123949d986f",
+   "size": 10754
   },
   "./src/system/app-icon.js": {
    "hash": "7254b6d959158811444dc2b383816a13de9da460f0d1adcb7a0c4d75b14b3543",
    "size": 4790
   },
   "./src/system/app-runtime.js": {
-   "hash": "2b8adc928011d7afaacdf94fc649244a42cc55afc1c03c56070cea715dd27729",
-   "size": 17807
+   "hash": "ff0e26ffa02e26dc9ce50e45cd578ea5c3f3903a754fdc56f5efe15767390942",
+   "size": 21459
   },
   "./src/system/banners.js": {
    "hash": "563899c6c61665d7d4f42df91761ee2c08ff81f019b4a3de78faff4cf749a9fe",
@@ -505,8 +516,8 @@
    "size": 6681
   },
   "./src/system/sign-in.js": {
-   "hash": "8a22b8ad9c3adac6789ee694f1cb33412ecbdd5665a8ed8107224b7eb15767fc",
-   "size": 5558
+   "hash": "089b5b04b97c211ac808ee125ad0485141a8edda1914dfa115652611c1567d18",
+   "size": 7437
   },
   "./src/system/sound.js": {
    "hash": "970b21eeb27687997ba44c2d283b52a21b6e92fc08ea78ce1b471ada0ac50ed8",

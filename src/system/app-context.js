@@ -76,7 +76,7 @@ export function createAppContext({ ui, proc, pkg }) {
    * des comptes que le nom et l'adresse.
    */
   const allowMail = async () => {
-    if (!kernel.mail.available) throw new Error('La messagerie demande Orion installé (orion-server)');
+    if (!kernel.mail.available) throw new Error('Aucune messagerie sur cet appareil : Orion installé (orion-server), ou Gmail et Outlook par Internet (identifiants clients d\'Orion)');
     if (!(await kernel.permissions.request(appId, 'mail'))) throw new Error('Accès aux e-mails refusé');
   };
   const mailCall = (method) => async (...args) => {

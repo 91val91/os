@@ -43,6 +43,8 @@ import { BluetoothService } from './bluetooth.js';
 import { LocationService } from './location.js';
 import { MailService } from './mail.js';
 import { NetService } from './net.js';
+import { WebMail } from './webmail.js';
+import { OIDC_CLIENTS } from '../config/identity.js';
 import { IdentityService } from './identity.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
@@ -71,8 +73,9 @@ export const OS = Object.freeze({
  * @param {() => Promise<object>} [options.storeRuntime] module qui exécute les apps publiées sur le Store
  * @param {object} [options.protectionBackend] base de la protection de l'appareil (gardée lors d'un effacement)
  * @param {(step: string, progress: number) => void} [options.onProgress]
+ * @param {{ google?: string, microsoft?: string }} [options.clients] identifiants clients OAuth (config/identity.js)
  */
-export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], shared = null, storeRuntime = null, protectionBackend = null, env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null } = {}) {
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], shared = null, storeRuntime = null, protectionBackend = null, env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null, clients = OIDC_CLIENTS } = {}) {
   const log = new SystemLog({ now, echo: echoLog });
   const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
   log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
@@ -130,9 +133,12 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const network = new NetworkService({ events, settings, env, bridge, log, timers }).init();
   const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
   const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
-  const mail = new MailService({ bridge, events, log, account: () => accountId });
+  // Gmail et Outlook par Internet : requêtes du navigateur lui-même (Microsoft refuse d'émettre
+  // les jetons d'une application « monopage » ailleurs que dans le navigateur).
+  const webmail = await new WebMail({ store: ns('webmail'), net: new NetService({ env, log }), clients, notifications, events, log, now, crypto: env.crypto }).load();
+  const mail = new MailService({ bridge, events, log, account: () => accountId, web: webmail });
   const net = new NetService({ bridge, env, log });
-  const identity = new IdentityService({ accounts, account: () => accountId, mail, events, log, now, fetch: env.fetch?.bind(env), subtle: env.crypto?.subtle });
+  const identity = new IdentityService({ accounts, account: () => accountId, mail, clients, events, log, now, fetch: env.fetch?.bind(env), subtle: env.crypto?.subtle });
 
   const contacts = new ContactsProvider({ fs, events }).load();
   const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);

@@ -20,7 +20,7 @@ Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racin
   que le serveur refuse : aucun site tiers ne peut piloter le matériel), sinon 403 ;
 - aucun en-tête CORS n'est jamais envoyé ; `OPTIONS` (pré-vol), `PUT`, `DELETE`… → 405 ;
 - en plus : un en-tête `Origin` différent de `http://<Host>` ou un `Sec-Fetch-Site` autre que `same-origin`/`none` → 403 `Origine refusée` sur `/api/` (une page d'un autre port de 127.0.0.1 est donc refusée elle aussi) ;
-- corps limité à 256 Kio (413 ; la taille d'un e-mail envoyé), JSON invalide ou non objet → 400, `Transfer-Encoding` refusé (411) ;
+- corps limité à 256 Kio (413 ; la taille d'un e-mail envoyé ; 2 Mio pour `/api/net/request`), JSON invalide ou non objet → 400, `Transfer-Encoding` refusé (411) ;
 - les outils système sont lancés avec une liste d'arguments (jamais de shell), avec délai maximal ; adresses MAC, numéros, identifiants, SSID, APN et code PIN sont validés strictement ;
 - toute réponse porte `X-Content-Type-Options: nosniff` et `Cross-Origin-Resource-Policy: same-origin`.
 
@@ -32,7 +32,7 @@ Options : `--root DOSSIER` (dossier contenant `index.html`, par défaut la racin
 ```json
 { "bridge": "orion-server", "version": "1.0.0", "hostname": "orion", "simulated": false,
   "capabilities": { "wifi": true, "bluetooth": true, "modem": false, "gps": false, "power": true, "network": true,
-                    "protection": true, "integrity": true, "mail": true } }
+                    "protection": true, "integrity": true, "mail": true, "net": true } }
 ```
 Une capacité est vraie si l'outil correspondant est présent et répond :
 - `wifi` : nmcli présent, NetworkManager actif et au moins une carte Wi‑Fi ;
@@ -41,7 +41,7 @@ Une capacité est vraie si l'outil correspondant est présent et répond :
 - `gps` : gpsd joignable sur 127.0.0.1:2947 **et** au moins un récepteur branché ;
 - `power` : systemctl présent ;
 - `network` *(ajout)* : NetworkManager utilisable (actif), même sans Wi‑Fi (machine virtuelle, câble) ;
-- `protection`, `integrity` et `mail` *(ajout)* : toujours vrais (voir plus bas).
+- `protection`, `integrity`, `mail` et `net` *(ajout)* : toujours vrais (voir plus bas).
 
 Résultat gardé 5 s. *(Ajout)* `simulated` vaut `true` avec `--simulate`.
 
@@ -167,6 +167,15 @@ Les comptes portent un `owner` (identifiant du compte Orion qui l'a ajouté) : l
 - `POST /api/mail/move` `{ "account", "folder", "uids", "to": "archive" | "<dossier>" }` → `{ "ok": true, "folder": "Archive" }` (`UID MOVE`, sinon `COPY` + `\Deleted` + `EXPUNGE`) ;
 - `POST /api/mail/delete` `{ "account", "folder", "uids" }` → vers la corbeille (`"folder": "Trash"`) ; définitivement (`"folder": null`) si le message y est déjà ou sans corbeille ;
 - `POST /api/mail/send` `{ "account", "to": [ { "name", "address" } | "adresse" ], "cc", "bcc", "subject", "text", "inReplyTo": "<id@…>", "references": "…" }` → `{ "ok": true, "messageId": "<…>", "refused": [], "savedTo": "Sent" }` : texte brut UTF-8, `Bcc` jamais transmis aux destinataires, en-têtes nettoyés (pas de retour à la ligne dans l'objet), 100 destinataires et 100 000 caractères au plus ; copie dans « Envoyés » si `saveSent` (Gmail et Outlook la font eux-mêmes : désactivée par défaut). 400 destinataire refusé par le serveur.
+
+## Accès à Internet des apps *(ajout)*
+
+Les apps du Store tournent sans réseau ; avec l'autorisation « Internet », Orion fait leurs requêtes (SDK `orion.net`, voir [`src/kernel/net.js`](../src/kernel/net.js)). Sur Orion installé, c'est `orion-server` qui les fait ([`orion_net.py`](orion_net.py)), sans les limites des navigateurs (CORS) :
+
+- `POST /api/net/request` `{ "url": "https://…", "method": "GET", "headers": { "Authorization": "…" }, "body": "…" | null, "bodyEncoding": "text" | "base64", "responseType": "text" | "base64" }` → `{ "ok": true, "status": 200, "url": "<adresse finale>", "headers": { "content-type", "link", "location", "etag", "last-modified", "retry-after", "www-authenticate", "content-language", "x-ratelimit-remaining", "x-ratelimit-reset" }, "body": "…", "encoding": "text" | "base64" }` : le statut du site est rendu tel quel (`ok` faux pour 4xx/5xx), le texte décodé selon son `charset` ;
+- **jamais le réseau local** : `http`/`https` seulement, pas d'identifiants dans l'adresse ; `localhost`, `.local`, `.lan`, `.internal`, `.home.arpa` refusés ; le nom est résolu et **toutes** ses adresses doivent être publiques (ni privées, ni locales, ni réservées, ni multidiffusion, IPv4 dans IPv6 compris), puis la connexion est ouverte sur l'adresse vérifiée elle-même (certificat vérifié pour le nom demandé) : un second passage par le DNS ne peut pas mener ailleurs. Chaque redirection (5 au plus, 303 → `GET`) est revérifiée. Sinon 403 `Le réseau local et l'appareil lui-même sont inaccessibles aux apps` ;
+- méthodes `GET` `HEAD` `POST` `PUT` `PATCH` `DELETE` `OPTIONS` (sinon 400) ; en-têtes : 50 au plus, retours à la ligne retirés, `Host`, `Cookie`, `Origin`, `Referer`, `Connection`, `Content-Length`, `Transfer-Encoding`, `Accept-Encoding`, `X-Orion`, `Proxy-*`, `Sec-*`… retirés ; `User-Agent: OrionOS/0.1 (orion-server)` ; aucun cookie n'est gardé ni renvoyé ;
+- corps envoyé de 1 Mio au plus (413), réponse de 8 Mio au plus (502 `Réponse trop volumineuse`) ; délai de 25 s (504) ; nom introuvable ou site injoignable → 502, certificat invalide → 502.
 
 ## Mode simulé (`--simulate`)
 
