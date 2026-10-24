@@ -8,6 +8,7 @@
 import { h, render } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { formatTime } from '../lib/format.js';
+import { everySecond } from './ticker.js';
 
 export class StatusBar {
   constructor(ui) {
@@ -25,15 +26,15 @@ export class StatusBar {
   start() {
     const refresh = () => this.render();
     for (const type of ['settings:change', 'battery:change', 'network:change', 'bluetooth:change', 'location:change', 'alarm:change', 'call:state']) this.k.events.on(type, refresh);
-    this.timer = setInterval(() => {
+    this.stopTicking = everySecond(() => {
       this.#renderTime();
       this.#renderIsland();
-    }, 1000);
+    });
     this.render();
   }
 
   stop() {
-    clearInterval(this.timer);
+    this.stopTicking?.();
   }
 
   render() {

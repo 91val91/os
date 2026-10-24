@@ -183,12 +183,14 @@ export function mount(root, ctx) {
     sw.startedAt = ctx.now();
     saveSw();
     renderSw();
+    schedule();
   }
   function stopSw() {
     sw.elapsed = swElapsed();
     sw.running = false;
     saveSw();
     renderSw();
+    schedule();
   }
   function resetSw() {
     Object.assign(sw, { running: false, elapsed: 0, laps: [] });
@@ -309,17 +311,38 @@ export function mount(root, ctx) {
     tabs.select(id);
     container.replaceChildren(views[id]);
     renderers[id]();
+    schedule();
   }
 
   root.classList.add('with-tabbar', 'clock');
   root.append(container, tabs);
 
-  ctx.setInterval(() => {
-    if (!ctx.foreground) return;
+  // Rythme selon ce qui est affiché : chrono lancé 20 fois par seconde, minuteur 4 fois,
+  // sinon une fois (horloges du monde, à chaque minute) ; rien en arrière-plan.
+  let pace = 0;
+  let stopTick = null;
+  let worldMinute = null;
+  const tick = () => {
     if (tab === 'stopwatch' && sw.running) renderSwDisplay();
     if (tab === 'timer') renderTimer();
-    if (tab === 'world' && new Date().getSeconds() === 0) renderWorld();
-  }, 50);
+    const minute = Math.floor(ctx.now() / 60_000);
+    if (tab === 'world' && minute !== worldMinute) {
+      worldMinute = minute;
+      renderWorld();
+    }
+  };
+  function schedule() {
+    const next = !ctx.foreground ? 0 : tab === 'stopwatch' && sw.running ? 50 : tab === 'timer' ? 250 : 1000;
+    if (next === pace) return;
+    stopTick?.();
+    stopTick = next ? ctx.setInterval(tick, next) : null;
+    pace = next;
+  }
+  ctx.on('pause', schedule);
+  ctx.on('resume', () => {
+    schedule();
+    tick();
+  });
   ctx.subscribe('alarm:change', () => {
     if (tab === 'alarms') renderAlarms();
     if (tab === 'timer') renderTimer();

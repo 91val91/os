@@ -51,7 +51,7 @@ export class PowerManager {
 
   async hideBoot() {
     const layer = this.ui.layers.boot;
-    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 450, fill: 'forwards' });
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
     layer.classList.remove('visible');
     layer.getAnimations?.().forEach((a) => a.cancel());
     layer.replaceChildren();

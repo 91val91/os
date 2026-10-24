@@ -27,11 +27,14 @@ import { CallScreen } from './call-screen.js';
 import { AlarmScreen } from './alarm-screen.js';
 import { SetupWizard } from './setup.js';
 import { takeRedirectResult } from './sign-in.js';
+
+const BOOT_MIN_MS = 500;
 import { DeviceProtection } from './protection.js';
 import { PowerManager, logo } from './power.js';
 import { platform } from './platform.js';
 import { DeveloperMode } from './developer.js';
 import { UpdateManager } from './updates.js';
+import { everySecond } from './ticker.js';
 
 const LAYERS = ['wallpaper', 'home', 'drawer', 'windows', 'recents', 'navbar', 'lock', 'system', 'setup', 'shade', 'controlCenter', 'statusbar', 'banners', 'dialogs', 'hud', 'toasts', 'filters', 'boot', 'off'];
 const SCREEN_W = 393;
@@ -166,6 +169,7 @@ export class SystemUI {
     }
     this.kernel = await bootKernel({ backend, accounts: session?.registry ?? null, accountId: session?.account.id, manifests: MANIFESTS, shared: session?.shared ?? null, storeRuntime: () => import('./app-runtime.js'), protectionBackend: await openBestBackend(globalThis, { name: 'orion-protection' }).catch(() => null), onProgress: (_, p) => this.power.setBootProgress(p) });
     window.orion = { kernel: this.kernel, ui: this };
+    performance.mark?.('orion:kernel');
     this.#syncAccount();
     this.developer = new DeveloperMode(this);
     this.developer.migrate();
@@ -212,8 +216,11 @@ export class SystemUI {
     this.#setupInput();
     this.#startTimers();
 
+    performance.mark?.('orion:ui');
     const elapsed = performance.now() - started;
-    await new Promise((r) => setTimeout(r, Math.max(0, 1300 - elapsed)));
+    // Le noyau et l'interface sont prêts en quelques centaines de millisecondes : le logo reste
+    // juste assez pour ne pas clignoter.
+    await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - elapsed)));
     this.power.setBootProgress(1);
     this.lock.lock();
     this.setState('locked');
@@ -362,14 +369,14 @@ export class SystemUI {
 
   #startTimers() {
     const k = this.kernel;
-    setInterval(() => {
+    everySecond(() => {
       k.alarms.tick();
       for (const { account, service } of this.otherAlarms ?? []) {
         for (const alarm of service.tick(undefined, { kinds: ['alarm', 'timer'] })) this.alarmScreen.ring(alarm, { account, service });
       }
       k.device.tick();
       this.#checkAutoLock();
-    }, 1000);
+    });
   }
 
   #checkAutoLock() {

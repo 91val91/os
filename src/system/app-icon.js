@@ -7,9 +7,10 @@
 import { h, svgEl } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { appArt } from './app-art.js';
+import { everySecond } from './ticker.js';
 
 const liveClocks = new Set();
-let clockTimer = null;
+let stopClocks = null;
 
 function updateClock(svg) {
   const now = new Date();
@@ -21,20 +22,22 @@ function updateClock(svg) {
 }
 
 function tickClocks() {
+  // Onglet ou app en arrière-plan : rien à dessiner (les aiguilles sont recalées au retour).
+  if (globalThis.document?.hidden) return;
   for (const svg of liveClocks) {
     if (!svg.isConnected) liveClocks.delete(svg);
     else updateClock(svg);
   }
   if (!liveClocks.size) {
-    clearInterval(clockTimer);
-    clockTimer = null;
+    stopClocks?.();
+    stopClocks = null;
   }
 }
 
 function watchClock(svg) {
   updateClock(svg);
   liveClocks.add(svg);
-  clockTimer ??= setInterval(tickClocks, 1000);
+  stopClocks ??= everySecond(tickClocks);
   return svg;
 }
 

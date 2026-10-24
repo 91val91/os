@@ -9,6 +9,7 @@ import { formatDate, formatTime } from '../lib/format.js';
 import { avatar } from '../lib/ui.js';
 import { verifyPasscode } from '../kernel/settings.js';
 import { formatWait } from './protection.js';
+import { everySecond } from './ticker.js';
 
 const LETTERS = { 2: 'ABC', 3: 'DEF', 4: 'GHI', 5: 'JKL', 6: 'MNO', 7: 'PQRS', 8: 'TUV', 9: 'WXYZ' };
 
@@ -70,7 +71,7 @@ export class LockScreen {
 
     const refresh = () => this.isLocked && this.render();
     for (const type of ['notification:post', 'notification:dismiss', 'media:change', 'settings:change', 'account:change']) this.k.events.on(type, refresh);
-    setInterval(() => this.isLocked && this.#renderClock(), 1000);
+    everySecond(() => this.isLocked && this.#renderClock());
   }
 
   get pinVisible() {
@@ -130,10 +131,13 @@ export class LockScreen {
     );
   }
 
+  /** Écrit seulement ce qui change (une fois par minute) : la grande horloge coûte cher à redessiner. */
   #renderClock() {
     const now = this.k.now();
-    this.time.textContent = formatTime(now, this.k.settings.get('use24h'));
-    this.date.textContent = formatDate(now);
+    const time = formatTime(now, this.k.settings.get('use24h'));
+    const date = formatDate(now);
+    if (this.time.textContent !== time) this.time.textContent = time;
+    if (this.date.textContent !== date) this.date.textContent = date;
   }
 
   #renderActions() {

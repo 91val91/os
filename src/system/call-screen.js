@@ -6,6 +6,7 @@ import { h } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { formatDuration } from '../lib/format.js';
 import { avatar } from '../lib/ui.js';
+import { everySecond } from './ticker.js';
 
 export class CallScreen {
   constructor(ui) {
@@ -22,9 +23,9 @@ export class CallScreen {
     this.k.events.on('call:state', (call) => this.#onState(call));
     // Modem : numéro refusé, pas de réseau, décrochage impossible…
     this.k.events.on('call:error', ({ message }) => this.ui.dialogs.toast(message, { icon: 'phone-missed' }));
-    setInterval(() => {
+    everySecond(() => {
       if (this.k.telephony.call?.state === 'active') this.#renderStatus();
-    }, 1000);
+    });
   }
 
   #status(call) {

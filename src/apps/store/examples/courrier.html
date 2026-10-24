@@ -1304,6 +1304,7 @@ async function send() {
   if (recipients.some((p) => isMe(p.address))) state.messages.push({ ...message, id: newId(), box: 'inbox', read: false, date: now + 1500, deliverAt: now + 1500 });
   if (recipients.some((p) => same(p.address, DEMO))) state.messages.push(autoReply(message, now + 5000));
   persist('messages');
+  scheduleDelivery();
   orion.device.vibrate(15);
   state.draft = null;
   back();
@@ -1365,11 +1366,20 @@ function autoReply(sent, at) {
   };
 }
 
+/** Prochaine arrivée attendue : une seule minuterie, à l'heure dite (pas de vérification chaque seconde). */
+let deliveryTimer = null;
+function scheduleDelivery() {
+  clearTimeout(deliveryTimer);
+  const next = Math.min(...state.messages.filter((m) => m.deliverAt).map((m) => m.deliverAt));
+  deliveryTimer = Number.isFinite(next) ? setTimeout(deliver, Math.max(0, next - Date.now()) + 20) : null;
+}
+
 /** Messages arrivés (distribution différée, mode sans compte) : affichage et notification. */
 function deliver() {
   const arrived = state.messages.filter((m) => m.deliverAt && m.deliverAt <= Date.now());
-  if (!arrived.length) return;
   for (const m of arrived) delete m.deliverAt;
+  scheduleDelivery();
+  if (!arrived.length) return;
   persist('messages');
   const last = arrived.at(-1);
   if (paused) orion.notify({ title: nameOf(last.from), body: last.subject || '(Sans objet)' }).catch(() => {});
@@ -1794,7 +1804,7 @@ async function start() {
   state.messages = Array.isArray(messages) ? messages : [];
   state.status = status || { available: false, permission: 'denied' };
   if (purgeTrash()) persist('messages');
-  setInterval(deliver, 1000);
+  deliver();
   // Compte de l'appareil choisi la dernière fois : rouvert directement (sans redemander si refusé).
   if (state.settings.source === 'device' && state.status.available && state.status.permission !== 'denied' && (await connectDevice({ quiet: true }))) return;
   if (state.account) {

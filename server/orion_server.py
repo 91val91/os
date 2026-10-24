@@ -2083,6 +2083,7 @@ def mail_routes(mail: MailService) -> dict[str, dict[str, Handler]]:
         "/api/mail/autoconfig": {"POST": lambda hw, body, q: _mail_call(lambda: mail.autoconfig(body))},
         "/api/mail/accounts/add": {"POST": lambda hw, body, q: _mail_call(lambda: mail.add_account(body))},
         "/api/mail/accounts/remove": {"POST": lambda hw, body, q: _mail_call(lambda: mail.remove_account(body))},
+        "/api/mail/verify": {"POST": lambda hw, body, q: _mail_call(lambda: mail.verify_login(body))},
         "/api/mail/folders": {"GET": lambda hw, body, q: _mail_call(lambda: mail.folders(_query(q, "account")))},
         "/api/mail/messages": {
             "GET": lambda hw, body, q: _mail_call(

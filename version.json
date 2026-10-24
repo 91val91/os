@@ -11,7 +11,7 @@
   "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → Compte → console développeur → nouvelle app → Modèles). Elle utilise vos comptes, ou fonctionne sans compte.",
   "Image installable : Orion s'affiche en plein écran et démarre plus vite sur les cartes graphiques sans accélération 3D."
  ],
- "size": 1424703,
+ "size": 1466470,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -70,8 +70,8 @@
    "size": 4461
   },
   "./src/apps/clock/index.js": {
-   "hash": "e25439e7ccdc6fa4f7e80996e8d05542efb74f3e38abb5462f50ac6ffa6d613a",
-   "size": 15519
+   "hash": "2eb9748b4362278db5699560ef36597f59549aa53474a75d1c9573bc4fd13f01",
+   "size": 16204
   },
   "./src/apps/clock/style.css": {
    "hash": "47708862b805115c4bb6ad7d5d09c1fffa441ed6b3d5cbb028524c625da0386f",
@@ -178,8 +178,8 @@
    "size": 8920
   },
   "./src/apps/settings/index.js": {
-   "hash": "69002883123dd168dd109f4cad9b3607d9a82b78c16fc2699b59166e63fed716",
-   "size": 101845
+   "hash": "0793e8e1623ae1d79c672a44e97d12869f2515607ce6d1d1b28d0305d77d88ea",
+   "size": 103476
   },
   "./src/apps/settings/style.css": {
    "hash": "2bdf749e1c805f2b6a707fb04b338fbd59aa8603b4b592135212bdd60d95565a",
@@ -198,8 +198,8 @@
    "size": 22218
   },
   "./src/apps/store/examples/courrier.html": {
-   "hash": "c43abcabe913c92b122731cb7830545e2b0fe47b0300958feef61eb8c69204a0",
-   "size": 94430
+   "hash": "752e49b830402e89b4ac33c1977e7d559ffd486f66deb447e29eefc300ec69f8",
+   "size": 94862
   },
   "./src/apps/store/index.js": {
    "hash": "b791da9e04fb795c3e1ff59693d5f006217a043f28786f28476fced42a824629",
@@ -225,9 +225,21 @@
    "hash": "a6f0d05135897c36f854e615418b797e320abd9889fec214928afe90d9bb6fad",
    "size": 4113
   },
+  "./src/auth-callback.js": {
+   "hash": "cf9ec6e9445c398c7a72d34120bb2b13b9168726c9cf97b224ec118af1eb11e2",
+   "size": 1424
+  },
+  "./src/auth.html": {
+   "hash": "f6952c7daa51286184e1bfcaf9bdb34669b7f15caf9ad6f2483c5f664068cc76",
+   "size": 686
+  },
+  "./src/config/identity.js": {
+   "hash": "dd045b3f642c7119df3e83b27692f13048b1e6bfa68f9c91d2dee3b7394914cf",
+   "size": 1191
+  },
   "./src/kernel/accounts.js": {
-   "hash": "843b16344903a021283cf2bce2b005fcfc4204fa85c33d46dc73572630010e36",
-   "size": 8082
+   "hash": "5a924a060ca8f9ecfae5acb2e9a17fa14dd8b2d49f0ea691e52480d91368b877",
+   "size": 8462
   },
   "./src/kernel/alarms.js": {
    "hash": "9113361c3521b2db198fca328e87b70d86ef2d1be93f33cf46376ab829a440ec",
@@ -261,13 +273,17 @@
    "hash": "692c2025fa12d666167744a53a6b1d28f7af061bb0fabcadf97db8fa01a7188c",
    "size": 1111
   },
+  "./src/kernel/identity.js": {
+   "hash": "d2ae0c4f382d0a5eb91f900a0127a2acc71add9bc29a4055a82369ae9dc99d3b",
+   "size": 14462
+  },
   "./src/kernel/intents.js": {
    "hash": "eae60ea03506a4210624ebd7d4f72edb1ca05fbc6e0a8ec8bc28cd4df8e581b1",
    "size": 3972
   },
   "./src/kernel/kernel.js": {
-   "hash": "623d71327bf409a00fb1a8407c877a1a300b1112b4a79a1203df6cc75f00e4b7",
-   "size": 9780
+   "hash": "84443d8a53ea661ae05e6c34fb343c9c80fbafbd7627b733e9e4aeaea41c047b",
+   "size": 10093
   },
   "./src/kernel/location.js": {
    "hash": "abcca202a3bb8459dd36456b469ebf2cfbbc8c54e791fc680ae64b8d6114e730",
@@ -278,8 +294,8 @@
    "size": 1630
   },
   "./src/kernel/mail.js": {
-   "hash": "7978eb1d0e7b3dedd9f1d22a1b0c5cbd6256c76fdbaa8ab4724a5d8f2ae6a405",
-   "size": 6382
+   "hash": "bf04a9f9b1e9f07a799d0bb9b85a77fa5235e9651a61aa4966858ae36f3febf4",
+   "size": 6724
   },
   "./src/kernel/media.js": {
    "hash": "f50db07a450900ffc7f16241797bbfae88139da388ffcfaf6060975304dfa20c",
@@ -390,8 +406,8 @@
    "size": 13635
   },
   "./src/styles/system.css": {
-   "hash": "e6bef5b731808ef86ac81eeccc1a1817c83274f03ce9a5221a72083be4d2fd50",
-   "size": 53731
+   "hash": "0e186a1686ba2a4bfe61409e3114f8313ac6a8eb3f484db64cb60af40d7bd193",
+   "size": 55438
   },
   "./src/system/alarm-screen.js": {
    "hash": "59255c094d3012ef1fc95cfb41231f6d67fbb7c8cd1715dd66fadc85fe6b3133",
@@ -406,8 +422,8 @@
    "size": 9729
   },
   "./src/system/app-icon.js": {
-   "hash": "534de1afd0eac41c3082181543a159269e8afe2bd12be597eb8d102bf6b481a0",
-   "size": 4624
+   "hash": "7254b6d959158811444dc2b383816a13de9da460f0d1adcb7a0c4d75b14b3543",
+   "size": 4790
   },
   "./src/system/app-runtime.js": {
    "hash": "2b8adc928011d7afaacdf94fc649244a42cc55afc1c03c56070cea715dd27729",
@@ -418,8 +434,8 @@
    "size": 2962
   },
   "./src/system/call-screen.js": {
-   "hash": "002310c9751aadcb1e3b8b23ce40b350ac953be10450b16789916384df6d6968",
-   "size": 6839
+   "hash": "685cf96adb67ae9f37d8cbb243c66280967962c876b598a62493d81b5c9ad8c3",
+   "size": 6876
   },
   "./src/system/control-center.js": {
    "hash": "2fe9624fde21f2797eb5e2d12494c8aa474ebd9d25aee1bb86d2dfd72f0f8ae1",
@@ -446,8 +462,8 @@
    "size": 3532
   },
   "./src/system/lockscreen.js": {
-   "hash": "425642f5ee7d7f1aec656b172287052d1247241e862f25c10fd9444909750f34",
-   "size": 12316
+   "hash": "bfa7584f81c200c976a5c14983f3f216a41cf79d6beb99de41ff42acd30747b6",
+   "size": 12580
   },
   "./src/system/navigation.js": {
    "hash": "1a3f29558747887846d869947e7361f51ee9b2d3939abee46be47555f00702fe",
@@ -458,7 +474,7 @@
    "size": 1269
   },
   "./src/system/power.js": {
-   "hash": "aa0d760b768f8b3335803454ed3ba5d00b2e0f252fe7e42b1d12395b5eb9e829",
+   "hash": "d3951c485f505670c3e566a56052f08badde73f5581b527aa75d54e6250c63ab",
    "size": 5465
   },
   "./src/system/protection.js": {
@@ -474,28 +490,36 @@
    "size": 4970
   },
   "./src/system/setup.js": {
-   "hash": "95929a85679e4099bdd4a0a2f6a6e18b1e8d1a42703f0bef46ad572648fd0b31",
-   "size": 11905
+   "hash": "022e379d3f6118e4c49369446063e2a065773d6e69a69134896dc0ab729c2714",
+   "size": 21674
   },
   "./src/system/shade.js": {
    "hash": "3e453d88252d7eccf7d18edb9bca1d2993336116b6550dca155f215e46f2832d",
    "size": 6681
+  },
+  "./src/system/sign-in.js": {
+   "hash": "8a22b8ad9c3adac6789ee694f1cb33412ecbdd5665a8ed8107224b7eb15767fc",
+   "size": 5558
   },
   "./src/system/sound.js": {
    "hash": "970b21eeb27687997ba44c2d283b52a21b6e92fc08ea78ce1b471ada0ac50ed8",
    "size": 5956
   },
   "./src/system/statusbar.js": {
-   "hash": "6a7ae62d12c3aa77fb3c58082542b7a5aedbcdf690624525da45001fee1a4278",
-   "size": 6076
+   "hash": "8f80d18f6b6b7f6b4907b747232d97503d66d2544c5c8c1fab29697059ee9c19",
+   "size": 6114
   },
   "./src/system/system-ui.js": {
-   "hash": "837d38cbd36c1a5a60538f670729fd8c2d236d1db3e987d68d634f2756c2d97e",
-   "size": 27490
+   "hash": "50d5c25f932ce42f7398dc8876d740dae47cbb0401f64b4b870ed15395472a30",
+   "size": 29256
   },
   "./src/system/theme.js": {
    "hash": "99c6e8f2aebd4204d53844df1bc0b4d30a6574766e529b237d5238742d01a618",
    "size": 2235
+  },
+  "./src/system/ticker.js": {
+   "hash": "12aad9d8bdbe6fdf7403a74ba856c59f1574cd2e8266c400439eb7fdcafd3bff",
+   "size": 916
   },
   "./src/system/updates.js": {
    "hash": "f1bafef5e921b3da8684773905bbf90e8989c0876df4339893e434a1353354ea",
