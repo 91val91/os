@@ -1,11 +1,12 @@
 {
  "version": "0.1",
  "channel": "alpha",
- "sequence": 6,
- "build": "OR0A.261024.001",
+ "sequence": 7,
+ "build": "OR0A.261024.002",
  "codename": "Rigel",
  "date": "2026-10-24",
  "notes": [
+  "Pour les développeurs : Agora, un réseau social complet prêt à publier (Store → console développeur → nouvelle app → Modèles). Fil, publications avec sondage, fond coloré ou citation, j'aime d'un double toucher, partages, commentaires, profils, abonnements, tendances, notifications et messages privés ; tout reste sur l'appareil, avec une communauté de démonstration qui réagit.",
   "Compte en ligne obligatoire : votre profil est associé à un compte Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo ou à une autre adresse e-mail. L'assistant le demande ; un profil qui n'en a pas encore le reçoit juste après le déverrouillage.",
   "L'adresse est vérifiée par le fournisseur : « Continuer avec Google / Microsoft » quand cette copie d'Orion l'a activé, ou connexion à votre messagerie sur Orion installé. Sinon, elle est enregistrée « non vérifiée » (Réglages → Compte).",
   "Plus rapide : démarrage deux fois plus court, un seul réveil par seconde pour tout le système au lieu de cinq, Horloge et Courrier au repos quand ils sont en arrière-plan.",
@@ -13,7 +14,7 @@
   "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → console développeur → nouvelle app → Modèles).",
   "Corrections : les horloges (barre d'état, écran verrouillé) changent à la minute pile, le chronomètre et le minuteur ne consomment plus rien en arrière-plan, et la fenêtre de connexion fermée trop tôt ne bloque plus le bouton."
  ],
- "size": 1469945,
+ "size": 1601692,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -196,8 +197,12 @@
    "size": 1368
   },
   "./src/apps/store/console.js": {
-   "hash": "d92025ea442c8475ca3e9643649931c26080112d8a891ea3882cd47461932dfd",
-   "size": 22218
+   "hash": "5e06be310d559afac3effbddef63df3365a251727ca6ff77f0d9970492ebf2e5",
+   "size": 23028
+  },
+  "./src/apps/store/examples/agora.html": {
+   "hash": "9d6e98fbd74451b3a4262a49fd9f1cdb26bf5de8315ca4e6c2183e74245da51b",
+   "size": 130514
   },
   "./src/apps/store/examples/courrier.html": {
    "hash": "752e49b830402e89b4ac33c1977e7d559ffd486f66deb447e29eefc300ec69f8",
@@ -352,8 +357,8 @@
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "2a63eed932e45a41cc8677e4a6cb5fbaa84b0cd1c5e41cd103f9469428aeb92c",
-   "size": 2233
+   "hash": "3dba1ccd4574e604a09c594a1ecea5aa648157f0415bdf2d76ae682b118a9a3c",
+   "size": 2656
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",

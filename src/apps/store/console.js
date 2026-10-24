@@ -34,6 +34,20 @@ const TEMPLATES = [
     },
     permissions: ['mail'],
   },
+  {
+    label: 'Exemple : Agora (réseau social)',
+    code: async () => {
+      const response = await fetch(new URL('./examples/agora.html', import.meta.url));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    },
+    listing: {
+      subtitle: 'Publiez, suivez, échangez',
+      description: 'Agora est un réseau social complet : fil d\'actualité, publications avec mots-dièse, mentions, fond coloré, sondage ou citation, j\'aime, partages, commentaires, profils, abonnements, recherche, tendances, notifications et messages privés. Sans accès à Internet, tout reste sur l\'appareil ; les autres membres forment une communauté de démonstration qui réagit à vos publications.',
+      category: 'Divertissement',
+      icon: 'heart',
+    },
+  },
 ];
 /** Autorisations qu'une app du Store peut déclarer (l'utilisateur les accorde au premier usage). */
 const PERMISSION_TOGGLES = [

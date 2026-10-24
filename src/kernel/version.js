@@ -6,16 +6,17 @@
  * `sequence` est le numéro d'ordre de la publication : il augmente de 1 à
  * chaque version publiée et c'est lui qui dit laquelle est la plus récente,
  * même quand le numéro affiché repart de zéro (1.2.0 → 0.1 alpha) ou est
- * repris (0.1.1 n° 5 → 0.1 n° 6).
+ * repris (0.1.1 n° 5 → 0.1 n° 6, puis 0.1 n° 7).
  */
 export const RELEASE = Object.freeze({
   version: '0.1',
   channel: 'alpha',
-  sequence: 6,
-  build: 'OR0A.261024.001',
+  sequence: 7,
+  build: 'OR0A.261024.002',
   codename: 'Rigel',
   date: '2026-10-24',
   notes: Object.freeze([
+    'Pour les développeurs : Agora, un réseau social complet prêt à publier (Store → console développeur → nouvelle app → Modèles). Fil, publications avec sondage, fond coloré ou citation, j\'aime d\'un double toucher, partages, commentaires, profils, abonnements, tendances, notifications et messages privés ; tout reste sur l\'appareil, avec une communauté de démonstration qui réagit.',
     'Compte en ligne obligatoire : votre profil est associé à un compte Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo ou à une autre adresse e-mail. L\'assistant le demande ; un profil qui n\'en a pas encore le reçoit juste après le déverrouillage.',
     'L\'adresse est vérifiée par le fournisseur : « Continuer avec Google / Microsoft » quand cette copie d\'Orion l\'a activé, ou connexion à votre messagerie sur Orion installé. Sinon, elle est enregistrée « non vérifiée » (Réglages → Compte).',
     'Plus rapide : démarrage deux fois plus court, un seul réveil par seconde pour tout le système au lieu de cinq, Horloge et Courrier au repos quand ils sont en arrière-plan.',

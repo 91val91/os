@@ -180,6 +180,24 @@ test('analyse des apps', () => {
   assert.equal(scanApp(`<script>var s = "${'\\x41'.repeat(60)}"</script>`).findings[0].id, 'obfuscated');
 });
 
+test('l\'exemple Agora (réseau social) passe l\'examen du Store', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const code = await readFile(new URL('../src/apps/store/examples/agora.html', import.meta.url), 'utf8');
+  assert.deepEqual(scanApp(code), { level: 'safe', findings: [] });
+  assert.ok(new Blob([code]).size <= MAX_CODE);
+  // Aucune autorisation : Agora n'utilise que orion.storage, orion.ui, orion.notify et le vibreur.
+  assert.doesNotMatch(code, /orion\.(?:mail|location)\b/);
+  const { session } = device();
+  const { store } = await session('camille');
+  store.topUp(DEVELOPER_FEE);
+  store.registerDeveloper({ name: 'Studio Camille', email: 'camille@exemple.fr', accepted: true });
+  const app = store.createApp({ name: 'Agora' });
+  store.updateDraft(app.id, { code, description: 'Le réseau social de votre appareil.', category: 'Divertissement', icon: 'heart' });
+  const review = store.review(app.id);
+  assert.ok(review.ok, JSON.stringify(review.checks.filter((c) => !c.ok)));
+  assert.equal(store.publish(app.id).live.size, new Blob([code]).size);
+});
+
 test('l\'exemple Courrier (e-mail) passe l\'examen du Store', async () => {
   const { readFile } = await import('node:fs/promises');
   const code = await readFile(new URL('../src/apps/store/examples/courrier.html', import.meta.url), 'utf8');

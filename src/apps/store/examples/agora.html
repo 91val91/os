@@ -1,0 +1,2213 @@
+<!--
+  Agora : réseau social pour Orion OS (app du Store, SDK orion).
+
+  Fil d'actualité (abonnements et découverte), publications avec mots-dièse,
+  mentions, fond coloré, sondage ou citation ; j'aime (aussi en touchant deux
+  fois), partages, commentaires en fil de discussion, enregistrements ;
+  profils (photo émoji, couverture, bio, publication épinglée), abonnements ;
+  recherche (personnes, mots-dièse, publications) et tendances ;
+  notifications (aussi en arrière-plan, par orion.notify) ; messages privés ;
+  comptes et mots masqués.
+
+  Les apps du Store n'ont pas accès à Internet : tout reste sur l'appareil
+  (orion.storage, 1 Mo). Les autres membres sont une communauté de
+  démonstration, signalée comme telle, qui publie, répond à vos
+  publications et à vos messages, et s'abonne à vous.
+-->
+<style>
+  :root {
+    --bg: #fff;
+    --fg: #0f1419;
+    --muted: #6e767d;
+    --line: rgba(60, 60, 67, 0.16);
+    --group: #f2f2f7;
+    --card: #fff;
+    --sheet: rgba(255, 255, 255, 0.98);
+    --bar: rgba(255, 255, 255, 0.92);
+    --field: rgba(118, 118, 128, 0.12);
+    --hover: rgba(0, 0, 0, 0.03);
+    --accent: #5856d6;
+    --accent-soft: rgba(88, 86, 214, 0.12);
+    --like: #ff2d55;
+    --repost: #00ba7c;
+    --danger: #ff3b30;
+    --ok: #34c759;
+    --bubble: #e9e9eb;
+    color-scheme: light;
+  }
+  :root[data-theme='dark'] {
+    --bg: #000;
+    --fg: #e7e9ea;
+    --muted: #8b9095;
+    --line: rgba(84, 84, 88, 0.6);
+    --group: #000;
+    --card: #1c1c1e;
+    --sheet: #2c2c2e;
+    --bar: rgba(0, 0, 0, 0.88);
+    --field: rgba(118, 118, 128, 0.24);
+    --hover: rgba(255, 255, 255, 0.04);
+    --accent: #7d7aff;
+    --accent-soft: rgba(125, 122, 255, 0.18);
+    --like: #ff375f;
+    --repost: #00ba7c;
+    --danger: #ff453a;
+    --ok: #30d158;
+    --bubble: #26252a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { margin: 0; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: default; opacity: 0.4; }
+  svg { display: block; flex: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+
+  #app { display: flex; flex-direction: column; height: 100%; }
+  .bar { position: relative; z-index: 2; display: flex; flex: none; align-items: center; gap: 4px; min-height: 50px; padding: 4px 8px; border-bottom: 0.5px solid var(--line); background: var(--bar); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .bar-title { flex: 1; overflow: hidden; font-size: 17px; font-weight: 700; text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+  .bar-title small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+  .bar .logo { flex: 1; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+  .bar .logo span { color: var(--accent); }
+  .ibtn { position: relative; display: grid; place-items: center; min-width: 40px; height: 40px; border-radius: 20px; color: var(--fg); }
+  .ibtn:active { background: var(--field); }
+  .link { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 10px; border-radius: 20px; color: var(--accent); font-size: 16px; white-space: nowrap; }
+  .link:active:not(:disabled) { opacity: 0.5; }
+  .pill-btn { min-height: 34px; padding: 0 16px; border-radius: 17px; background: var(--accent); color: #fff; font-weight: 700; white-space: nowrap; }
+  .pill-btn.ghost { border: 1px solid var(--line); background: none; color: var(--fg); }
+  .pill-btn.small { min-height: 30px; padding: 0 12px; font-size: 14px; }
+  .scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .muted { color: var(--muted); }
+  .badge { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--bg); border-radius: 9px; background: var(--like); color: #fff; font-size: 11px; font-weight: 700; }
+  .demo { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 6px; background: var(--field); color: var(--muted); font-size: 11px; font-weight: 600; vertical-align: 1px; }
+
+  /* Barre d'onglets */
+  .tabs { display: flex; flex: none; justify-content: space-around; padding: 4px 0; border-top: 0.5px solid var(--line); background: var(--bar); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .tab { position: relative; display: grid; flex: 1; place-items: center; height: 46px; color: var(--muted); }
+  .tab[aria-current='page'] { color: var(--fg); }
+  .tab .badge { top: 4px; right: calc(50% - 22px); }
+  .tab.create span { display: grid; place-items: center; width: 44px; height: 32px; border-radius: 12px; background: var(--accent); color: #fff; }
+
+  /* Fil */
+  .seg { display: flex; flex: none; border-bottom: 0.5px solid var(--line); background: var(--bar); }
+  .seg button { position: relative; flex: 1; height: 44px; color: var(--muted); font-weight: 600; }
+  .seg button[aria-pressed='true'] { color: var(--fg); }
+  .seg button[aria-pressed='true']::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 56px; height: 3px; border-radius: 2px; background: var(--accent); transform: translateX(-50%); }
+  .new-pill { position: sticky; top: 10px; z-index: 3; display: flex; justify-content: center; height: 0; overflow: visible; }
+  .new-pill button { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 17px; background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2); }
+  .post { position: relative; display: flex; gap: 10px; padding: 12px 14px 4px; border-bottom: 0.5px solid var(--line); }
+  .post.unseen { animation: arrive 0.4s ease-out; }
+  @keyframes arrive { from { background: var(--accent-soft); } }
+  .post-side { display: flex; flex: none; flex-direction: column; align-items: center; }
+  .post-main { flex: 1; min-width: 0; }
+  .post-ctx { display: flex; align-items: center; gap: 6px; margin: -2px 0 2px; color: var(--muted); font-size: 13px; font-weight: 600; }
+  .post-head { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .post-who { display: flex; flex: 1; align-items: baseline; gap: 4px; min-width: 0; overflow: hidden; text-align: left; white-space: nowrap; }
+  /* Le nom passe avant l'identifiant et l'heure, qui sont raccourcis d'abord. */
+  .post-who b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .post-who .demo { flex: none; }
+  .post-who span:not(.demo) { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; }
+  .post-more { width: 32px; height: 28px; margin: -4px -6px 0 0; color: var(--muted); }
+  .post-reply-to { margin-top: 1px; color: var(--muted); font-size: 14px; }
+  .post-text { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; }
+  .post-text a, .rich a { color: var(--accent); text-decoration: none; cursor: pointer; }
+  .edited { color: var(--muted); font-size: 13px; }
+  .bgcard { display: grid; place-items: center; min-height: 170px; margin-top: 6px; padding: 24px 18px; border-radius: 16px; color: #fff; font-size: 22px; font-weight: 700; line-height: 1.25; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
+  .bgcard a { color: #fff; text-decoration: underline; }
+  .quote { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; text-align: left; }
+  .quote .post-who { font-size: 14px; }
+  .quote .q-text { display: -webkit-box; overflow: hidden; font-size: 14px; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+  .actions { display: flex; justify-content: space-between; max-width: 420px; margin: 4px 0 0 -8px; }
+  .act { display: flex; align-items: center; gap: 4px; min-width: 52px; height: 36px; padding: 0 8px; border-radius: 18px; color: var(--muted); font-size: 13px; }
+  .act:active { background: var(--field); }
+  .act.on.like { color: var(--like); }
+  .act.on.repost { color: var(--repost); }
+  .act.on.mark { color: var(--accent); }
+  .act.like.pop svg { animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); }
+  @keyframes pop { 40% { transform: scale(1.45); } }
+  .burst { position: absolute; z-index: 4; color: var(--like); pointer-events: none; animation: burst 0.7s ease-out forwards; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25)); }
+  @keyframes burst { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
+  .thread-line { flex: 1; width: 2px; margin-top: 4px; background: var(--line); }
+
+  /* Sondage */
+  .poll { display: grid; gap: 6px; margin-top: 8px; }
+  .poll-opt { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; overflow: hidden; padding: 0 12px; border: 1px solid var(--accent); border-radius: 19px; color: var(--accent); font-weight: 600; text-align: left; }
+  .poll.done .poll-opt { border-color: transparent; color: var(--fg); font-weight: 400; cursor: default; }
+  .poll-opt i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; background: var(--field); }
+  .poll-opt.mine i { background: var(--accent-soft); }
+  .poll-opt span { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .poll-opt b { position: relative; flex: none; }
+  .poll-meta { color: var(--muted); font-size: 13px; }
+
+  /* Avatars */
+  .av { display: grid; flex: none; place-items: center; overflow: hidden; border-radius: 50%; color: #fff; font-weight: 700; line-height: 1; user-select: none; }
+  .av.emoji { background: var(--field); }
+
+  /* Détail d'une publication */
+  .detail { padding: 12px 14px 0; border-bottom: 0.5px solid var(--line); }
+  .detail .post-text, .detail .bgcard { font-size: 19px; }
+  .detail .bgcard { font-size: 24px; }
+  .detail-date { padding: 12px 0; border-bottom: 0.5px solid var(--line); color: var(--muted); font-size: 14px; }
+  .detail-stats { display: flex; gap: 16px; padding: 12px 0; border-bottom: 0.5px solid var(--line); font-size: 14px; }
+  .detail-stats b { margin-right: 3px; }
+  .detail .actions { justify-content: space-around; max-width: none; margin: 2px 0; }
+  .composer { display: flex; flex: none; align-items: flex-end; gap: 8px; padding: 8px 10px; border-top: 0.5px solid var(--line); background: var(--bar); }
+  .composer textarea { flex: 1; max-height: 120px; min-height: 38px; padding: 8px 14px; border: 0; border-radius: 19px; outline: 0; background: var(--field); resize: none; }
+  .send { display: grid; flex: none; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #fff; }
+
+  /* Rédaction */
+  .compose { display: flex; gap: 10px; padding: 12px 14px; }
+  .compose textarea { flex: 1; min-height: 140px; padding: 6px 0; border: 0; outline: 0; background: none; font-size: 18px; line-height: 1.4; resize: none; }
+  .compose-parent { padding: 12px 14px 0; color: var(--muted); font-size: 14px; }
+  .compose-parent .q-text { display: -webkit-box; overflow: hidden; color: var(--fg); -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  .suggest { display: flex; gap: 6px; padding: 6px 14px; overflow-x: auto; }
+  .suggest:empty { display: none; }
+  .chip { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 4px; border-radius: 17px; background: var(--field); font-size: 14px; }
+  .chip.plain { padding: 0 14px; }
+  .chip[aria-pressed='true'] { background: var(--accent); color: #fff; }
+  .tools { display: flex; flex: none; align-items: center; gap: 4px; padding: 6px 10px; border-top: 0.5px solid var(--line); }
+  .tools .ibtn { color: var(--accent); }
+  .tools .ibtn[aria-pressed='true'] { background: var(--accent-soft); }
+  .counter { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .counter.over { color: var(--danger); font-weight: 700; }
+  .swatches { display: flex; gap: 10px; padding: 10px 14px; overflow-x: auto; }
+  .swatch { flex: none; width: 34px; height: 34px; border: 3px solid transparent; border-radius: 50%; }
+  .swatch[aria-pressed='true'] { border-color: var(--fg); }
+  .swatch.none { display: grid; place-items: center; border: 1.5px solid var(--line); color: var(--muted); }
+  .poll-edit { display: grid; gap: 8px; margin: 4px 14px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+  .poll-edit input { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: none; }
+  .poll-edit input:focus { border-color: var(--accent); }
+  .poll-edit .row { display: flex; align-items: center; gap: 8px; }
+  .minis { display: flex; flex: 1; padding: 2px; border-radius: 9px; background: var(--field); }
+  .minis button { flex: 1; height: 30px; border-radius: 7px; font-size: 13px; }
+  .minis button[aria-pressed='true'] { background: var(--card); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); font-weight: 600; }
+
+  /* Profil */
+  .cover { height: 120px; }
+  .profile-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin: -40px 14px 0; }
+  .profile-top .av { border: 4px solid var(--bg); }
+  .profile-info { padding: 8px 14px 12px; }
+  .profile-info h2 { margin: 0; font-size: 21px; }
+  .profile-info .handle { color: var(--muted); }
+  .profile-info .bio { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .profile-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; color: var(--muted); font-size: 14px; }
+  .stats { display: flex; gap: 16px; margin-top: 10px; font-size: 14px; }
+  .stats button { color: var(--muted); }
+  .stats b { color: var(--fg); }
+  .follows-you { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--field); color: var(--muted); font-size: 12px; }
+
+  /* Listes (personnes, notifications, conversations, réglages) */
+  .person { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; text-align: left; }
+  .person + .person { border-top: 0.5px solid var(--line); }
+  .person .who { flex: 1; min-width: 0; }
+  .person .who b, .person .who span, .person .who p { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .person .who span { color: var(--muted); font-size: 14px; }
+  .person .who p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  .section { margin: 18px 14px 6px; font-size: 19px; font-weight: 800; }
+  .trend { display: block; width: 100%; padding: 10px 14px; text-align: left; }
+  .trend small { display: block; color: var(--muted); font-size: 13px; }
+  .trend b { font-size: 16px; }
+  .search { display: flex; flex: 1; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 19px; background: var(--field); color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--fg); font-size: 16px; }
+  .notif { display: flex; gap: 12px; width: 100%; padding: 12px 14px; border-bottom: 0.5px solid var(--line); text-align: left; }
+  .notif.unread { background: var(--accent-soft); }
+  .notif-icon { display: grid; flex: none; place-items: center; width: 32px; }
+  .notif-icon.like { color: var(--like); }
+  .notif-icon.repost { color: var(--repost); }
+  .notif-icon.follow, .notif-icon.reply, .notif-icon.mention { color: var(--accent); }
+  .notif-icon.poll { color: #ff9500; }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-body p { margin: 6px 0 0; }
+  .notif-body .excerpt { display: -webkit-box; overflow: hidden; color: var(--muted); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .notif-avs { display: flex; gap: 4px; }
+  .empty { display: grid; justify-items: center; gap: 6px; padding: 56px 32px; color: var(--muted); text-align: center; }
+  .empty b { color: var(--fg); font-size: 19px; }
+  .empty .pill-btn { margin-top: 10px; }
+  .more-btn { display: block; width: 100%; padding: 16px; color: var(--accent); }
+  .group { margin: 0 14px 22px; overflow: hidden; border-radius: 12px; background: var(--card); }
+  .group-title { margin: 22px 30px 6px; color: var(--muted); font-size: 13px; text-transform: uppercase; }
+  .group-foot { margin: -14px 30px 22px; color: var(--muted); font-size: 13px; }
+  .cell { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 0 16px; text-align: left; }
+  .cell + .cell::before { content: ''; position: absolute; top: 0; right: 0; left: 16px; border-top: 0.5px solid var(--line); }
+  .cell .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell input:not(.switch) { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: none; text-align: right; }
+  .cell textarea { flex: 1; min-height: 76px; padding: 12px 0; border: 0; outline: 0; background: none; resize: none; }
+  .cell.stack { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; }
+  .cell.danger { justify-content: center; color: var(--danger); }
+  .cell.accent { color: var(--accent); }
+  .switch { position: relative; flex: none; width: 51px; height: 31px; margin: 0 0 0 auto; border-radius: 16px; background: var(--field); cursor: pointer; transition: background 0.2s; appearance: none; -webkit-appearance: none; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); transition: transform 0.2s; }
+  .switch:checked { background: var(--ok); }
+  .switch:checked::after { transform: translateX(20px); }
+  #app[data-view='settings'] .scroll, #app[data-view='edit'] .scroll, #app[data-view='welcome'] .scroll { background: var(--group); }
+  .emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .emojis button { height: 38px; border-radius: 10px; font-size: 22px; }
+  .emojis button[aria-pressed='true'] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+  .colors { display: flex; flex-wrap: wrap; gap: 10px; }
+  .colors button { width: 30px; height: 30px; border: 3px solid transparent; border-radius: 50%; }
+  .colors button[aria-pressed='true'] { border-color: var(--fg); }
+  .covers { display: flex; gap: 8px; overflow-x: auto; }
+  .covers button { flex: none; width: 64px; height: 36px; border: 3px solid transparent; border-radius: 10px; }
+  .covers button[aria-pressed='true'] { border-color: var(--fg); }
+  .preview { display: grid; justify-items: center; gap: 8px; padding: 18px 0 8px; }
+
+  /* Accueil (première ouverture) */
+  .welcome { padding: 24px 0; text-align: center; }
+  .welcome-logo { display: grid; place-items: center; width: 84px; height: 84px; margin: 12px auto 16px; border-radius: 24px; background: linear-gradient(150deg, #af52de, #5856d6 55%, #007aff); color: #fff; font-size: 44px; font-weight: 800; box-shadow: 0 10px 28px rgba(88, 86, 214, 0.38); }
+  .welcome h1 { margin: 0 24px 8px; font-size: 28px; }
+  .welcome > p { margin: 0 30px 22px; color: var(--muted); }
+  .welcome .cell input { text-align: left; }
+  .welcome .cell > span:first-child { width: 92px; }
+  .error { min-height: 20px; margin: -12px 30px 12px; color: var(--danger); font-size: 14px; text-align: left; }
+  .primary { display: block; width: calc(100% - 28px); min-height: 50px; margin: 0 14px; border-radius: 25px; background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; }
+  .note { display: flex; gap: 10px; margin: 18px 14px; padding: 12px 14px; border-radius: 12px; background: var(--field); color: var(--muted); font-size: 13px; text-align: left; }
+  .note svg { color: var(--accent); }
+  .interests { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 14px 24px; }
+  .interests .chip { height: 40px; padding: 0 16px; font-size: 15px; }
+
+  /* Messages */
+  .bubbles { display: flex; flex-direction: column; gap: 4px; padding: 12px 12px 16px; }
+  .bubble { max-width: 78%; padding: 8px 12px; border-radius: 18px; background: var(--bubble); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bubble.me { align-self: flex-end; background: var(--accent); color: #fff; }
+  .bubble + .bubble.me, .bubble.me + .bubble:not(.me) { margin-top: 6px; }
+  .stamp { align-self: center; margin: 10px 0 4px; color: var(--muted); font-size: 12px; }
+  .typing { display: flex; gap: 4px; align-self: flex-start; padding: 12px 14px; border-radius: 18px; background: var(--bubble); }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: 0.2s; }
+  .typing i:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+
+  /* Feuille d'actions et message temporaire */
+  #sheet { position: fixed; inset: 0; z-index: 20; }
+  .sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); opacity: 0; transition: opacity 0.2s; }
+  .sheet-panel { position: absolute; right: 8px; bottom: 8px; left: 8px; display: grid; gap: 8px; max-height: 80%; transform: translateY(110%); transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  #sheet.open .sheet-backdrop { opacity: 1; }
+  #sheet.open .sheet-panel { transform: none; }
+  .sheet-group { overflow-y: auto; border-radius: 14px; background: var(--sheet); }
+  .sheet-title { padding: 12px 16px; border-bottom: 0.5px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; }
+  .sheet-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 54px; background: var(--sheet); color: var(--accent); font-size: 18px; }
+  .sheet-btn + .sheet-btn { border-top: 0.5px solid var(--line); }
+  .sheet-btn.danger { color: var(--danger); }
+  .sheet-btn.cancel { border-radius: 14px; font-weight: 600; }
+  .sheet-btn.person { justify-content: flex-start; padding: 0 16px; color: var(--fg); font-size: 16px; }
+  #snack { position: fixed; right: 12px; bottom: 70px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: rgba(44, 44, 46, 0.97); color: #fff; font-size: 15px; opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity 0.2s, transform 0.2s; }
+  #snack.show { opacity: 1; pointer-events: auto; transform: none; }
+  #snack span { flex: 1; }
+  #snack button { color: #a5a4ff; font-weight: 700; }
+</style>
+
+<div id="app"></div>
+<div id="sheet" hidden></div>
+<div id="snack" role="status"></div>
+
+<script>
+'use strict';
+const $app = document.getElementById('app');
+const $sheet = document.getElementById('sheet');
+const $snack = document.getElementById('snack');
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const MAX_TEXT = 500;
+const MAX_BIO = 160;
+const PAGE = 25;
+const KEEP_POSTS = 450; // publications de la communauté gardées (les vôtres le sont toutes)
+const KEEP_NOTIFS = 150;
+const KEEP_DM = 80;
+const HANDLE = /^[a-z0-9_.]{3,20}$/;
+const TAG_RE = /(^|[^\p{L}\p{N}_&])#([\p{L}\p{N}_]{2,40})/gu;
+const MENTION_RE = /(^|[^\p{L}\p{N}_.@])@([a-z0-9_.]{3,20})/giu;
+
+const COLORS = ['#5856d6', '#007aff', '#34c759', '#ff9500', '#ff2d55', '#af52de', '#5ac8fa', '#a2845e', '#ff3b30', '#30b0c7'];
+const EMOJIS = ['', '😀', '😎', '🤓', '🥳', '😺', '🦊', '🐼', '🦁', '🐙', '🦄', '🐝', '🌻', '🌈', '🌙', '⭐', '🔥', '🍀', '🎧', '🎨', '📚', '⚽', '🚀', '🍕'];
+const GRADIENTS = [
+  'linear-gradient(135deg, #5856d6, #af52de)',
+  'linear-gradient(135deg, #ff9500, #ff2d55)',
+  'linear-gradient(135deg, #34c759, #30b0c7)',
+  'linear-gradient(135deg, #007aff, #5ac8fa)',
+  'linear-gradient(135deg, #1c1c1e, #48484a)',
+  'linear-gradient(135deg, #ff2d55, #af52de 60%, #5856d6)',
+  'linear-gradient(135deg, #a2845e, #ff9500)',
+];
+const POLL_DURATIONS = [{ label: '1 h', ms: HOUR }, { label: '1 jour', ms: DAY }, { label: '3 jours', ms: 3 * DAY }];
+
+const ICONS = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  reply: '<path d="M4 12a8 8 0 1 1 3.3 6.5L3 20l1.4-4.1A8 8 0 0 1 4 12z"/>',
+  repost: '<path d="M7 4L4 7l3 3"/><path d="M4 7h11a4 4 0 0 1 4 4v1"/><path d="M17 20l3-3-3-3"/><path d="M20 17H9a4 4 0 0 1-4-4v-1"/>',
+  heart: '<path d="M12 20s-7-4.4-9.2-9A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 9.2 5c-2.2 4.6-9.2 9-9.2 9z"/>',
+  heartFill: '<path fill="currentColor" d="M12 20s-7-4.4-9.2-9A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 9.2 5c-2.2 4.6-9.2 9-9.2 9z"/>',
+  mark: '<path d="M6 4h12v17l-6-4-6 4z"/>',
+  markFill: '<path fill="currentColor" d="M6 4h12v17l-6-4-6 4z"/>',
+  send: '<path d="M21 3L10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  poll: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1.1-1.6-1.1-2.7 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
+  quote: '<path d="M7 17c-2 0-3-1.5-3-3.5C4 10 6 7 9 6M17 17c-2 0-3-1.5-3-3.5 0-3.5 2-6.5 5-7.5"/>',
+  pin: '<path d="M9 3h6l-1 6 4 4H6l4-4z"/><path d="M12 13v8"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  mute: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6M21 9l-4 6"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+  hash: '<path d="M9 3L7 21M17 3l-2 18M4 8h17M3 16h17"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  userPlus: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M19 8v6M16 11h6"/>',
+};
+const icon = (name, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+// ───────────── Communauté de démonstration ─────────────
+// Les membres ci-dessous n'existent que dans Agora, sur cet appareil : ils publient de
+// temps en temps, réagissent à vos publications et répondent à vos messages.
+
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const between = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const chance = (p) => Math.random() < p;
+
+const PEOPLE = [
+  {
+    handle: 'agora', name: 'Équipe Agora', emoji: '🏛️', color: '#5856d6', cover: 0, base: 1204, since: '2026-01-12',
+    bio: 'Le compte d\'Agora : astuces, nouveautés et bonne humeur. Agora fonctionne sur votre appareil, sans Internet.',
+    interests: [],
+    posts: [
+      'Bienvenue sur Agora ! 👋 Publiez ce qui vous passe par la tête, suivez les personnes qui vous inspirent et touchez deux fois une publication pour l\'aimer. #bienvenue',
+      'Astuce : ajoutez un sondage à votre publication avec le bouton « Sondage » de l\'éditeur. Parfait pour départager vos amis. #astuce',
+      'Astuce : les mots-dièse relient les publications d\'un même sujet. Touchez #astuce pour toutes les retrouver. #astuce',
+      'Astuce : un mot vous agace ? Masquez-le dans Réglages → Mots masqués, il disparaît de votre fil. #astuce',
+      'Vos publications ne quittent jamais votre appareil : Agora n\'a pas accès à Internet. #vieprivée',
+      'Astuce : touchez « Partager » puis « Citer » pour ajouter votre avis à la publication de quelqu\'un. #astuce',
+    ],
+    replies: ['Merci d\'utiliser Agora ! 💜', 'Belle publication 👏', 'On adore 💜'],
+    answers: ['Bonne question ! Les réglages sont dans votre profil, en haut à droite.', 'Tout reste sur votre appareil, promis 🙂'],
+    dm: ['Merci pour votre message ! L\'équipe Agora vous répondra… enfin, c\'est déjà fait 😄', 'Une idée pour Agora ? Publiez-la avec #idée !'],
+    daily: () => `Astuce du jour : ${pick(['épinglez votre meilleure publication sur votre profil', 'enregistrez une publication pour la relire plus tard', 'changez la couverture de votre profil', 'mentionnez quelqu\'un avec @ pour lui répondre directement', 'touchez une tendance dans Explorer'])}. #astuce`,
+  },
+  {
+    handle: 'lea.photo', name: 'Léa Martin', emoji: '📷', color: '#ff9500', cover: 1, base: 3812, since: '2025-03-02',
+    bio: 'Photographe à Lyon. La lumière du matin, toujours.', place: 'Lyon',
+    interests: ['photo', 'voyage'],
+    posts: [
+      'Lever de soleil sur Fourvière ce matin, le ciel était rose fuchsia. Je ne m\'en lasse pas. #lyon #photo',
+      'Petit conseil photo : attendez l\'heure bleue, juste après le coucher du soleil. Tout devient doux. #photo #astuce',
+      'Retour de Lisbonne avec 2 000 photos à trier… quelqu\'un a un week-end à me prêter ? 😅 #voyage',
+      'Les quais de Saône sous la pluie, c\'est sous-estimé. #lyon #photo',
+      'Question du jour : argentique ou numérique ? Je reste fidèle à mon vieux Nikon. #photo',
+      'Exposition terminée ! Merci à toutes les personnes venues ce week-end 🙏 #photo',
+    ],
+    replies: ['Magnifique 😍', 'Ça me donne envie de sortir mon appareil photo 📷', 'J\'adore cette idée !', 'Tellement vrai !'],
+    answers: ['Pour moi, c\'est la lumière qui fait tout. Le reste suit !', 'Je dirais : essaie, et garde ce qui te plaît 🙂'],
+    dm: ['Je prépare une sortie photo samedi matin, ça te dit ?', 'Haha, je te raconte tout ça bientôt !', 'Je t\'envoie mes meilleures adresses à Lyon 📷'],
+    daily: () => `Photo du jour : ${pick(['un chat sur un toit', 'la brume sur la Saône', 'un vieux tramway', 'des reflets après l\'averse', 'un marché aux fleurs', 'la tour Métallique au crépuscule'])}, ${pick(['à la lumière dorée', 'en noir et blanc', 'au 50 mm', 'à main levée'])}. #photo`,
+  },
+  {
+    handle: 'hugo.code', name: 'Hugo Bernard', emoji: '💻', color: '#007aff', cover: 3, base: 2240, since: '2025-06-18',
+    bio: 'Développeur web. Je casse des choses en production pour que vous n\'ayez pas à le faire.', place: 'Nantes',
+    interests: ['code', 'orion'],
+    posts: [
+      'Mon app tourne sur Orion en dix minutes : un fichier HTML, le SDK orion, et hop, publiée sur le Store. #orion #code',
+      'Rappel amical : il n\'y a pas de petit test. Il n\'y a que des bugs qui attendent. #code',
+      'Café ☕ + bug introuvable depuis deux heures = une faute de frappe. Comme d\'habitude. #code',
+      'Ce soir je découvre le sélecteur CSS :has(). Je crois que je suis amoureux. #css #code',
+      'Le meilleur raccourci clavier de l\'histoire : Ctrl+Z. Je ne vois pas de débat possible. #code',
+    ],
+    replies: ['Bien vu 👌', 'Je confirme, vécu la semaine dernière 😂', 'Intéressant, je n\'y avais pas pensé !', '+1'],
+    answers: ['Commence petit, teste souvent, et lis les messages d\'erreur jusqu\'au bout 😉', 'Ça dépend… (la réponse préférée des développeurs)'],
+    dm: ['Yo ! Tu codes quelque chose en ce moment ?', 'Si tu veux, je relis ton code ce soir 🙂', 'Le SDK orion est vraiment simple, tu vas voir.'],
+    daily: () => `Aujourd'hui j'ai appris ${pick(['que structuredClone existe', 'à me méfier des dates en JavaScript', 'que les sélecteurs :is() simplifient tout', 'à écrire mes tests avant le code', 'que « ça marche chez moi » n\'est pas un argument'])}. #code`,
+  },
+  {
+    handle: 'chef.amina', name: 'Amina Diallo', emoji: '🍲', color: '#34c759', cover: 2, base: 5120, since: '2025-01-21',
+    bio: 'Cheffe à domicile. Recettes simples, épices généreuses.', place: 'Marseille',
+    interests: ['cuisine'],
+    posts: [
+      'Ce soir : mafé au poulet, riz parfumé et beaucoup d\'amour. La recette arrive demain ! #cuisine #recette',
+      'Astuce cuisine : un filet de citron à la fin, et votre soupe change de vie. #cuisine #astuce',
+      'Marché du dimanche : les premières fraises sont là 🍓 #cuisine',
+      'Recette express : pâtes, ail, huile d\'olive, piment, persil. Dix minutes, zéro regret. #recette',
+      'Gâteau au yaourt sans balance : on mesure tout avec le pot ! Qui veut la recette ? #recette #pâtisserie',
+    ],
+    replies: ['Miam 😋', 'Je note !', 'Ça a l\'air délicieux', 'Il faut absolument goûter ça'],
+    answers: ['Le secret, c\'est de goûter à chaque étape 😉', 'Un peu de citron et d\'herbes fraîches, et le tour est joué !'],
+    dm: ['Avec plaisir ! Je t\'écris la recette ce soir 🍲', 'Tu cuisines quoi en ce moment ?', 'Viens goûter un jour, il y en a toujours pour un de plus 😄'],
+    daily: () => `Au menu ce soir : ${pick(['tajine de légumes', 'poulet yassa', 'soupe de lentilles corail', 'gratin de courge', 'curry de pois chiches', 'tarte aux poireaux'])}. ${pick(['Simple et réconfortant.', 'Recette demain !', 'Les épices font tout.'])} #cuisine`,
+  },
+  {
+    handle: 'rando.paul', name: 'Paul Lefèvre', emoji: '🥾', color: '#a2845e', cover: 6, base: 980, since: '2025-08-04',
+    bio: 'Randonneur du dimanche (et du samedi). Alpes, Vosges, Jura.', place: 'Annecy',
+    interests: ['rando', 'nature'],
+    posts: [
+      '1 400 m de dénivelé, des jambes en coton et une vue à couper le souffle sur le Mont-Blanc. Ça valait le coup. #rando #montagne',
+      'Conseil du jour : partez toujours avec plus d\'eau que prévu. Toujours. #rando',
+      'Bivouac sous les étoiles au col de la Croix, silence total. #montagne',
+      'Quelqu\'un connaît un beau sentier dans le Jura pour ce week-end ? #rando',
+      'Les marmottes étaient de sortie aujourd\'hui 🐾 #montagne #nature',
+    ],
+    replies: ['Superbe sortie !', 'Ça donne envie de partir marcher 🥾', 'La montagne, ça vous gagne', 'Bravo !'],
+    answers: ['Le sentier des cascades du Hérisson, dans le Jura, est magnifique !', 'De bonnes chaussures et une bonne météo, c\'est tout ce qu\'il faut.'],
+    dm: ['Salut ! Je pars en rando dimanche, tu veux te joindre à nous ?', 'Pense à prendre de l\'eau 😄', 'Je t\'envoie la trace du parcours !'],
+    daily: () => `Sortie du jour : ${pick(['lac d\'Annecy par le Semnoz', 'tour du Parmelan', 'crêtes des Vosges', 'forêt de la Joux', 'col de la Forclaz'])}, ${between(8, 22)} km et ${between(4, 14) * 100} m de dénivelé. ${pick(['Grand soleil !', 'Brouillard magique.', 'Les mollets s\'en souviennent.'])} #rando`,
+  },
+  {
+    handle: 'nina.lit', name: 'Nina Rossi', emoji: '📚', color: '#ff2d55', cover: 5, base: 1655, since: '2025-04-30',
+    bio: 'Libraire. Je lis trop, j\'en achète encore plus.', place: 'Bordeaux',
+    interests: ['lecture'],
+    posts: [
+      'Fini « L\'Élégance du hérisson » cette nuit. Je ne m\'en remets pas. #lecture',
+      'Club de lecture jeudi : on parle de Colette ! Qui vient ? #lecture #livres',
+      'Pile à lire : 47 livres. Achats cette semaine : 3. Tout va bien. 📚 #livres',
+      'Le meilleur marque-page reste un ticket de métro, je ne discuterai pas. #lecture',
+      'Recommandez-moi un roman qui fait du bien, j\'en ai besoin. #lecture',
+    ],
+    replies: ['Quel beau message 📚', 'Je l\'ajoute à ma pile !', 'Oh, j\'adore', 'Tellement d\'accord'],
+    answers: ['« La Tresse » de Laetitia Colombani, sans hésiter !', 'Je conseille toujours « Le Petit Prince » : il dit tout.'],
+    dm: ['Coucou ! Tu lis quoi en ce moment ?', 'Passe à la librairie, je te mets un livre de côté 📚', 'J\'ai une recommandation parfaite pour toi.'],
+    daily: () => `En ce moment je lis « ${pick(['Les Misérables', 'Bonjour tristesse', 'L\'Étranger', 'Le Comte de Monte-Cristo', 'La Promesse de l\'aube', 'Vingt mille lieues sous les mers'])} ». ${pick(['Je dévore.', 'Quelle plume !', 'Lecture parfaite pour un dimanche.'])} #lecture`,
+  },
+  {
+    handle: 'tom.ciel', name: 'Tom Garnier', emoji: '🔭', color: '#30b0c7', cover: 4, base: 870, since: '2025-10-09',
+    bio: 'Astronome amateur. La nuit, je regarde en l\'air.', place: 'Clermont-Ferrand',
+    interests: ['astronomie'],
+    posts: [
+      'La constellation d\'Orion est bien visible ce soir vers le sud. Cherchez les trois étoiles alignées de la ceinture ! #astronomie #orion',
+      'Saturne et ses anneaux au télescope : chaque fois, la même émotion. #astronomie',
+      'Pluie d\'étoiles filantes ce week-end : éloignez-vous des lumières de la ville ✨ #ciel',
+      'Bételgeuse est une supergéante rouge : à la place du Soleil, elle avalerait l\'orbite de Mars. #astronomie',
+      'Ciel couvert, encore. Les astronomes amateurs sont des gens patients. #ciel',
+    ],
+    replies: ['Fascinant ✨', 'Il faudra lever les yeux ce soir !', 'L\'univers est fou', 'Belle observation !'],
+    answers: ['Une simple paire de jumelles suffit pour commencer !', 'Le meilleur moment, c\'est une nuit sans lune, loin des villes.'],
+    dm: ['Salut ! Ce soir le ciel sera dégagé, regarde vers le sud 🔭', 'Tu as déjà vu Saturne au télescope ? Il faut absolument !', 'Je t\'explique comment trouver Orion 😉'],
+    daily: () => `Ce soir dans le ciel : ${pick(['Jupiter et ses lunes', 'la Lune gibbeuse', 'les Pléiades', 'Vénus juste après le coucher du soleil', 'la galaxie d\'Andromède aux jumelles', 'la ceinture d\'Orion'])}. ${pick(['Ouvrez l\'œil !', 'Ciel dégagé annoncé ✨', 'Prenez une couverture.'])} #astronomie`,
+  },
+  {
+    handle: 'sarah.run', name: 'Sarah Cohen', emoji: '🏃‍♀️', color: '#af52de', cover: 5, base: 2390, since: '2025-02-14',
+    bio: 'Coureuse, kiné, optimiste. 10 km avant le café.', place: 'Paris',
+    interests: ['sport'],
+    posts: [
+      '10 km ce matin en 52 minutes, record personnel ! 🎉 #running',
+      'Rappel de kiné : on s\'étire après la course, en douceur. #santé #running',
+      'Semi-marathon dans trois semaines, le stress monte… #running',
+      'Courir sous la pluie : 10 % de souffrance, 90 % de fierté. #running',
+      'Qui court le dimanche matin au parc ? On pourrait faire un groupe ! #running',
+    ],
+    replies: ['Bravo 👏', 'Quelle motivation !', 'Ça donne envie de chausser les baskets 👟', 'Allez, on lâche rien !'],
+    answers: ['Commence doucement : courir lentement, c\'est déjà courir !', 'Hydratation, sommeil et régularité : le trio gagnant.'],
+    dm: ['Hello ! On court ensemble dimanche ?', 'Petit conseil de kiné : n\'oublie pas les étirements 😉', 'Tu prépares une course ?'],
+    daily: () => `${between(5, 15)} km ce matin, ${pick(['sous un grand soleil', 'dans le brouillard', 'au bord de la Seine', 'avec le club', 'en écoutant un podcast'])}. ${pick(['La forme !', 'Café mérité ☕', 'Les jambes piquent un peu.'])} #running`,
+  },
+  {
+    handle: 'jules.son', name: 'Jules Moreau', emoji: '🎸', color: '#ff3b30', cover: 1, base: 3074, since: '2025-05-27',
+    bio: 'Guitariste. Concerts, vinyles et mauvais jeux de mots.', place: 'Lille',
+    interests: ['musique'],
+    posts: [
+      'Nouvelle chanson terminée cette nuit. Trois accords et beaucoup de cœur. #musique',
+      'Le vinyle du jour : « Kind of Blue », Miles Davis. Indémodable. #musique',
+      'Concert vendredi au Grand Mix, venez nombreux ! 🎶 #concert',
+      'Accorder sa guitare, c\'est la moitié de la vie d\'un guitariste. L\'autre moitié, c\'est la réaccorder. #musique',
+      'Quelle chanson vous met de bonne humeur à coup sûr ? #musique',
+    ],
+    replies: ['Ça sonne bien 🎶', 'J\'adore !', 'Excellent choix musical 🎸', 'Haha, excellent 😄'],
+    answers: ['« Here Comes the Sun », à tous les coups ☀️', 'Le plus important, c\'est de jouer tous les jours, même dix minutes.'],
+    dm: ['Salut ! Tu viens au concert vendredi ? 🎸', 'Je t\'envoie une playlist, tu m\'en diras des nouvelles', 'On pourrait jouer ensemble un jour !'],
+    daily: () => `Le vinyle du jour : « ${pick(['Abbey Road', 'Rumours', 'Random Access Memories', 'L\'Homme à tête de chou', 'Back in Black', 'Blue', 'Melody Nelson'])} ». ${pick(['Indémodable.', 'À écouter en entier.', 'Face B, surtout.'])} #musique`,
+  },
+];
+const PERSON = new Map(PEOPLE.map((p) => [p.handle, p]));
+const INTERESTS = [
+  { id: 'photo', label: '📷 Photo', who: ['lea.photo'] },
+  { id: 'code', label: '💻 Code', who: ['hugo.code'] },
+  { id: 'cuisine', label: '🍲 Cuisine', who: ['chef.amina'] },
+  { id: 'rando', label: '🥾 Randonnée', who: ['rando.paul'] },
+  { id: 'lecture', label: '📚 Lecture', who: ['nina.lit'] },
+  { id: 'astronomie', label: '🔭 Astronomie', who: ['tom.ciel'] },
+  { id: 'sport', label: '🏃 Sport', who: ['sarah.run'] },
+  { id: 'musique', label: '🎸 Musique', who: ['jules.son'] },
+];
+/** Sujets reconnus dans vos publications : le membre concerné y répond. */
+const TOPICS = [
+  { re: /photo|appareil|lumi[eè]re|coucher de soleil|paysage|voyage/i, who: 'lea.photo' },
+  { re: /\bcode|bug|javascript|css|html|d[ée]velopp|orion|\bapp\b|ordinateur/i, who: 'hugo.code' },
+  { re: /cuisin|recette|manger|d[îi]ner|d[ée]jeuner|repas|g[âa]teau|faim|miam/i, who: 'chef.amina' },
+  { re: /rando|montagne|marche|balade|sentier|nature|for[êe]t/i, who: 'rando.paul' },
+  { re: /livre|\blire\b|lecture|roman|biblioth[eè]que/i, who: 'nina.lit' },
+  { re: /ciel|[ée]toile|lune|plan[eè]te|astro|nuit/i, who: 'tom.ciel' },
+  { re: /cours[eu]|courir|sport|running|footing|v[ée]lo|fatigu|muscu/i, who: 'sarah.run' },
+  { re: /musique|chanson|concert|guitare|[ée]cout|album|playlist/i, who: 'jules.son' },
+];
+/** Sondages de la communauté (on peut y voter). */
+const POLLS = [
+  { who: 'hugo.code', text: 'Le grand débat : espaces ou tabulations ? #code', options: ['Espaces', 'Tabulations', 'Les deux (le chaos)'] },
+  { who: 'nina.lit', text: 'Vous lisez plutôt… #lecture', options: ['Papier', 'Liseuse', 'Livres audio'] },
+  { who: 'chef.amina', text: 'Le meilleur dessert de tous les temps ? #cuisine', options: ['Tarte au citron', 'Mousse au chocolat', 'Crème brûlée', 'Tiramisu'] },
+];
+const CHEERS = ['Super ! 😊', 'Bien dit !', 'J\'adore 💜', 'Tellement vrai', 'Merci pour le partage 🙏', 'Haha 😄', 'Je suis bien d\'accord'];
+
+// ───────────── État ─────────────
+
+const DEFAULT_SETTINGS = { simulate: true, notify: { like: true, reply: true, follow: true, repost: true, mention: true, dm: true, poll: true }, background: true, mutedWords: [], mutedUsers: [], hiddenPosts: [] };
+const state = {
+  profile: null, // { name, handle, bio, emoji, color, cover, place, since, pinned }
+  posts: [], // { id, author, text, at, likes, liked, reposts, reposted, replyTo, repostOf, quoteOf, bg, poll, edited }
+  follows: [], // membres que vous suivez
+  followers: [], // membres qui vous suivent
+  notifs: [], // { id, kind, actors, post, text, at, read }
+  dms: {}, // membre → [{ me, text, at }]
+  dmRead: {}, // membre → date du dernier message lu
+  bookmarks: [],
+  settings: structuredClone(DEFAULT_SETTINGS),
+  sim: { queue: [], ambientAt: 0, lastRun: 0, cursor: {} }, // activité de la communauté (voir plus bas)
+  draft: null,
+};
+const ui = { tab: 'home', view: 'loading', params: {}, feed: 'following', shown: PAGE, fresh: 0, query: '', typing: new Set(), profileTab: 'posts' };
+const stack = [];
+let paused = false;
+
+// ───────────── Outils ─────────────
+
+const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const fold = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+let serial = 0;
+const newId = () => Date.now().toString(36) + (serial++ % 1296).toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 7);
+const me = () => state.profile?.handle;
+const isMe = (handle) => Boolean(handle) && handle === me();
+const person = (handle) => (isMe(handle) ? { ...state.profile, me: true } : PERSON.get(handle) || null);
+const nameOf = (handle) => person(handle)?.name || `@${handle}`;
+const firstName = () => state.profile.name.split(/\s+/)[0];
+const shuffle = (list) => list.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+
+function compact(n) {
+  n = Math.max(0, Math.round(n || 0));
+  if (n < 10_000) return n.toLocaleString('fr-FR');
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 100_000 ? 1 : 0).replace('.', ',').replace(/,0$/, '')} k`;
+  return `${(n / 1_000_000).toFixed(1).replace('.', ',').replace(/,0$/, '')} M`;
+}
+
+function ago(ts) {
+  const d = Date.now() - ts;
+  if (d < 45_000) return 'à l\'instant';
+  if (d < HOUR) return `${Math.max(1, Math.round(d / MINUTE))} min`;
+  if (d < DAY) return `${Math.round(d / HOUR)} h`;
+  if (d < 7 * DAY) return `${Math.round(d / DAY)} j`;
+  const date = new Date(ts);
+  return date.toLocaleDateString('fr-FR', date.getFullYear() === new Date().getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+}
+const fullDate = (ts) => `${new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+const since = (date) => new Date(date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+const avatar = (handle, px = 40) => avatarOf(person(handle), px);
+function avatarOf(p, px = 40) {
+  p ||= { name: '?', color: '#8e8e93' };
+  const box = `width:${px}px;height:${px}px`;
+  if (p.emoji) return `<span class="av emoji" style="${box};font-size:${Math.round(px * 0.56)}px;background:${p.color}2e">${p.emoji}</span>`;
+  const initials = (p.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  return `<span class="av" style="${box};font-size:${Math.round(px * 0.4)}px;background:${p.color}">${esc(initials)}</span>`;
+}
+const badge = (handle) => (PERSON.has(handle) ? '<span class="demo" title="Membre de démonstration">démo</span>' : '');
+
+/** Texte d'une publication : mots-dièse et mentions cliquables. */
+function rich(text) {
+  return esc(text)
+    .replace(TAG_RE, (all, before, tag) => `${before}<a data-act="tag" data-tag="${esc(fold(tag))}">#${tag}</a>`)
+    .replace(MENTION_RE, (all, before, raw) => {
+      const handle = raw.toLowerCase().replace(/\.+$/, '');
+      if (!person(handle)) return all;
+      return `${before}<a data-act="profile" data-user="${handle}">@${raw.slice(0, handle.length)}</a>${raw.slice(handle.length)}`;
+    });
+}
+const tagsOf = (text) => [...String(text || '').matchAll(TAG_RE)].map((m) => fold(m[2]));
+const mentionsOf = (text) => [...new Set([...String(text || '').matchAll(MENTION_RE)].map((m) => m[2].toLowerCase().replace(/\.+$/, '')))].filter((h) => person(h));
+
+// ───────────── Données gardées par l'app ─────────────
+
+const dirty = new Set();
+let saveTimer = 0;
+let saving = Promise.resolve();
+/** Enregistre (un peu plus tard, en une fois) des clés de l'état. */
+function save(...keys) {
+  keys.forEach((key) => dirty.add(key));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 400);
+}
+function flush(retry = true) {
+  clearTimeout(saveTimer);
+  const keys = [...dirty];
+  dirty.clear();
+  if (keys.includes('posts')) prune();
+  let full = false;
+  for (const key of keys) {
+    saving = saving.then(() => orion.storage.set(key, state[key])).catch((error) => {
+      if (/plein/i.test(error.message)) full = true;
+      else snack(error.message);
+    });
+  }
+  saving = saving.then(() => {
+    if (!full) return;
+    if (!retry) return void snack('Espace de stockage plein : supprimez quelques publications');
+    // 1 Mo par app : on oublie les plus anciennes publications de la communauté, puis on réessaie.
+    prune(true);
+    keys.forEach((key) => dirty.add(key));
+    dirty.add('posts').add('notifs');
+    snack('Espace presque plein : les plus anciennes publications de la communauté ont été retirées');
+    setTimeout(() => flush(false));
+  });
+  return saving;
+}
+
+let index = null; // id → publication
+let replyCounts = null; // id → nombre de réponses
+function changed() {
+  index = null;
+  replyCounts = null;
+}
+function find(id) {
+  if (!id) return null;
+  index ??= new Map(state.posts.map((p) => [p.id, p]));
+  return index.get(id) || null;
+}
+function repliesTo(id) {
+  if (!replyCounts) {
+    replyCounts = new Map();
+    for (const p of state.posts) if (p.replyTo && !hidden(p)) replyCounts.set(p.replyTo, (replyCounts.get(p.replyTo) || 0) + 1);
+  }
+  return replyCounts.get(id) || 0;
+}
+
+/** Garde toutes vos publications et ce qu'elles citent ; seulement les plus récentes de la communauté. */
+function prune(harder = false) {
+  const keep = harder ? KEEP_POSTS / 3 : KEEP_POSTS;
+  const kept = new Set([...state.bookmarks, state.profile?.pinned]);
+  for (const p of state.posts) if (isMe(p.author)) [p.id, p.replyTo, p.quoteOf, p.repostOf].forEach((id) => id && kept.add(id));
+  const others = state.posts.filter((p) => !kept.has(p.id)).sort((a, b) => b.at - a.at);
+  const drop = new Set(others.slice(keep).map((p) => p.id));
+  if (drop.size) {
+    state.posts = state.posts.filter((p) => !drop.has(p.id) && (isMe(p.author) || !(drop.has(p.replyTo) || drop.has(p.repostOf))));
+    changed();
+  }
+  if (harder) state.notifs.length = Math.min(state.notifs.length, 40);
+}
+
+// ───────────── Fil, discussions, profils ─────────────
+
+function hidden(p) {
+  const s = state.settings;
+  if (s.mutedUsers.includes(p.author) || s.hiddenPosts.includes(p.id)) return true;
+  if (s.mutedWords.length && !isMe(p.author)) {
+    const text = fold(p.text);
+    if (s.mutedWords.some((w) => text.includes(fold(w)))) return true;
+  }
+  const shared = p.repostOf && find(p.repostOf);
+  return Boolean(p.repostOf) && (!shared || hidden(shared));
+}
+const original = (entry) => (entry.repostOf ? find(entry.repostOf) : entry);
+
+function feed(kind) {
+  const follows = new Set(state.follows);
+  const seen = new Set();
+  return state.posts
+    .filter((p) => !p.replyTo && !hidden(p) && (kind === 'foryou' ? !p.repostOf : isMe(p.author) || follows.has(p.author)))
+    .sort((a, b) => b.at - a.at)
+    .filter((p) => {
+      // Une publication partagée n'apparaît qu'une fois, à sa place la plus récente.
+      const id = p.repostOf || p.id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+}
+const thread = (id) => state.posts.filter((p) => p.replyTo === id && !hidden(p)).sort((a, b) => a.at - b.at);
+function ancestors(post) {
+  const chain = [];
+  for (let p = find(post.replyTo); p && chain.length < 8; p = find(p.replyTo)) chain.unshift(p);
+  return chain;
+}
+const postsBy = (handle) => state.posts.filter((p) => p.author === handle && !p.replyTo && !hidden(p)).sort((a, b) => b.at - a.at);
+const repliesBy = (handle) => state.posts.filter((p) => p.author === handle && p.replyTo && !hidden(p)).sort((a, b) => b.at - a.at);
+// Les membres de démonstration ont aussi publié avant votre arrivée (et ailleurs que sur cet appareil).
+const postCount = (handle) => state.posts.filter((p) => p.author === handle && !p.repostOf).length + (PERSON.has(handle) ? Math.round(PERSON.get(handle).base / 12) : 0);
+const followerCount = (handle) => (isMe(handle) ? state.followers.length : PERSON.get(handle).base + (state.follows.includes(handle) ? 1 : 0));
+const followingCount = (handle) => (isMe(handle) ? state.follows.length : 80 + (PERSON.get(handle).base % 260));
+const followsMe = (handle) => state.followers.includes(handle);
+
+/** Tendances : mots-dièse des trois derniers jours. */
+function trends() {
+  const counts = new Map();
+  const since = Date.now() - 3 * DAY;
+  for (const p of state.posts) if (p.at > since && !p.repostOf && !hidden(p)) for (const tag of new Set(tagsOf(p.text))) counts.set(tag, (counts.get(tag) || 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 6);
+}
+
+function search(query) {
+  const q = fold(query.trim().replace(/^[@#]/, ''));
+  if (!q) return null;
+  const people = [...PEOPLE.map((p) => p.handle), me()].filter((h) => {
+    const p = person(h);
+    return fold(`${p.name} ${h} ${p.bio || ''}`).includes(q);
+  });
+  const tags = [...new Set(state.posts.flatMap((p) => tagsOf(p.text)))].filter((t) => t.includes(q)).slice(0, 5);
+  const posts = state.posts.filter((p) => !p.repostOf && !hidden(p) && fold(`${p.text} ${p.poll ? p.poll.options.map((o) => o.text).join(' ') : ''}`).includes(q)).sort((a, b) => b.at - a.at);
+  return { people, tags, posts };
+}
+
+// ───────────── Notifications ─────────────
+
+const NOTIF_TEXT = {
+  like: (who) => `${who} ${who.includes(' et ') ? 'ont' : 'a'} aimé votre publication`,
+  repost: (who) => `${who} ${who.includes(' et ') ? 'ont' : 'a'} partagé votre publication`,
+  reply: (who) => `${who} ${who.includes(' et ') ? 'ont' : 'a'} répondu`,
+  mention: (who) => `${who} ${who.includes(' et ') ? 'ont' : 'a'} parlé de vous`,
+  follow: (who) => `${who} ${who.includes(' et ') ? 'vous suivent' : 'vous suit'} désormais`,
+  poll: () => 'Votre sondage est terminé',
+  vote: (who) => `${who} ${who.includes(' et ') ? 'ont' : 'a'} voté à votre sondage`,
+};
+const NOTIF_ICON = { like: 'heartFill', repost: 'repost', reply: 'reply', mention: 'reply', follow: 'userPlus', poll: 'poll', vote: 'poll' };
+function whoText(actors) {
+  const names = actors.map(nameOf);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} et ${names[1]}`;
+  return `${names[0]} et ${names.length - 1} autres personnes`;
+}
+
+/** Ajoute une notification, ou regroupe avec la précédente du même genre (« Léa et 2 autres… »). */
+function notify(kind, actor, post = null, text = '') {
+  const now = Date.now();
+  const group = ['like', 'repost', 'follow', 'vote'].includes(kind) && state.notifs.find((n) => !n.read && n.kind === kind && n.post === post && now - n.at < 6 * HOUR);
+  if (group) {
+    group.actors = [actor, ...group.actors.filter((a) => a !== actor)].slice(0, 12);
+    group.at = now;
+    state.notifs.sort((a, b) => b.at - a.at);
+  } else {
+    state.notifs.unshift({ id: newId(), kind, actors: actor ? [actor] : [], post, text, at: now, read: false });
+    state.notifs.length = Math.min(state.notifs.length, KEEP_NOTIFS);
+  }
+  save('notifs');
+  return { kind, actor, post, text };
+}
+const unreadNotifs = () => state.notifs.filter((n) => !n.read).length;
+const unreadDms = () => Object.keys(state.dms).filter((h) => state.dms[h].some((m) => !m.me && m.at > (state.dmRead[h] || 0))).length;
+
+// ───────────── Communauté de démonstration ─────────────
+// Activité planifiée (réactions à vos publications, réponses, abonnements) dans
+// state.sim.queue, et publications « spontanées » de temps en temps tant qu'Agora
+// est ouverte (rattrapées en partie à la réouverture). Une seule minuterie, à la
+// prochaine échéance : rien ne tourne pour rien.
+
+let simTimer = 0;
+const simOn = () => Boolean(state.profile) && state.settings.simulate;
+
+function plan(delayMs, event) {
+  if (!simOn()) return;
+  state.sim.queue.push({ at: Date.now() + delayMs, ...event });
+  state.sim.queue.sort((a, b) => a.at - b.at);
+  save('sim');
+  arm();
+}
+function arm() {
+  clearTimeout(simTimer);
+  if (!simOn()) return;
+  const next = Math.min(state.sim.queue[0]?.at ?? Infinity, paused ? Infinity : state.sim.ambientAt || Infinity);
+  if (Number.isFinite(next)) simTimer = setTimeout(tick, Math.min(Math.max(0, next - Date.now()) + 40, 2 ** 31 - 1));
+}
+function tick() {
+  if (!simOn()) return;
+  const now = Date.now();
+  const fresh = [];
+  while (state.sim.queue.length && state.sim.queue[0].at <= now) apply(state.sim.queue.shift(), fresh);
+  if (!paused && state.sim.ambientAt && state.sim.ambientAt <= now) {
+    ambient(now, fresh);
+    state.sim.ambientAt = now + between(60, 130) * 1000;
+  }
+  state.sim.lastRun = now;
+  save('sim');
+  if (fresh.length) announce(fresh);
+  arm();
+}
+/** À l'ouverture : quelques publications pendant l'absence (une par quart d'heure, six au plus). */
+function catchUp() {
+  if (!simOn()) return;
+  const now = Date.now();
+  const last = state.sim.lastRun || now;
+  const missed = Math.min(6, Math.floor((now - last) / (15 * MINUTE)));
+  for (let i = 1; i <= missed; i++) ambientPost(last + (i * (now - last)) / (missed + 1));
+  if (missed) save('posts');
+  state.sim.ambientAt = now + between(35, 80) * 1000;
+  tick();
+}
+
+function apply(event, fresh) {
+  const post = find(event.post);
+  const actor = event.actor;
+  switch (event.type) {
+    case 'like':
+      if (!post || post.likedBy?.includes(actor)) return;
+      post.likes = (post.likes || 0) + 1;
+      post.likedBy = [actor, ...(post.likedBy || [])].slice(0, 30);
+      save('posts');
+      if (isMe(post.author)) fresh.push(notify('like', actor, post.id));
+      return;
+    case 'repost':
+      if (!post || state.posts.some((p) => p.author === actor && p.repostOf === post.id)) return;
+      post.reposts = (post.reposts || 0) + 1;
+      state.posts.push({ id: newId(), author: actor, repostOf: post.id, text: '', at: Date.now() });
+      changed();
+      save('posts');
+      if (isMe(post.author)) fresh.push(notify('repost', actor, post.id));
+      return;
+    case 'reply': {
+      if (!post) return;
+      const reply = { id: newId(), author: actor, text: event.text, at: Date.now(), likes: 0, reposts: 0, replyTo: post.id };
+      state.posts.push(reply);
+      changed();
+      save('posts');
+      if (isMe(post.author)) fresh.push(notify('reply', actor, reply.id, event.text));
+      else if (mentionsOf(event.text).includes(me())) fresh.push(notify('mention', actor, reply.id, event.text));
+      return;
+    }
+    case 'follow':
+      if (state.followers.includes(actor)) return;
+      state.followers.push(actor);
+      save('followers');
+      fresh.push(notify('follow', actor));
+      return;
+    case 'vote': {
+      if (!post?.poll || Date.now() > post.poll.ends) return;
+      post.poll.options[event.option].votes++;
+      save('posts');
+      if (isMe(post.author)) fresh.push(notify('vote', actor, post.id));
+      return;
+    }
+    case 'pollEnd':
+      if (post?.poll && isMe(post.author)) fresh.push(notify('poll', null, post.id));
+      return;
+    case 'dm':
+      (state.dms[actor] ||= []).push({ me: false, text: event.text, at: Date.now() });
+      state.dms[actor] = state.dms[actor].slice(-KEEP_DM);
+      save('dms');
+      fresh.push({ kind: 'dm', actor, text: event.text });
+      return;
+    default:
+  }
+}
+
+function nextText(p) {
+  const used = state.sim.cursor[p.handle] || 0;
+  if (used < p.posts.length) {
+    state.sim.cursor[p.handle] = used + 1;
+    return p.posts[used];
+  }
+  let text = p.daily();
+  for (let i = 0; i < 6 && state.posts.some((x) => x.text === text); i++) text = p.daily();
+  return text;
+}
+function ambientPost(at, fresh = null) {
+  const author = chance(0.06) ? PERSON.get('agora') : pick(PEOPLE.slice(1));
+  const post = { id: newId(), author: author.handle, text: nextText(author), at: Math.round(at), likes: between(0, 9), reposts: between(0, 2) };
+  state.posts.push(post);
+  changed();
+  fresh?.push({ kind: 'post', actor: author.handle, post: post.id });
+  return post;
+}
+function ambient(now, fresh) {
+  const roll = Math.random();
+  if (roll < 0.6) ambientPost(now, fresh);
+  else if (roll < 0.8) {
+    // Un membre répond à la publication récente d'un autre.
+    const target = pick(state.posts.filter((p) => PERSON.has(p.author) && !p.replyTo && !p.repostOf && now - p.at < 2 * DAY));
+    const actor = target && pick(PEOPLE.slice(1).filter((p) => p.handle !== target.author));
+    if (actor) apply({ type: 'reply', actor: actor.handle, post: target.id, text: replyText(actor.handle, target.text) }, fresh);
+  } else if (roll < 0.92) {
+    const mine = state.posts.filter((p) => isMe(p.author) && !p.repostOf);
+    const post = pick(mine);
+    const actor = post && pick(PEOPLE.filter((p) => !post.likedBy?.includes(p.handle)));
+    if (actor) apply({ type: 'like', actor: actor.handle, post: post.id }, fresh);
+  } else {
+    const actor = pick(PEOPLE.filter((p) => !followsMe(p.handle)));
+    if (actor) apply({ type: 'follow', actor: actor.handle }, fresh);
+  }
+  // Les publications récentes de la communauté gagnent quelques j'aime.
+  for (const p of state.posts) if (PERSON.has(p.author) && !p.repostOf && now - p.at < DAY && chance(0.3)) p.likes = (p.likes || 0) + between(1, 3);
+  save('posts');
+}
+
+function replyText(handle, text, toYou = false) {
+  const p = PERSON.get(handle);
+  const line = /\?/.test(text) ? pick(p.answers) : pick([...p.replies, ...p.replies, ...CHEERS]);
+  return toYou && chance(0.25) ? `${firstName()}, ${line.charAt(0).toLowerCase()}${line.slice(1)}` : line;
+}
+const GREETING = /^\s*(?:salut|bonjour|coucou|hello|hey|bonsoir|yo)\b[^!?.]*[!.]?\s*/i;
+function dmText(handle, text) {
+  const p = PERSON.get(handle);
+  const last = state.dms[handle]?.filter((m) => !m.me).at(-1)?.text;
+  // Une question reçoit une réponse ; un bonjour, un bonjour (sans en dire deux).
+  const lines = /merci/i.test(text) ? ['Avec plaisir 😊', 'De rien !', 'Avec grand plaisir !'] : /\?/.test(text) ? p.answers : p.dm;
+  const options = GREETING.test(text) ? lines.map((line) => `${pick(['Salut', 'Coucou', 'Hello'])} ${firstName()} ! ${line.replace(GREETING, '')}`) : lines;
+  return pick(options.filter((o) => o !== last)) || pick(options);
+}
+
+/** Votre publication arrive dans le fil des autres : j'aime, réponses, partages, votes. */
+function reactTo(post) {
+  if (!simOn()) return;
+  const text = post.text || '';
+  const fans = shuffle(PEOPLE.slice(1)).sort((a, b) => followsMe(b.handle) - followsMe(a.handle));
+  const likers = fans.slice(0, between(1, Math.min(6, 2 + state.followers.length)));
+  likers.forEach((p, i) => plan(between(4, 20) * 1000 * (i + 1), { type: 'like', actor: p.handle, post: post.id }));
+  const mentioned = mentionsOf(text).filter((h) => PERSON.has(h));
+  for (const h of mentioned) plan(between(8, 25) * 1000, { type: 'reply', actor: h, post: post.id, text: `${pick(['Merci pour la mention !', 'Oh, merci !', 'Présent !'])} ${pick(PERSON.get(h).replies)}` });
+  // Le sujet se lit sans les mentions (« @lea.photo » ne parle pas de photo).
+  const plain = text.replace(MENTION_RE, '$1');
+  const topic = TOPICS.find((t) => t.re.test(plain) && !mentioned.includes(t.who));
+  if (topic && chance(0.85)) plan(between(10, 40) * 1000, { type: 'reply', actor: topic.who, post: post.id, text: replyText(topic.who, text, true) });
+  else if (!mentioned.length && text && chance(/\?/.test(text) ? 0.9 : 0.4)) {
+    const p = pick(fans);
+    plan(between(12, 45) * 1000, { type: 'reply', actor: p.handle, post: post.id, text: replyText(p.handle, text, true) });
+  }
+  if (!post.replyTo && chance(0.25)) plan(between(25, 90) * 1000, { type: 'repost', actor: pick(fans).handle, post: post.id });
+  if (post.poll) {
+    for (let i = between(4, 9); i > 0; i--) plan(between(5, 150) * 1000, { type: 'vote', actor: pick(PEOPLE).handle, post: post.id, option: Math.floor(Math.random() ** 1.6 * post.poll.options.length) });
+    plan(post.poll.ends - Date.now(), { type: 'pollEnd', post: post.id });
+  }
+  // Réponse ou citation d'un membre : il la voit.
+  const target = find(post.replyTo || post.quoteOf);
+  if (target && PERSON.has(target.author)) {
+    plan(between(5, 15) * 1000, { type: 'like', actor: target.author, post: post.id });
+    if (post.replyTo && !mentioned.includes(target.author) && chance(0.5)) plan(between(15, 45) * 1000, { type: 'reply', actor: target.author, post: post.id, text: replyText(target.author, text, true) });
+  }
+}
+
+// ───────────── Écrans ─────────────
+
+const count = (n) => (n ? compact(n) : '');
+const plural = (n, one, many) => `${compact(n)} ${n > 1 ? many : one}`;
+const marked = (id) => state.bookmarks.includes(id);
+const backBtn = () => `<button class="ibtn" data-act="back" aria-label="Retour">${icon('back', 22)}</button>`;
+const spacer = '<span style="width:40px;flex:none"></span>';
+const header = (title, { left = backBtn(), right = spacer, sub = '' } = {}) => `<header class="bar">${left}<div class="bar-title">${title}${sub ? `<small>${sub}</small>` : ''}</div>${right}</header>`;
+const empty = (title, text = '', action = '') => `<div class="empty">${title ? `<b>${title}</b>` : ''}${text ? `<span>${text}</span>` : ''}${action}</div>`;
+
+const TABS = [
+  { id: 'home', icon: 'home', label: 'Accueil' },
+  { id: 'explore', icon: 'search', label: 'Explorer' },
+  { id: 'create' },
+  { id: 'notifs', icon: 'bell', label: 'Notifications' },
+  { id: 'me', icon: 'user', label: 'Profil' },
+];
+function tabs() {
+  const items = TABS.map((t) => {
+    if (t.id === 'create') return `<button class="tab create" data-act="compose" aria-label="Publier"><span>${icon('plus', 22)}</span></button>`;
+    const n = t.id === 'notifs' ? unreadNotifs() : 0;
+    return `<button class="tab" data-act="tab" data-tab="${t.id}" aria-label="${t.label}"${ui.tab === t.id ? ' aria-current="page"' : ''}>${icon(t.icon, 25)}${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  });
+  return `<nav class="tabs">${items.join('')}</nav>`;
+}
+
+function body(p) {
+  if (p.bg != null && GRADIENTS[p.bg]) return `<div class="bgcard" data-act="open" data-id="${p.id}" style="background:${GRADIENTS[p.bg]}">${rich(p.text)}</div>`;
+  return p.text ? `<div class="post-text" data-act="open" data-id="${p.id}">${rich(p.text)}${p.edited ? ' <span class="edited">· modifié</span>' : ''}</div>` : '';
+}
+function quoteHtml(p) {
+  if (!p.quoteOf) return '';
+  const q = find(p.quoteOf);
+  if (!q || hidden(q)) return '<div class="quote muted">Cette publication n\'est plus disponible.</div>';
+  return `<button class="quote" data-act="open" data-id="${q.id}"><span class="post-who">${avatar(q.author, 18)} <b>${esc(nameOf(q.author))}</b><span>@${q.author} · ${ago(q.at)}</span></span><span class="q-text">${esc(q.text)}</span></button>`;
+}
+function timeLeft(ts) {
+  const d = ts - Date.now();
+  if (d < HOUR) return `${Math.max(1, Math.ceil(d / MINUTE))} min`;
+  if (d < DAY) return `${Math.ceil(d / HOUR)} h`;
+  return `${Math.ceil(d / DAY)} j`;
+}
+function pollHtml(p) {
+  const poll = p.poll;
+  if (!poll) return '';
+  const total = poll.options.reduce((s, o) => s + o.votes, 0);
+  const ended = Date.now() > poll.ends;
+  const done = ended || poll.mine != null || isMe(p.author);
+  const options = poll.options.map((o, i) => {
+    if (!done) return `<button class="poll-opt" data-act="vote" data-id="${p.id}" data-option="${i}"><span>${esc(o.text)}</span></button>`;
+    const pct = total ? Math.round((o.votes * 100) / total) : 0;
+    return `<div class="poll-opt${poll.mine === i ? ' mine' : ''}"><i style="width:${pct}%"></i><span>${esc(o.text)}${poll.mine === i ? ' ✓' : ''}</span><b>${pct} %</b></div>`;
+  });
+  return `<div class="poll${done ? ' done' : ''}">${options.join('')}<div class="poll-meta">${plural(total, 'vote', 'votes')} · ${ended ? 'Terminé' : `encore ${timeLeft(poll.ends)}`}</div></div>`;
+}
+function actionsHtml(p) {
+  const saved = marked(p.id);
+  return `<div class="actions">
+    <button class="act" data-act="reply" data-id="${p.id}" aria-label="Répondre">${icon('reply', 18)}<span>${count(repliesTo(p.id))}</span></button>
+    <button class="act repost${p.reposted ? ' on' : ''}" data-act="repost" data-id="${p.id}" aria-label="Partager">${icon('repost', 18)}<span>${count(p.reposts)}</span></button>
+    <button class="act like${p.liked ? ' on' : ''}" data-act="like" data-id="${p.id}" aria-label="J'aime" aria-pressed="${Boolean(p.liked)}">${icon(p.liked ? 'heartFill' : 'heart', 18)}<span>${count(p.likes)}</span></button>
+    <button class="act mark${saved ? ' on' : ''}" data-act="bookmark" data-id="${p.id}" aria-label="${saved ? 'Retirer des enregistrements' : 'Enregistrer'}">${icon(saved ? 'markFill' : 'mark', 18)}</button>
+  </div>`;
+}
+const who = (handle, extra = '') => `<button class="post-who" data-act="profile" data-user="${handle}"><b>${esc(nameOf(handle))}</b>${badge(handle)}<span>@${handle}${extra}</span></button>`;
+
+/** Une publication dans une liste (`entry` peut être un partage). */
+function postCard(entry, { line = false, pinned = false } = {}) {
+  const p = original(entry);
+  if (!p) return '';
+  const context = entry.repostOf
+    ? `<div class="post-ctx">${icon('repost', 14)} ${isMe(entry.author) ? 'Vous avez partagé' : `${esc(nameOf(entry.author))} a partagé`}</div>`
+    : pinned ? `<div class="post-ctx">${icon('pin', 14)} Épinglé</div>` : '';
+  const replied = p.replyTo && find(p.replyTo);
+  return `<article class="post" data-card="${p.id}" data-entry="${entry.id}"${pinned ? ' data-pinned="1"' : ''}${line ? ' data-line="1"' : ''}>
+    <div class="post-side"><button data-act="profile" data-user="${p.author}" aria-label="Profil de ${esc(nameOf(p.author))}">${avatar(p.author, 42)}</button>${line ? '<div class="thread-line"></div>' : ''}</div>
+    <div class="post-main">${context}
+      <div class="post-head">${who(p.author, ` · ${ago(p.at)}`)}<button class="post-more" data-act="more" data-id="${p.id}" aria-label="Plus">${icon('more', 18)}</button></div>
+      ${replied && !line && !entry.repostOf ? `<div class="post-reply-to">En réponse à <a data-act="profile" data-user="${replied.author}">@${replied.author}</a></div>` : ''}
+      ${body(p)}${quoteHtml(p)}${pollHtml(p)}${actionsHtml(p)}
+    </div>
+  </article>`;
+}
+
+/** La publication ouverte, en grand. */
+function detailCard(p) {
+  const likers = (p.likedBy || []).filter((h) => person(h));
+  const others = Math.max(0, (p.likes || 0) - likers.length - (p.liked ? 1 : 0));
+  const names = [...(p.liked ? ['vous'] : []), ...likers.slice(0, 2).map(nameOf)];
+  const rest = (p.liked ? 1 : 0) + likers.length - names.length + others;
+  return `<article class="detail" data-card="${p.id}" data-entry="${p.id}" data-detail="1">
+    <div class="post-head" style="gap:10px"><button data-act="profile" data-user="${p.author}">${avatar(p.author, 46)}</button>${who(p.author)}<button class="post-more" data-act="more" data-id="${p.id}" aria-label="Plus">${icon('more', 18)}</button></div>
+    ${p.replyTo && find(p.replyTo) ? `<div class="post-reply-to">En réponse à <a data-act="profile" data-user="${find(p.replyTo).author}">@${find(p.replyTo).author}</a></div>` : ''}
+    <div style="margin-top:8px">${body(p)}</div>${quoteHtml(p)}${pollHtml(p)}
+    <div class="detail-date">${fullDate(p.at)}${p.edited ? ' · modifié' : ''}</div>
+    ${p.likes || p.reposts ? `<div class="detail-stats">${p.reposts ? `<span><b>${compact(p.reposts)}</b>${p.reposts > 1 ? 'partages' : 'partage'}</span>` : ''}${p.likes ? `<span><b>${compact(p.likes)}</b>J'aime</span>` : ''}</div>` : ''}
+    ${names.length ? `<div class="detail-date">Aimé par ${esc(names.join(', '))}${rest > 0 ? ` et ${plural(rest, 'autre personne', 'autres personnes')}` : ''}</div>` : ''}
+    ${actionsHtml(p)}
+  </article>`;
+}
+
+const moreButton = (total) => (total > ui.shown ? '<button class="more-btn" data-act="more-posts">Afficher plus</button>' : '');
+const followButton = (handle, small = true) => (isMe(handle) ? '' : state.follows.includes(handle)
+  ? `<button class="pill-btn ghost${small ? ' small' : ''}" data-act="follow" data-user="${handle}">Abonné·e</button>`
+  : `<button class="pill-btn${small ? ' small' : ''}" data-act="follow" data-user="${handle}">${followsMe(handle) ? 'Suivre en retour' : 'Suivre'}</button>`);
+function personRow(handle, { bio = true } = {}) {
+  const p = person(handle);
+  return `<div class="person"><button data-act="profile" data-user="${handle}" aria-label="Profil">${avatar(handle, 46)}</button>
+    <button class="who" data-act="profile" data-user="${handle}"><b>${esc(p.name)}${badge(handle)}</b><span>@${handle}${followsMe(handle) ? ' · vous suit' : ''}</span>${bio && p.bio ? `<p>${esc(p.bio)}</p>` : ''}</button>${followButton(handle)}</div>`;
+}
+const suggestions = (n = 4) => shuffle(PEOPLE.filter((p) => !state.follows.includes(p.handle))).slice(0, n).map((p) => personRow(p.handle)).join('');
+
+const VIEWS = {
+  loading: () => '<div class="empty">Chargement…</div>',
+
+  home() {
+    const list = feed(ui.feed);
+    const dms = unreadDms();
+    const content = list.length
+      ? list.slice(0, ui.shown).map((p) => postCard(p)).join('') + moreButton(list.length)
+      : ui.feed === 'following'
+        ? empty('Votre fil est vide', 'Suivez des personnes pour voir leurs publications ici.') + suggestions() + `<div class="empty" style="padding-top:12px"><button class="pill-btn" data-act="feed" data-feed="foryou">Découvrir « Pour vous »</button></div>`
+        : empty('Rien pour le moment', 'Revenez dans un instant.');
+    return `<header class="bar"><div class="logo">agora<span>.</span></div><button class="ibtn" data-act="messages" aria-label="Messages">${icon('chat', 23)}${dms ? `<span class="badge">${dms}</span>` : ''}</button></header>
+      <div class="seg"><button data-act="feed" data-feed="following" aria-pressed="${ui.feed === 'following'}">Abonnements</button><button data-act="feed" data-feed="foryou" aria-pressed="${ui.feed === 'foryou'}">Pour vous</button></div>
+      <main class="scroll">${freshPill()}${content}</main>${tabs()}`;
+  },
+
+  explore() {
+    return `<header class="bar"><label class="search">${icon('search', 18)}<input id="q" data-keep type="search" enterkeyhint="search" placeholder="Rechercher sur Agora" autocomplete="off" value="${esc(ui.query)}"></label></header>
+      <main class="scroll" id="explore">${exploreContent()}</main>${tabs()}`;
+  },
+
+  tag() {
+    const tag = ui.params.tag;
+    const list = state.posts.filter((p) => !p.repostOf && !hidden(p) && tagsOf(p.text).includes(tag)).sort((a, b) => b.at - a.at);
+    return `${header(`#${esc(tag)}`, { sub: plural(list.length, 'publication', 'publications') })}
+      <main class="scroll">${list.length ? list.slice(0, ui.shown).map((p) => postCard(p)).join('') + moreButton(list.length) : empty('Aucune publication', 'Soyez la première personne à utiliser ce mot-dièse.')}</main>${tabs()}`;
+  },
+
+  notifs() {
+    const list = state.notifs.filter((n) => !n.actors.some((a) => state.settings.mutedUsers.includes(a)));
+    return `${header('Notifications', { left: spacer })}
+      <main class="scroll">${list.length ? list.map(notifRow).join('') : empty('Aucune notification', 'Les j\'aime, réponses et abonnements apparaîtront ici.')}</main>${tabs()}`;
+  },
+
+  profile() {
+    const handle = ui.params.user || me();
+    const p = person(handle);
+    if (!p) return `${header('Profil')}<main class="scroll">${empty('Profil introuvable')}</main>${tabs()}`;
+    const mine = isMe(handle);
+    const root = !stack.length && ui.tab === 'me';
+    const right = mine ? `<button class="ibtn" data-act="settings" aria-label="Réglages">${icon('gear', 22)}</button>` : `<button class="ibtn" data-act="profile-more" data-user="${handle}" aria-label="Plus">${icon('more', 22)}</button>`;
+    const sections = mine ? [['posts', 'Publications'], ['replies', 'Réponses'], ['likes', 'J\'aime'], ['saved', 'Enregistrés']] : [['posts', 'Publications'], ['replies', 'Réponses']];
+    const tab = sections.some(([id]) => id === ui.profileTab) ? ui.profileTab : 'posts';
+    let list;
+    let pinned = null;
+    if (tab === 'posts') {
+      list = postsBy(handle);
+      pinned = mine && state.profile.pinned ? find(state.profile.pinned) : null;
+      if (pinned) list = list.filter((x) => x.id !== pinned.id);
+    } else if (tab === 'replies') list = repliesBy(handle);
+    else if (tab === 'likes') list = state.posts.filter((x) => x.liked && !hidden(x)).sort((a, b) => b.at - a.at);
+    else list = state.bookmarks.map(find).filter((x) => x && !hidden(x)).reverse();
+    const emptyText = { posts: mine ? 'Vos publications apparaîtront ici.' : 'Rien de publié pour le moment.', replies: 'Aucune réponse.', likes: 'Touchez ♥ pour retrouver une publication ici.', saved: 'Touchez le signet d\'une publication pour la garder ici.' }[tab];
+    const actions = mine
+      ? '<button class="pill-btn ghost" data-act="edit-profile">Modifier le profil</button>'
+      : `<span style="display:flex;gap:8px"><button class="pill-btn ghost" data-act="chat" data-user="${handle}" aria-label="Message">${icon('chat', 18)}</button>${followButton(handle, false)}</span>`;
+    const stat = (n, label, list) => (mine && list ? `<button data-act="people" data-list="${list}"><b>${compact(n)}</b> ${label}</button>` : `<span class="muted"><b style="color:var(--fg)">${compact(n)}</b> ${label}</span>`);
+    return `${header(esc(p.name), { left: root ? spacer : backBtn(), right, sub: plural(postCount(handle), 'publication', 'publications') })}
+      <main class="scroll">
+        <div class="cover" style="background:${GRADIENTS[p.cover] || GRADIENTS[0]}"></div>
+        <div class="profile-top">${avatarOf(p, 84)}${actions}</div>
+        <div class="profile-info">
+          <h2>${esc(p.name)}${badge(handle)}</h2>
+          <div class="handle">@${handle}${!mine && followsMe(handle) ? '<span class="follows-you">Vous suit</span>' : ''}</div>
+          ${p.bio ? `<p class="bio rich">${rich(p.bio)}</p>` : ''}
+          <div class="profile-meta">${p.place ? `<span>📍 ${esc(p.place)}</span>` : ''}<span>${icon('calendar', 14).replace('<svg', '<svg style="display:inline;vertical-align:-2px"')} Membre depuis ${since(p.since)}</span></div>
+          <div class="stats">${stat(followingCount(handle), 'abonnements', 'following')}${stat(followerCount(handle), followerCount(handle) > 1 ? 'abonnés' : 'abonné', 'followers')}</div>
+        </div>
+        <div class="seg">${sections.map(([id, label]) => `<button data-act="profile-tab" data-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join('')}</div>
+        ${pinned && !hidden(pinned) ? postCard(pinned, { pinned: true }) : ''}
+        ${list.length ? list.slice(0, ui.shown).map((x) => postCard(x)).join('') + moreButton(list.length) : pinned ? '' : empty('', emptyText)}
+      </main>${tabs()}`;
+  },
+
+  people() {
+    const following = ui.params.list === 'following';
+    const list = following ? state.follows : state.followers;
+    return `${header(following ? 'Abonnements' : 'Abonnés')}
+      <main class="scroll">${list.length ? list.filter((h) => person(h)).map((h) => personRow(h)).join('') : empty('', following ? 'Vous ne suivez personne pour le moment.' : 'Personne ne vous suit encore.')}</main>${tabs()}`;
+  },
+
+  post() {
+    const p = find(ui.params.id);
+    if (!p || hidden(p)) return `${header('Publication')}<main class="scroll">${empty('Publication indisponible', 'Elle a été supprimée ou masquée.')}</main>`;
+    const chain = ancestors(p).filter((x) => !hidden(x));
+    const replies = thread(p.id);
+    return `${header('Publication')}
+      <main class="scroll">${chain.map((x) => postCard(x, { line: true })).join('')}${detailCard(p)}${replies.map((r) => postCard(r)).join('') || empty('', 'Aucune réponse pour le moment.')}</main>
+      <div class="composer"><textarea id="reply-text" data-keep rows="1" maxlength="${MAX_TEXT}" placeholder="Répondre à @${p.author}…"></textarea><button class="send" data-act="send-reply" aria-label="Publier la réponse">${icon('send', 18)}</button></div>`;
+  },
+
+  compose() {
+    const d = state.draft;
+    const target = find(d.replyTo || d.quoteOf);
+    const title = d.edit ? 'Modifier' : d.replyTo ? 'Répondre' : d.quoteOf ? 'Citer' : 'Nouvelle publication';
+    const bg = d.bg != null && !d.poll;
+    const canStyle = !d.poll && !d.replyTo && !d.quoteOf;
+    return `<header class="bar"><button class="link" data-act="cancel-compose">Annuler</button><div class="bar-title">${title}</div><button class="pill-btn small" id="publish" data-act="publish">${d.edit ? 'Enregistrer' : d.replyTo ? 'Répondre' : 'Publier'}</button></header>
+      <main class="scroll">
+        ${d.replyTo && target ? `<div class="compose-parent">En réponse à <b>@${target.author}</b><div class="q-text">${esc(target.text)}</div></div>` : ''}
+        <div class="compose">${avatar(me(), 42)}<textarea id="c-text" data-keep placeholder="${d.replyTo ? 'Votre réponse' : d.poll ? 'Posez votre question' : 'Quoi de neuf ?'}">${esc(d.text)}</textarea></div>
+        <div class="suggest" id="suggest"></div>
+        ${bg ? `<div style="padding:0 14px 12px"><div class="bgcard" id="bg-preview" style="background:${GRADIENTS[d.bg]}">${esc(d.text) || 'Votre texte ici'}</div></div>` : ''}
+        ${d.palette && canStyle ? `<div class="swatches"><button class="swatch none" data-act="bg" data-bg="" aria-pressed="${d.bg == null}" aria-label="Sans fond">${icon('close', 16)}</button>${GRADIENTS.map((g, i) => `<button class="swatch" data-act="bg" data-bg="${i}" style="background:${g}" aria-pressed="${d.bg === i}" aria-label="Fond ${i + 1}"></button>`).join('')}</div>` : ''}
+        ${d.quoteOf && target ? `<div style="padding:0 14px 12px 66px">${quoteHtml({ quoteOf: d.quoteOf })}</div>` : ''}
+        ${d.poll ? pollEditor(d.poll) : ''}
+      </main>
+      <div class="tools">
+        <button class="ibtn" data-act="toggle-palette" aria-label="Fond coloré" aria-pressed="${Boolean(d.palette && canStyle)}"${canStyle && !d.edit ? '' : ' disabled'}>${icon('palette', 22)}</button>
+        <button class="ibtn" data-act="toggle-poll" aria-label="Sondage" aria-pressed="${Boolean(d.poll)}"${d.replyTo || d.quoteOf || d.edit ? ' disabled' : ''}>${icon('poll', 22)}</button>
+        <button class="ibtn" data-act="insert" data-text="#" aria-label="Mot-dièse">${icon('hash', 22)}</button>
+        <button class="ibtn" data-act="insert" data-text="@" aria-label="Mention" style="font-size:20px;font-weight:600;color:var(--accent)">@</button>
+        <span class="counter" id="counter"></span>
+      </div>`;
+  },
+
+  messages() {
+    const list = Object.keys(state.dms).filter((h) => state.dms[h].length && person(h)).sort((a, b) => state.dms[b].at(-1).at - state.dms[a].at(-1).at);
+    const rows = list.map((h) => {
+      const last = state.dms[h].at(-1);
+      const unread = !last.me && last.at > (state.dmRead[h] || 0);
+      return `<button class="person" data-act="chat" data-user="${h}">${avatar(h, 50)}<span class="who"><b>${esc(nameOf(h))}${badge(h)}</b><p style="${unread ? 'color:var(--fg);font-weight:600' : ''}">${last.me ? 'Vous : ' : ''}${esc(last.text)}</p></span><span class="muted" style="font-size:13px">${ago(last.at)}</span>${unread ? '<span class="dot"></span>' : ''}</button>`;
+    });
+    return `${header('Messages', { right: `<button class="ibtn" data-act="new-dm" aria-label="Nouveau message">${icon('edit', 22)}</button>` })}
+      <main class="scroll">${rows.length ? rows.join('') : empty('Aucun message', 'Écrivez à un membre d\'Agora : il vous répondra.', '<button class="pill-btn" data-act="new-dm">Nouveau message</button>')}</main>`;
+  },
+
+  chat() {
+    const handle = ui.params.user;
+    const messages = state.dms[handle] || [];
+    let previous = 0;
+    const bubbles = messages.map((m) => {
+      const stamp = m.at - previous > HOUR ? `<div class="stamp">${fullDate(m.at)}</div>` : '';
+      previous = m.at;
+      return `${stamp}<div class="bubble${m.me ? ' me' : ''}">${esc(m.text)}</div>`;
+    });
+    const typing = state.sim.queue.some((e) => e.type === 'dm' && e.actor === handle);
+    const p = person(handle);
+    return `<header class="bar">${backBtn()}<button class="bar-title" data-act="profile" data-user="${handle}" style="display:flex;align-items:center;justify-content:center;gap:8px">${avatar(handle, 30)}<span style="text-align:left">${esc(p?.name || handle)}<small>@${handle}</small></span></button>${spacer}</header>
+      <main class="scroll"><div class="bubbles">${bubbles.join('') || `<div class="empty" style="padding:40px 20px">${avatar(handle, 64)}<b>${esc(p?.name || handle)}</b><span>${esc(p?.bio || '')}</span></div>`}${typing ? '<div class="typing" aria-label="En train d\'écrire"><i></i><i></i><i></i></div>' : ''}</div></main>
+      <div class="composer"><textarea id="dm-text" data-keep rows="1" maxlength="1000" placeholder="Message"></textarea><button class="send" data-act="send-dm" aria-label="Envoyer">${icon('send', 18)}</button></div>`;
+  },
+
+  settings() {
+    const s = state.settings;
+    const sw = (key, label, on) => `<label class="cell"><span class="grow">${label}</span><input class="switch" type="checkbox" data-setting="${key}"${on ? ' checked' : ''}></label>`;
+    const words = s.mutedWords.map((w, i) => `<div class="cell"><span class="grow">${esc(w)}</span><button class="link" data-act="unmute-word" data-i="${i}">Retirer</button></div>`).join('');
+    const users = s.mutedUsers.map((h) => `<div class="cell">${avatar(h, 30)}<span class="grow">@${h}</span><button class="link" data-act="unmute-user" data-user="${h}">Afficher</button></div>`).join('');
+    const used = new TextEncoder().encode(JSON.stringify(state)).length;
+    return `${header('Réglages')}
+      <main class="scroll">
+        <div class="group-title">Profil</div>
+        <div class="group"><button class="cell" data-act="edit-profile">${avatar(me(), 30)}<span class="grow">${esc(state.profile.name)} · @${me()}</span>${icon('back', 16).replace('<svg', '<svg style="transform:rotate(180deg);color:var(--muted)"')}</button></div>
+        <div class="group-title">Notifications</div>
+        <div class="group">${sw('notify.like', 'J\'aime', s.notify.like)}${sw('notify.reply', 'Réponses et mentions', s.notify.reply)}${sw('notify.follow', 'Nouveaux abonnés', s.notify.follow)}${sw('notify.repost', 'Partages', s.notify.repost)}${sw('notify.dm', 'Messages', s.notify.dm)}${sw('background', 'Quand Agora est en arrière-plan', s.background)}</div>
+        <div class="group-foot">En arrière-plan, Agora vous prévient par une notification d'Orion.</div>
+        <div class="group-title">Mots masqués</div>
+        <div class="group">${words}<button class="cell accent" data-act="mute-word">${icon('plus', 18)} Ajouter un mot</button></div>
+        <div class="group-foot">Les publications qui contiennent ces mots n'apparaissent plus.</div>
+        ${users ? `<div class="group-title">Comptes masqués</div><div class="group">${users}</div>` : ''}
+        <div class="group-title">Communauté de démonstration</div>
+        <div class="group">${sw('simulate', 'Activité de la communauté', s.simulate)}</div>
+        <div class="group-foot">Les applications du Store n'ont pas accès à Internet : les autres membres d'Agora (marqués « démo ») vivent sur cet appareil. Ils publient, répondent à vos publications et à vos messages.</div>
+        <div class="group-title">Données</div>
+        <div class="group"><div class="cell"><span class="grow">Espace utilisé</span><span class="muted">${Math.max(1, Math.round(used / 1024))} Ko sur 1 024 Ko</span></div><button class="cell danger" data-act="erase">Effacer toutes les données d'Agora</button></div>
+        <div class="group-foot">Vos publications, messages et réglages restent sur cet appareil.</div>
+      </main>`;
+  },
+
+  edit() {
+    const e = ui.edit;
+    return `<header class="bar"><button class="link" data-act="back">Annuler</button><div class="bar-title">Modifier le profil</div><button class="pill-btn small" data-act="save-profile">Enregistrer</button></header>
+      <main class="scroll">
+        <div class="cover" style="background:${GRADIENTS[e.cover]};height:90px"></div>
+        <div class="preview" style="margin-top:-52px">${avatarOf(e, 88)}</div>
+        <div class="group"><label class="cell"><span>Nom</span><input id="e-name" data-keep maxlength="40" value="${esc(e.name)}"></label><label class="cell"><span>Identifiant</span><input id="e-handle" data-keep maxlength="20" autocapitalize="off" spellcheck="false" value="${esc(e.handle)}"></label><label class="cell"><span>Lieu</span><input id="e-place" data-keep maxlength="40" placeholder="Facultatif" value="${esc(e.place || '')}"></label><label class="cell stack"><span class="muted" style="font-size:13px">Bio (${MAX_BIO} caractères au plus)</span><textarea id="e-bio" data-keep maxlength="${MAX_BIO}" placeholder="Quelques mots sur vous">${esc(e.bio || '')}</textarea></label></div>
+        <div class="error" id="e-error" style="margin-top:-14px"></div>
+        <div class="group-title">Photo</div>
+        <div class="group"><div class="cell stack"><div class="emojis">${EMOJIS.map((x) => `<button data-act="pick-emoji" data-emoji="${x}" aria-pressed="${(e.emoji || '') === x}" aria-label="${x || 'Initiales'}">${x || '<span style="font-size:15px;font-weight:700">Aa</span>'}</button>`).join('')}</div><div class="colors">${COLORS.map((c) => `<button data-act="pick-color" data-color="${c}" style="background:${c}" aria-pressed="${e.color === c}" aria-label="Couleur"></button>`).join('')}</div></div></div>
+        <div class="group-title">Couverture</div>
+        <div class="group"><div class="cell stack"><div class="covers">${GRADIENTS.map((g, i) => `<button data-act="pick-cover" data-cover="${i}" style="background:${g}" aria-pressed="${e.cover === i}" aria-label="Couverture ${i + 1}"></button>`).join('')}</div></div></div>
+      </main>`;
+  },
+
+  welcome() {
+    return `<main class="scroll"><div class="welcome">
+      <div class="welcome-logo">a</div>
+      <h1>Bienvenue sur Agora</h1>
+      <p>Partagez vos idées, suivez les personnes qui vous inspirent, discutez.</p>
+      <div class="group"><label class="cell"><span>Nom</span><input id="w-name" data-keep maxlength="40" placeholder="Camille Martin" autocomplete="name"></label><label class="cell"><span>Identifiant</span><input id="w-handle" data-keep maxlength="20" placeholder="camille" autocapitalize="off" spellcheck="false"></label></div>
+      <div class="error" id="w-error"></div>
+      <button class="primary" data-act="welcome-next">Continuer</button>
+      <div class="note">${icon('info', 18)}<span>Agora fonctionne sur cet appareil, sans Internet : vos publications ne le quittent pas. Les autres membres forment une communauté de démonstration, marquée « démo », qui réagit à ce que vous publiez.</span></div>
+    </div></main>`;
+  },
+
+  interests() {
+    return `<main class="scroll"><div class="welcome">
+      <h1>Qu'est-ce qui vous plaît ?</h1>
+      <p>Agora vous abonne aux membres qui en parlent. Vous pourrez changer d'avis à tout moment.</p>
+      <div class="interests">${INTERESTS.map((i) => `<button class="chip plain" data-act="interest" data-id="${i.id}" aria-pressed="${ui.interests.has(i.id)}">${i.label}</button>`).join('')}</div>
+      <button class="primary" data-act="start">${ui.interests.size ? 'C\'est parti' : 'Passer'}</button>
+    </div></main>`;
+  },
+};
+
+function freshPill() {
+  return ui.fresh ? `<div class="new-pill"><button data-act="fresh">${icon('back', 16).replace('<svg', '<svg style="transform:rotate(90deg)"')} ${ui.fresh > 1 ? `${ui.fresh} nouvelles publications` : '1 nouvelle publication'}</button></div>` : '';
+}
+
+function exploreContent() {
+  const results = search(ui.query);
+  if (results) {
+    const { people, tags, posts } = results;
+    if (!people.length && !tags.length && !posts.length) return empty('Aucun résultat', `Rien ne correspond à « ${esc(ui.query.trim())} ».`);
+    return `${people.length ? `<div class="section">Personnes</div>${people.map((h) => personRow(h)).join('')}` : ''}
+      ${tags.length ? `<div class="section">Mots-dièse</div>${tags.map((t) => `<button class="trend" data-act="tag" data-tag="${esc(t)}"><b>#${esc(t)}</b></button>`).join('')}` : ''}
+      ${posts.length ? `<div class="section">Publications</div>${posts.slice(0, 30).map((p) => postCard(p)).join('')}` : ''}`;
+  }
+  const trending = trends();
+  const popular = state.posts.filter((p) => !p.repostOf && !p.replyTo && !hidden(p) && Date.now() - p.at < 3 * DAY).sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 5);
+  const others = PEOPLE.filter((p) => !state.follows.includes(p.handle));
+  return `${trending.length ? `<div class="section">Tendances</div>${trending.map(([tag, n], i) => `<button class="trend" data-act="tag" data-tag="${esc(tag)}"><small>${i + 1} · Tendance sur Agora</small><b>#${esc(tag)}</b><small>${plural(n, 'publication', 'publications')}</small></button>`).join('')}` : ''}
+    ${others.length ? `<div class="section">Personnes à suivre</div>${others.slice(0, 4).map((p) => personRow(p.handle)).join('')}` : ''}
+    ${popular.length ? `<div class="section">Populaires</div>${popular.map((p) => postCard(p)).join('')}` : ''}`;
+}
+
+function notifRow(n) {
+  const post = n.post && find(n.post);
+  const target = n.kind === 'follow' ? `data-act="profile" data-user="${n.actors[0]}"` : post ? `data-act="open" data-id="${post.id}"` : '';
+  const text = NOTIF_TEXT[n.kind](whoText(n.actors));
+  const replyKind = n.kind === 'reply' || n.kind === 'mention';
+  const excerpt = replyKind ? n.text : post && n.kind !== 'follow' ? post.text : '';
+  return `<div class="notif${n.read ? '' : ' unread'}" role="button" tabindex="0" ${target}>
+    <span class="notif-icon ${n.kind}">${icon(NOTIF_ICON[n.kind], 24)}</span>
+    <span class="notif-body"><span class="notif-avs">${n.actors.slice(0, 6).map((h) => avatar(h, 30)).join('')}</span>
+      <p><b>${esc(text)}</b> <span class="muted">· ${ago(n.at)}</span></p>${excerpt ? `<p class="excerpt">${esc(excerpt)}</p>` : ''}
+      ${n.kind === 'follow' && n.actors.length === 1 && !state.follows.includes(n.actors[0]) ? `<p>${followButton(n.actors[0])}</p>` : ''}</span>
+  </div>`;
+}
+
+function pollEditor(poll) {
+  return `<div class="poll-edit">
+    ${poll.options.map((o, i) => `<div class="row"><input data-poll="${i}" maxlength="40" placeholder="Choix ${i + 1}${i > 1 ? ' (facultatif)' : ''}" value="${esc(o)}">${i > 1 ? `<button class="ibtn" data-act="poll-remove" data-option="${i}" aria-label="Retirer ce choix">${icon('close', 16)}</button>` : ''}</div>`).join('')}
+    ${poll.options.length < 4 ? `<button class="link" data-act="poll-add" style="justify-self:start">${icon('plus', 16)} Ajouter un choix</button>` : ''}
+    <div class="row"><span class="muted" style="font-size:14px">Durée</span><div class="minis">${POLL_DURATIONS.map((x, i) => `<button data-act="poll-duration" data-i="${i}" aria-pressed="${poll.duration === i}">${x.label}</button>`).join('')}</div></div>
+    <button class="link" data-act="toggle-poll" style="justify-self:start;color:var(--danger)">Retirer le sondage</button>
+  </div>`;
+}
+
+// ───────────── Affichage ─────────────
+
+let observer = null;
+function render() {
+  $app.dataset.view = ui.view;
+  $app.innerHTML = VIEWS[ui.view]();
+  observer?.disconnect();
+  const more = $app.querySelector('.more-btn');
+  if (more && 'IntersectionObserver' in window) {
+    observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && showMore(), { root: $app.querySelector('.scroll'), rootMargin: '300px' });
+    observer.observe(more);
+  }
+  if (ui.view === 'compose') composeReady();
+  if (ui.view === 'chat') {
+    const scroller = $app.querySelector('.scroll');
+    scroller.scrollTop = scroller.scrollHeight;
+    state.dmRead[ui.params.user] = Date.now();
+    save('dmRead');
+  }
+  if (ui.view === 'notifs' && state.notifs.some((n) => !n.read)) {
+    state.notifs.forEach((n) => (n.read = true));
+    save('notifs');
+    updateTabs();
+  }
+}
+
+/** Redessine l'écran sans perdre le défilement ni la saisie en cours. */
+function rerender({ highlight = [] } = {}) {
+  const top = $app.querySelector('.scroll')?.scrollTop || 0;
+  const kept = [...$app.querySelectorAll('[data-keep]')].map((el) => ({ id: el.id, value: el.value, focus: el === document.activeElement, a: el.selectionStart, b: el.selectionEnd }));
+  render();
+  const scroller = $app.querySelector('.scroll');
+  if (scroller && ui.view !== 'chat') scroller.scrollTop = top;
+  for (const k of kept) {
+    const el = document.getElementById(k.id);
+    if (!el) continue;
+    el.value = k.value;
+    autosize(el);
+    if (k.focus) {
+      el.focus();
+      try {
+        el.setSelectionRange(k.a, k.b);
+      } catch {
+        /* champ sans sélection */
+      }
+    }
+  }
+  for (const id of highlight) $app.querySelector(`[data-card="${id}"]`)?.classList.add('unseen');
+}
+
+function updateTabs() {
+  const nav = $app.querySelector('.tabs');
+  if (nav) nav.outerHTML = tabs();
+}
+
+/** Remet à jour les publications affichées d'un id (après un j'aime, un partage…). */
+function refreshCards(id) {
+  for (const card of $app.querySelectorAll(`[data-card="${id}"]`)) {
+    const entry = find(card.dataset.entry);
+    if (!entry) continue;
+    const html = card.dataset.detail ? detailCard(entry) : postCard(entry, { line: Boolean(card.dataset.line), pinned: Boolean(card.dataset.pinned) });
+    card.insertAdjacentHTML('afterend', html);
+    card.remove();
+  }
+}
+
+function autosize(el) {
+  if (el?.tagName !== 'TEXTAREA') return;
+  const max = el.id === 'c-text' ? 600 : 120;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight + 2, max)}px`;
+}
+
+// ───────────── Navigation ─────────────
+
+const ROOTS = { home: 'home', explore: 'explore', notifs: 'notifs', me: 'profile' };
+const scrollTop = () => $app.querySelector('.scroll')?.scrollTop || 0;
+
+function switchTab(tab) {
+  if (ui.tab === tab && !stack.length && ui.view === ROOTS[tab]) {
+    $app.querySelector('.scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+    if (tab === 'home' && ui.fresh) showFresh();
+    return;
+  }
+  Object.assign(ui, { tab, view: ROOTS[tab], params: tab === 'me' ? { user: me() } : {}, shown: PAGE, profileTab: 'posts' });
+  stack.length = 0;
+  render();
+}
+function go(view, params = {}) {
+  stack.push({ view: ui.view, params: ui.params, scroll: scrollTop(), shown: ui.shown, profileTab: ui.profileTab });
+  Object.assign(ui, { view, params, shown: PAGE });
+  if (view === 'profile') ui.profileTab = 'posts';
+  render();
+}
+function back() {
+  const previous = stack.pop();
+  if (!previous) {
+    if (ui.tab === 'home' && ui.view === 'home') return false;
+    switchTab(ui.view === ROOTS[ui.tab] ? 'home' : ui.tab);
+    return true;
+  }
+  Object.assign(ui, { view: previous.view, params: previous.params, shown: previous.shown, profileTab: previous.profileTab });
+  render();
+  const scroller = $app.querySelector('.scroll');
+  if (scroller && ui.view !== 'chat') scroller.scrollTop = previous.scroll;
+  return true;
+}
+function showMore() {
+  ui.shown += PAGE;
+  rerender();
+}
+function showFresh() {
+  ui.fresh = 0;
+  render();
+}
+const openPost = (id) => find(id) && go('post', { id });
+const openProfile = (handle) => person(handle) && (isMe(handle) && ui.tab === 'me' && !stack.length ? switchTab('me') : go('profile', { user: handle }));
+function openChat(handle) {
+  if (!PERSON.has(handle)) return;
+  if (ui.view === 'chat') stack.pop(); // depuis la liste de choix : pas d'écran en double
+  go('chat', { user: handle });
+}
+
+// ───────────── Feuille d'actions et message temporaire ─────────────
+
+let sheetDone = null;
+let sheetActions = [];
+function sheet({ title = '', actions }) {
+  closeSheet(null);
+  sheetActions = actions.filter(Boolean);
+  $sheet.innerHTML = `
+    <div class="sheet-backdrop" data-sheet="-1"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true">
+      <div class="sheet-group">${title ? `<div class="sheet-title">${esc(title)}</div>` : ''}${sheetActions.map((a, i) => `<button class="sheet-btn${a.danger ? ' danger' : ''}${a.html ? ' person' : ''}" data-sheet="${i}">${a.html || esc(a.label)}</button>`).join('')}</div>
+      <button class="sheet-btn cancel" data-sheet="-1">Annuler</button>
+    </div>`;
+  $sheet.hidden = false;
+  requestAnimationFrame(() => $sheet.classList.add('open'));
+  return new Promise((resolve) => (sheetDone = resolve));
+}
+function closeSheet(value) {
+  if (!sheetDone) return;
+  const done = sheetDone;
+  sheetDone = null;
+  $sheet.classList.remove('open');
+  $sheet.hidden = true;
+  done(value);
+}
+$sheet.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-sheet]');
+  if (!button) return;
+  const i = Number(button.dataset.sheet);
+  closeSheet(i >= 0 ? sheetActions[i].value : null);
+});
+
+let snackTimer = 0;
+let snackAction = null;
+function snack(text, action = null) {
+  clearTimeout(snackTimer);
+  snackAction = action;
+  $snack.innerHTML = `<span>${esc(text)}</span>${action ? `<button type="button">${esc(action.label)}</button>` : ''}`;
+  $snack.classList.add('show');
+  snackTimer = setTimeout(() => {
+    $snack.classList.remove('show');
+    snackAction = null;
+  }, action ? 5000 : 2500);
+}
+$snack.addEventListener('click', (event) => {
+  if (!event.target.closest('button') || !snackAction) return;
+  const action = snackAction;
+  snackAction = null;
+  clearTimeout(snackTimer);
+  $snack.classList.remove('show');
+  action.run();
+});
+
+// ───────────── Publications ─────────────
+
+function toggleLike(id, { pop = true } = {}) {
+  const p = find(id);
+  if (!p) return;
+  p.liked = !p.liked;
+  p.likes = Math.max(0, (p.likes || 0) + (p.liked ? 1 : -1));
+  if (p.liked) orion.device.vibrate(8).catch(() => {});
+  save('posts');
+  refreshCards(id);
+  if (pop && p.liked) $app.querySelectorAll(`[data-card="${id}"] .act.like`).forEach((b) => b.classList.add('pop'));
+}
+function burst(x, y) {
+  const el = document.createElement('span');
+  el.className = 'burst';
+  el.style.cssText = `position:fixed;left:${x}px;top:${y}px`;
+  el.innerHTML = icon('heartFill', 84);
+  document.body.append(el);
+  setTimeout(() => el.remove(), 720);
+}
+
+async function repostMenu(id) {
+  const p = find(id);
+  if (!p) return;
+  const choice = await sheet({ actions: [{ label: p.reposted ? 'Annuler le partage' : 'Partager', value: 'repost' }, { label: 'Citer', value: 'quote' }] });
+  if (choice === 'quote') return compose({ quoteOf: id });
+  if (choice !== 'repost') return;
+  if (p.reposted) {
+    p.reposted = false;
+    p.reposts = Math.max(0, (p.reposts || 1) - 1);
+    state.posts = state.posts.filter((x) => !(isMe(x.author) && x.repostOf === id));
+  } else {
+    p.reposted = true;
+    p.reposts = (p.reposts || 0) + 1;
+    state.posts.push({ id: newId(), author: me(), repostOf: id, text: '', at: Date.now() });
+    if (PERSON.has(p.author) && chance(0.7)) plan(between(5, 20) * 1000, { type: 'follow', actor: p.author });
+    snack('Publication partagée avec vos abonnés');
+  }
+  changed();
+  save('posts');
+  if (ui.view === 'home') rerender();
+  else refreshCards(id);
+}
+
+function toggleBookmark(id) {
+  const saved = marked(id);
+  state.bookmarks = saved ? state.bookmarks.filter((x) => x !== id) : [...state.bookmarks, id].slice(-200);
+  save('bookmarks');
+  refreshCards(id);
+  snack(saved ? 'Retirée des enregistrements' : 'Enregistrée : retrouvez-la dans votre profil');
+}
+
+function vote(id, option) {
+  const p = find(id);
+  if (!p?.poll || p.poll.mine != null || Date.now() > p.poll.ends) return;
+  p.poll.mine = option;
+  p.poll.options[option].votes++;
+  save('posts');
+  refreshCards(id);
+}
+
+async function moreMenu(id) {
+  const p = find(id);
+  if (!p) return;
+  const author = p.author;
+  if (isMe(author)) {
+    const pinned = state.profile.pinned === id;
+    const choice = await sheet({
+      actions: [
+        !p.replyTo && { label: pinned ? 'Désépingler du profil' : 'Épingler sur votre profil', value: 'pin' },
+        !p.poll && { label: 'Modifier', value: 'edit' },
+        { label: 'Supprimer', value: 'delete', danger: true },
+      ],
+    });
+    if (choice === 'pin') {
+      state.profile.pinned = pinned ? null : id;
+      save('profile');
+      snack(pinned ? 'Publication désépinglée' : 'Épinglée en haut de votre profil');
+      if (ui.view === 'profile') rerender();
+    } else if (choice === 'edit') compose({ edit: id });
+    else if (choice === 'delete' && (await sheet({ title: 'Supprimer cette publication ? Ses réponses disparaîtront aussi.', actions: [{ label: 'Supprimer', value: true, danger: true }] }))) removePost(id);
+    return;
+  }
+  const following = state.follows.includes(author);
+  const choice = await sheet({
+    actions: [
+      { label: following ? `Ne plus suivre @${author}` : `Suivre @${author}`, value: 'follow' },
+      PERSON.has(author) && { label: `Envoyer un message à @${author}`, value: 'dm' },
+      { label: `Masquer @${author}`, value: 'mute' },
+      { label: 'Signaler la publication', value: 'report', danger: true },
+    ],
+  });
+  if (choice === 'follow') toggleFollow(author);
+  else if (choice === 'dm') openChat(author);
+  else if (choice === 'mute') muteUser(author);
+  else if (choice === 'report') {
+    state.settings.hiddenPosts.push(id);
+    state.settings.hiddenPosts = state.settings.hiddenPosts.slice(-200);
+    save('settings');
+    changed();
+    afterHide();
+    snack('Merci. Cette publication ne s\'affichera plus.', { label: 'Annuler', run: () => { state.settings.hiddenPosts = state.settings.hiddenPosts.filter((x) => x !== id); save('settings'); changed(); rerender(); } });
+  }
+}
+function afterHide() {
+  if (ui.view === 'post' && !find(ui.params.id)) return back();
+  rerender();
+}
+function removePost(id) {
+  const gone = new Set([id]);
+  // Ses réponses (et leurs réponses) disparaissent avec elle, ainsi que ses partages.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const p of state.posts) {
+      if (gone.has(p.id) || !(gone.has(p.replyTo) || gone.has(p.repostOf))) continue;
+      gone.add(p.id);
+      grew = true;
+    }
+  }
+  state.posts = state.posts.filter((p) => !gone.has(p.id));
+  state.notifs = state.notifs.filter((n) => !gone.has(n.post));
+  state.bookmarks = state.bookmarks.filter((b) => !gone.has(b));
+  if (gone.has(state.profile.pinned)) state.profile.pinned = null;
+  state.sim.queue = state.sim.queue.filter((e) => !gone.has(e.post));
+  changed();
+  save('posts', 'notifs', 'bookmarks', 'profile', 'sim');
+  snack('Publication supprimée');
+  if (ui.view === 'post' && gone.has(ui.params.id)) back();
+  else rerender();
+}
+
+function toggleFollow(handle) {
+  if (!PERSON.has(handle)) return;
+  if (state.follows.includes(handle)) {
+    state.follows = state.follows.filter((h) => h !== handle);
+    snack(`Vous ne suivez plus ${nameOf(handle)}`);
+  } else {
+    state.follows.push(handle);
+    if (!followsMe(handle) && chance(0.85)) plan(between(8, 40) * 1000, { type: 'follow', actor: handle });
+  }
+  save('follows');
+  rerender();
+}
+function muteUser(handle) {
+  if (!state.settings.mutedUsers.includes(handle)) state.settings.mutedUsers.push(handle);
+  save('settings');
+  changed();
+  afterHide();
+  snack(`@${handle} est masqué`, { label: 'Annuler', run: () => unmuteUser(handle) });
+}
+function unmuteUser(handle) {
+  state.settings.mutedUsers = state.settings.mutedUsers.filter((h) => h !== handle);
+  save('settings');
+  changed();
+  rerender();
+}
+
+// ───────────── Rédaction ─────────────
+
+function compose({ replyTo = null, quoteOf = null, edit = null } = {}) {
+  const editing = edit && find(edit);
+  const plain = !replyTo && !quoteOf && !edit;
+  // Un brouillon de publication est repris ; les réponses et citations partent de zéro.
+  if (!(plain && state.draft && !state.draft.replyTo && !state.draft.quoteOf && !state.draft.edit)) {
+    state.draft = { text: editing ? editing.text : '', replyTo, quoteOf, edit: editing ? edit : null, bg: editing?.bg ?? null, poll: null, palette: false };
+  }
+  go('compose');
+}
+function composeReady() {
+  const text = document.getElementById('c-text');
+  autosize(text);
+  updateCompose();
+  setTimeout(() => {
+    text.focus();
+    text.setSelectionRange(text.value.length, text.value.length);
+  }, 60);
+}
+function updateCompose() {
+  const d = state.draft;
+  const left = MAX_TEXT - d.text.length;
+  const counter = document.getElementById('counter');
+  counter.textContent = left < 60 ? String(left) : '';
+  counter.classList.toggle('over', left < 0);
+  const options = d.poll ? d.poll.options.map((o) => o.trim()).filter(Boolean) : [];
+  document.getElementById('publish').disabled = !d.text.trim() || left < 0 || (d.poll && options.length < 2);
+  const preview = document.getElementById('bg-preview');
+  if (preview) preview.textContent = d.text || 'Votre texte ici';
+  // Mention en cours : propositions de membres.
+  const input = document.getElementById('c-text');
+  const typed = /(^|\s)@([a-z0-9_.]*)$/i.exec(d.text.slice(0, input.selectionStart ?? d.text.length));
+  const box = document.getElementById('suggest');
+  const matches = typed ? PEOPLE.filter((p) => fold(`${p.handle} ${p.name}`).includes(fold(typed[2]))).slice(0, 6) : [];
+  box.innerHTML = matches.map((p) => `<button class="chip" data-act="mention-pick" data-user="${p.handle}">${avatar(p.handle, 26)}@${p.handle}</button>`).join('');
+}
+function insertText(snippet, replaceToken = false) {
+  const input = document.getElementById('c-text');
+  const at = input.selectionStart ?? input.value.length;
+  let before = input.value.slice(0, at);
+  if (replaceToken) before = before.replace(/@[a-z0-9_.]*$/i, '');
+  else if (before && !/\s$/.test(before)) before += ' ';
+  input.value = before + snippet + input.value.slice(at);
+  const caret = (before + snippet).length;
+  input.focus();
+  input.setSelectionRange(caret, caret);
+  state.draft.text = input.value;
+  autosize(input);
+  updateCompose();
+}
+async function leaveCompose() {
+  const d = state.draft;
+  const plain = !d.edit && !d.replyTo && !d.quoteOf;
+  if (d.edit || !d.text.trim()) {
+    state.draft = null;
+    save('draft');
+    return back();
+  }
+  // Seul un brouillon de publication se garde : une réponse ou une citation repart de zéro.
+  const choice = await sheet({ actions: [plain && { label: 'Garder le brouillon', value: 'keep' }, { label: plain ? 'Supprimer le brouillon' : 'Abandonner', value: 'drop', danger: true }] });
+  if (!choice) return;
+  if (choice === 'drop') state.draft = null;
+  save('draft');
+  back();
+}
+function publish() {
+  const d = state.draft;
+  const text = d.text.trim();
+  if (!text || text.length > MAX_TEXT) return;
+  if (d.edit) {
+    const p = find(d.edit);
+    if (p) Object.assign(p, { text, edited: true });
+    state.draft = null;
+    save('posts', 'draft');
+    back();
+    return snack('Publication modifiée');
+  }
+  const post = { id: newId(), author: me(), text, at: Date.now(), likes: 0, liked: false, reposts: 0, reposted: false };
+  if (d.replyTo) post.replyTo = d.replyTo;
+  if (d.quoteOf) post.quoteOf = d.quoteOf;
+  if (d.bg != null && !d.poll) post.bg = d.bg;
+  if (d.poll) {
+    const options = d.poll.options.map((o) => o.trim()).filter(Boolean);
+    if (options.length < 2) return;
+    post.poll = { options: options.map((o) => ({ text: o, votes: 0 })), ends: Date.now() + POLL_DURATIONS[d.poll.duration].ms, mine: null };
+  }
+  state.posts.push(post);
+  changed();
+  state.draft = null;
+  save('posts', 'draft');
+  reactTo(post);
+  orion.device.vibrate(12).catch(() => {});
+  back();
+  if (ui.view === 'home') {
+    ui.feed = 'following';
+    render();
+  }
+  snack(post.replyTo ? 'Réponse publiée' : 'Publication partagée', { label: 'Voir', run: () => openPost(post.id) });
+}
+function sendReply() {
+  const input = document.getElementById('reply-text');
+  const text = input.value.trim();
+  if (!text) return;
+  if (text.length > MAX_TEXT) return snack(`${MAX_TEXT} caractères au plus`);
+  const post = { id: newId(), author: me(), text, at: Date.now(), likes: 0, liked: false, reposts: 0, reposted: false, replyTo: ui.params.id };
+  state.posts.push(post);
+  changed();
+  save('posts');
+  reactTo(post);
+  input.value = '';
+  rerender();
+  const scroller = $app.querySelector('.scroll');
+  scroller.scrollTop = scroller.scrollHeight;
+}
+
+// ───────────── Messages ─────────────
+
+async function newDm() {
+  const choice = await sheet({ title: 'Nouveau message', actions: PEOPLE.map((p) => ({ value: p.handle, html: `${avatar(p.handle, 32)}<span>${esc(p.name)} <span class="muted">@${p.handle}</span></span>` })) });
+  if (choice) openChat(choice);
+}
+function sendDm() {
+  const input = document.getElementById('dm-text');
+  const text = input.value.trim();
+  if (!text) return;
+  const handle = ui.params.user;
+  (state.dms[handle] ||= []).push({ me: true, text, at: Date.now() });
+  state.dms[handle] = state.dms[handle].slice(-KEEP_DM);
+  save('dms');
+  input.value = '';
+  // Le membre répond (s'il n'est pas déjà en train d'écrire).
+  if (!state.sim.queue.some((e) => e.type === 'dm' && e.actor === handle)) plan(between(3, 7) * 1000, { type: 'dm', actor: handle, text: dmText(handle, text) });
+  rerender();
+  autosize(input);
+}
+
+// ───────────── Activité : affichage et notifications ─────────────
+
+const DESCRIBE = {
+  like: (f) => `${nameOf(f.actor)} a aimé votre publication`,
+  repost: (f) => `${nameOf(f.actor)} a partagé votre publication`,
+  reply: (f) => `${nameOf(f.actor)} a répondu : « ${f.text} »`,
+  mention: (f) => `${nameOf(f.actor)} a parlé de vous : « ${f.text} »`,
+  follow: (f) => `${nameOf(f.actor)} vous suit désormais`,
+  vote: (f) => `${nameOf(f.actor)} a voté à votre sondage`,
+  poll: () => 'Votre sondage est terminé',
+  dm: (f) => `${nameOf(f.actor)} : ${f.text}`,
+};
+const wanted = (f) => f.kind !== 'post' && state.settings.notify[{ mention: 'reply', vote: 'poll', poll: 'poll' }[f.kind] || f.kind] !== false;
+
+let pending = [];
+let lastNotify = 0;
+let notifyTimer = 0;
+/** En arrière-plan : une notification d'Orion (au plus une toutes les 5 secondes, regroupées). */
+function notifyLater(items) {
+  pending.push(...items);
+  clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => {
+    const list = pending.splice(0);
+    if (!list.length) return;
+    lastNotify = Date.now();
+    const body = list.length === 1 ? DESCRIBE[list[0].kind](list[0]) : `${DESCRIBE[list[0].kind](list[0])}, et ${list.length - 1} autre${list.length > 2 ? 's' : ''} activité${list.length > 2 ? 's' : ''}`;
+    orion.notify({ title: 'Agora', body }).catch(() => {});
+  }, Math.max(300, lastNotify + 5200 - Date.now()));
+}
+
+function announce(fresh) {
+  const alerts = fresh.filter(wanted);
+  if (paused) {
+    if (state.settings.background && alerts.length) notifyLater(alerts);
+    return;
+  }
+  const dm = alerts.find((f) => f.kind === 'dm');
+  const reply = alerts.find((f) => f.kind === 'reply' || f.kind === 'mention');
+  if (dm && !(ui.view === 'chat' && ui.params.user === dm.actor)) {
+    snack(DESCRIBE.dm(dm), { label: 'Lire', run: () => openChat(dm.actor) });
+    orion.device.vibrate([10, 50, 10]).catch(() => {});
+  } else if (reply && !['notifs', 'compose'].includes(ui.view) && !(ui.view === 'post' && find(reply.post)?.replyTo === ui.params.id)) {
+    snack(DESCRIBE[reply.kind](reply), { label: 'Voir', run: () => openPost(reply.post) });
+  }
+  if (ui.view === 'home') {
+    const ids = new Set(feed(ui.feed).map((p) => p.id));
+    const added = fresh.filter((f) => f.kind === 'post' && ids.has(f.post)).map((f) => f.post);
+    if (added.length && scrollTop() > 80) {
+      ui.fresh += added.length;
+      const pill = $app.querySelector('.new-pill');
+      if (pill) pill.outerHTML = freshPill();
+      else $app.querySelector('.scroll').insertAdjacentHTML('afterbegin', freshPill());
+      updateTabs();
+    } else rerender({ highlight: added });
+  } else if (['notifs', 'post', 'chat', 'messages', 'profile', 'tag'].includes(ui.view)) rerender();
+  else updateTabs();
+}
+
+// ───────────── Première ouverture ─────────────
+
+const slug = (name) => fold(name).replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').slice(0, 20) || '';
+function handleProblem(handle, current = null) {
+  if (!HANDLE.test(handle)) return 'L\'identifiant fait 3 à 20 caractères : lettres minuscules, chiffres, point ou tiret bas.';
+  if (handle !== current && PERSON.has(handle)) return 'Cet identifiant est déjà pris.';
+  return '';
+}
+
+function seed() {
+  const now = Date.now();
+  state.posts = [];
+  const add = (author, text, at, extra = {}) => {
+    const post = { id: newId(), author, text, at: Math.round(at), likes: between(3, 70), reposts: between(0, 9), ...extra };
+    state.posts.push(post);
+    return post;
+  };
+  for (const p of PEOPLE.slice(1)) {
+    for (let i = 0; i < 3; i++) add(p.handle, p.posts[i], now - between(20, 46 * 60) * MINUTE);
+    state.sim.cursor[p.handle] = 3;
+  }
+  // Quelques conversations entre membres.
+  for (const target of shuffle(state.posts).slice(0, 9)) {
+    const actor = pick(PEOPLE.slice(1).filter((p) => p.handle !== target.author));
+    add(actor.handle, replyText(actor.handle, target.text), Math.min(now - MINUTE, target.at + between(3, 180) * MINUTE), { replyTo: target.id, likes: between(0, 12), reposts: 0 });
+  }
+  for (const poll of POLLS) add(poll.who, poll.text, now - between(30, 600) * MINUTE, { poll: { options: poll.options.map((text) => ({ text, votes: between(4, 45) })), ends: now + between(5, 47) * HOUR, mine: null } });
+  add('agora', PERSON.get('agora').posts[0], now - 2 * MINUTE, { likes: 214, reposts: 31 });
+  state.sim.cursor.agora = 1;
+  changed();
+  Object.assign(state.sim, { queue: [], ambientAt: now + 40_000, lastRun: now });
+}
+
+function startAgora() {
+  const follows = ['agora', ...INTERESTS.filter((i) => ui.interests.has(i.id)).flatMap((i) => i.who)];
+  if (follows.length === 1) follows.push(...shuffle(PEOPLE.slice(1)).slice(0, 3).map((p) => p.handle));
+  Object.assign(state, { follows, followers: [], notifs: [], dms: {}, dmRead: {}, bookmarks: [], draft: null });
+  seed();
+  save('profile', 'posts', 'follows', 'followers', 'notifs', 'dms', 'dmRead', 'bookmarks', 'settings', 'sim', 'draft');
+  flush();
+  // Les premiers abonnés : l'équipe d'Agora et quelques membres suivis.
+  plan(6000, { type: 'follow', actor: 'agora' });
+  shuffle(follows.filter((h) => h !== 'agora')).slice(0, 2).forEach((h, i) => plan(between(15, 35) * 1000 * (i + 1), { type: 'follow', actor: h }));
+  plan(20_000, { type: 'dm', actor: 'agora', text: `Bienvenue ${firstName()} ! 👋 Votre première publication vous attend : touchez + en bas de l'écran. Les membres marqués « démo » vous répondront.` });
+  Object.assign(ui, { tab: 'home', view: 'home', feed: 'following', shown: PAGE, fresh: 0 });
+  stack.length = 0;
+  render();
+  arm();
+}
+
+async function eraseAll() {
+  if (!(await orion.ui.confirm({ title: 'Effacer Agora ?', message: 'Votre profil, vos publications, vos messages et vos réglages seront supprimés de cet appareil.', confirmLabel: 'Effacer' }))) return;
+  clearTimeout(simTimer);
+  dirty.clear();
+  await saving;
+  await orion.storage.clear();
+  Object.assign(state, { profile: null, posts: [], follows: [], followers: [], notifs: [], dms: {}, dmRead: {}, bookmarks: [], settings: structuredClone(DEFAULT_SETTINGS), sim: { queue: [], ambientAt: 0, lastRun: 0, cursor: {} }, draft: null });
+  changed();
+  stack.length = 0;
+  Object.assign(ui, { tab: 'home', view: 'welcome', params: {}, interests: new Set() });
+  render();
+}
+
+// ───────────── Événements ─────────────
+
+let tapTimer = 0;
+let lastTap = { id: null, at: 0 };
+/** Un toucher ouvre la publication ; deux touchers rapides l'aiment. */
+function tapPost(el, event) {
+  if (getSelection()?.toString()) return;
+  const id = el.dataset.id;
+  const now = Date.now();
+  if (lastTap.id === id && now - lastTap.at < 320) {
+    clearTimeout(tapTimer);
+    lastTap = { id: null, at: 0 };
+    burst(event.clientX, event.clientY);
+    if (!find(id)?.liked) toggleLike(id);
+    return;
+  }
+  lastTap = { id, at: now };
+  clearTimeout(tapTimer);
+  if (ui.view === 'post' && ui.params.id === id) return;
+  tapTimer = setTimeout(() => openPost(id), 280);
+}
+
+const ACTIONS = {
+  tab: (el) => switchTab(el.dataset.tab),
+  back: () => back(),
+  profile: (el) => openProfile(el.dataset.user),
+  tag: (el) => go('tag', { tag: el.dataset.tag }),
+  open: (el, event) => tapPost(el, event),
+  like: (el) => toggleLike(el.dataset.id),
+  repost: (el) => repostMenu(el.dataset.id),
+  bookmark: (el) => toggleBookmark(el.dataset.id),
+  more: (el) => moreMenu(el.dataset.id),
+  vote: (el) => vote(el.dataset.id, Number(el.dataset.option)),
+  reply(el) {
+    if (ui.view === 'post' && ui.params.id === el.dataset.id) return document.getElementById('reply-text')?.focus();
+    compose({ replyTo: el.dataset.id });
+  },
+  feed(el) {
+    Object.assign(ui, { feed: el.dataset.feed, shown: PAGE, fresh: 0 });
+    render();
+  },
+  fresh: () => showFresh(),
+  'more-posts': () => showMore(),
+  follow: (el) => toggleFollow(el.dataset.user),
+  people: (el) => go('people', { list: el.dataset.list }),
+  'profile-tab'(el) {
+    ui.profileTab = el.dataset.tab;
+    ui.shown = PAGE;
+    rerender();
+  },
+  async 'profile-more'(el) {
+    const handle = el.dataset.user;
+    const muted = state.settings.mutedUsers.includes(handle);
+    const choice = await sheet({ actions: [{ label: 'Envoyer un message', value: 'dm' }, { label: muted ? `Afficher @${handle}` : `Masquer @${handle}`, value: 'mute', danger: !muted }] });
+    if (choice === 'dm') openChat(handle);
+    else if (choice === 'mute') (muted ? unmuteUser : muteUser)(handle);
+  },
+  messages: () => go('messages'),
+  chat: (el) => openChat(el.dataset.user),
+  'new-dm': () => newDm(),
+  'send-dm': () => sendDm(),
+  'send-reply': () => sendReply(),
+  compose: () => compose(),
+  publish: () => publish(),
+  'cancel-compose': () => leaveCompose(),
+  'toggle-palette'() {
+    state.draft.palette = !state.draft.palette;
+    if (state.draft.palette && state.draft.bg == null) state.draft.bg = 0;
+    if (!state.draft.palette) state.draft.bg = null;
+    rerender();
+  },
+  bg(el) {
+    state.draft.bg = el.dataset.bg === '' ? null : Number(el.dataset.bg);
+    rerender();
+  },
+  'toggle-poll'() {
+    const d = state.draft;
+    d.poll = d.poll ? null : { options: ['', ''], duration: 1 };
+    if (d.poll) Object.assign(d, { bg: null, palette: false });
+    rerender();
+    if (d.poll) document.querySelector('[data-poll="0"]')?.focus();
+  },
+  'poll-add'() {
+    state.draft.poll.options.push('');
+    rerender();
+    document.querySelector(`[data-poll="${state.draft.poll.options.length - 1}"]`)?.focus();
+  },
+  'poll-remove'(el) {
+    state.draft.poll.options.splice(Number(el.dataset.option), 1);
+    rerender();
+  },
+  'poll-duration'(el) {
+    state.draft.poll.duration = Number(el.dataset.i);
+    rerender();
+  },
+  insert: (el) => insertText(el.dataset.text),
+  'mention-pick': (el) => insertText(`@${el.dataset.user} `, true),
+  settings: () => go('settings'),
+  'edit-profile'() {
+    ui.edit = { ...state.profile };
+    go('edit');
+  },
+  'pick-emoji'(el) {
+    ui.edit.emoji = el.dataset.emoji;
+    rerender();
+  },
+  'pick-color'(el) {
+    ui.edit.color = el.dataset.color;
+    rerender();
+  },
+  'pick-cover'(el) {
+    ui.edit.cover = Number(el.dataset.cover);
+    rerender();
+  },
+  'save-profile'() {
+    const e = ui.edit;
+    const error = document.getElementById('e-error');
+    const name = e.name.trim();
+    const handle = e.handle.trim().toLowerCase().replace(/^@/, '');
+    if (!name) return void (error.textContent = 'Indiquez votre nom.');
+    const problem = handleProblem(handle, me());
+    if (problem) return void (error.textContent = problem);
+    const old = me();
+    Object.assign(state.profile, { name, handle, bio: e.bio.trim().slice(0, MAX_BIO), place: (e.place || '').trim(), emoji: e.emoji, color: e.color, cover: e.cover });
+    if (old !== handle) {
+      for (const p of state.posts) if (p.author === old) p.author = handle;
+      for (const entry of stack) if (entry.params.user === old) entry.params = { ...entry.params, user: handle };
+    }
+    changed();
+    save('profile', 'posts');
+    back();
+    snack('Profil enregistré');
+  },
+  async 'mute-word'() {
+    const word = (await orion.ui.prompt({ title: 'Masquer un mot', message: 'Les publications qui le contiennent n\'apparaîtront plus.', placeholder: 'Par exemple : spoiler' }))?.trim();
+    if (!word) return;
+    if (!state.settings.mutedWords.some((w) => fold(w) === fold(word))) state.settings.mutedWords.push(word.slice(0, 40));
+    save('settings');
+    changed();
+    rerender();
+  },
+  'unmute-word'(el) {
+    state.settings.mutedWords.splice(Number(el.dataset.i), 1);
+    save('settings');
+    changed();
+    rerender();
+  },
+  'unmute-user': (el) => unmuteUser(el.dataset.user),
+  erase: () => eraseAll(),
+  'welcome-next'() {
+    const name = document.getElementById('w-name').value.trim();
+    const handle = document.getElementById('w-handle').value.trim().toLowerCase().replace(/^@/, '');
+    const error = document.getElementById('w-error');
+    if (!name) return void (error.textContent = 'Indiquez votre nom.');
+    const problem = handleProblem(handle);
+    if (problem) return void (error.textContent = problem);
+    state.profile = { name, handle, bio: '', place: '', emoji: '', color: pick(COLORS), cover: Math.floor(Math.random() * GRADIENTS.length), since: Date.now(), pinned: null };
+    ui.interests = new Set();
+    ui.view = 'interests';
+    render();
+  },
+  interest(el) {
+    const id = el.dataset.id;
+    if (!ui.interests.delete(id)) ui.interests.add(id);
+    rerender();
+  },
+  start: () => startAgora(),
+};
+
+$app.addEventListener('click', (event) => {
+  const el = event.target.closest('[data-act]');
+  if (!el || !$app.contains(el) || el.disabled) return;
+  const action = ACTIONS[el.dataset.act];
+  if (action) action(el, event);
+});
+
+$app.addEventListener('input', (event) => {
+  const t = event.target;
+  if (t.id === 'q') {
+    ui.query = t.value;
+    document.getElementById('explore').innerHTML = exploreContent();
+  } else if (t.id === 'c-text') {
+    state.draft.text = t.value;
+    autosize(t);
+    updateCompose();
+    save('draft');
+  } else if (t.dataset.poll != null) {
+    state.draft.poll.options[Number(t.dataset.poll)] = t.value;
+    updateCompose();
+  } else if (t.id === 'w-name') {
+    const handle = document.getElementById('w-handle');
+    if (!handle.dataset.touched) handle.value = slug(t.value);
+  } else if (t.id === 'w-handle') t.dataset.touched = '1';
+  else if (t.id?.startsWith('e-')) ui.edit[t.id.slice(2)] = t.value;
+  else if (t.tagName === 'TEXTAREA') autosize(t);
+});
+
+$app.addEventListener('change', (event) => {
+  const key = event.target.dataset.setting;
+  if (!key) return;
+  const [group, name] = key.split('.');
+  if (name) state.settings[group][name] = event.target.checked;
+  else state.settings[group] = event.target.checked;
+  save('settings');
+  if (key === 'simulate') {
+    if (state.settings.simulate) catchUp();
+    else clearTimeout(simTimer);
+  }
+});
+
+$app.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  const id = event.target.id;
+  if (id === 'dm-text' && !event.shiftKey) {
+    event.preventDefault();
+    sendDm();
+  } else if (id === 'reply-text' && !event.shiftKey) {
+    event.preventDefault();
+    sendReply();
+  } else if (id === 'c-text' && (event.ctrlKey || event.metaKey) && !document.getElementById('publish').disabled) publish();
+  else if (id === 'q') event.target.blur();
+  else if (id === 'w-name' || id === 'w-handle') ACTIONS['welcome-next']();
+});
+
+orion.onBack(() => {
+  if (sheetDone) closeSheet(null);
+  else if (ui.view === 'compose') leaveCompose();
+  else if (ui.view === 'interests') {
+    ui.view = 'welcome';
+    render();
+  } else return back();
+  return true;
+});
+orion.on('pause', () => {
+  paused = true;
+  flush();
+  arm();
+});
+orion.on('resume', () => {
+  paused = false;
+  if (!state.profile) return;
+  catchUp();
+  if (ui.view !== 'compose') rerender();
+});
+
+// ───────────── Démarrage ─────────────
+
+const KEYS = ['profile', 'posts', 'follows', 'followers', 'notifs', 'dms', 'dmRead', 'bookmarks', 'settings', 'sim', 'draft'];
+async function start() {
+  const values = await Promise.all(KEYS.map((key) => orion.storage.get(key)));
+  KEYS.forEach((key, i) => {
+    if (values[i] != null) state[key] = values[i];
+  });
+  const s = state.settings || {};
+  state.settings = { ...structuredClone(DEFAULT_SETTINGS), ...s, notify: { ...DEFAULT_SETTINGS.notify, ...s.notify } };
+  state.sim = { queue: [], ambientAt: 0, lastRun: 0, cursor: {}, ...state.sim };
+  for (const key of ['posts', 'follows', 'followers', 'notifs', 'bookmarks']) if (!Array.isArray(state[key])) state[key] = [];
+  changed();
+  ui.interests = new Set();
+  if (!state.profile) {
+    ui.view = 'welcome';
+    return render();
+  }
+  ui.view = 'home';
+  render();
+  catchUp();
+}
+
+start().catch((error) => {
+  $app.innerHTML = `<div class="empty"><b>Agora n'a pas pu démarrer</b><span>${esc(error.message)}</span></div>`;
+});
+</script>

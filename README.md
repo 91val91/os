@@ -227,6 +227,23 @@ Le Store retient **15 %** de chaque vente ; le reste est versé sur le solde du 
 
 Sur Orion installé, **« Utiliser mes comptes e-mail »** relève et envoie vos vrais e-mails par `orion.mail` (voir [Messagerie](#messagerie)) : dossiers du serveur, pages de 40 messages, recherche faite par le serveur, relève toutes les minutes. Comme toute app du Store, Courrier n'a pas accès à Internet par lui-même : c'est Orion qui passe ses demandes à `orion-server`. Sans compte (téléphone, navigateur, ou au choix), les messages restent dans l'app (`orion.storage`) : ceux que l'on s'adresse arrivent dans Réception, et `demo@courrier.app` répond automatiquement pour montrer l'arrivée d'un message. Pendant un « Essayer » de la console, l'app n'est pas installée : elle n'a pas accès aux vrais comptes.
 
+**Exemple complet : Agora**, un réseau social ([`src/apps/store/examples/agora.html`](src/apps/store/examples/agora.html), environ 130 Ko, aucune autorisation). **Modèles → Exemple : Agora** remplace le code et complète la fiche (catégorie Divertissement).
+
+- **Fil** « Abonnements » et « Pour vous », avec « Nouvelles publications » quand on a fait défiler. Une publication partagée n'y apparaît qu'une fois.
+- **Publications** : mots-dièse et mentions cliquables, suggestions de membres en tapant `@`, fond coloré, **sondage** (2 à 4 choix, 1 h à 3 jours) ou **citation** d'une autre publication. On peut les modifier, les supprimer avec leurs réponses ou les épingler sur son profil.
+- **Réactions** : j'aime, aussi en **touchant deux fois** la publication ; partages ; **commentaires** en fil de discussion ; enregistrements.
+- **Profils** : photo émoji, couleur, couverture, bio, lieu, abonnés et abonnements, onglets Publications, Réponses, J'aime et Enregistrés.
+- **Explorer** : tendances (mots-dièse des trois derniers jours), personnes à suivre, publications populaires, recherche sans tenir compte des accents.
+- **Notifications** regroupées (« Léa et 2 autres personnes… ») ; quand Agora est en arrière-plan, notification d'Orion par `orion.notify`.
+- **Messages privés** avec indicateur « en train d'écrire ».
+- **Réglages** : notifications, mots et comptes masqués, signalement d'une publication, espace utilisé, effacement.
+
+Les apps du Store n'ont pas accès à Internet : tout reste sur l'appareil (`orion.storage`). Les plus anciennes publications de la communauté sont oubliées pour tenir dans 1 Mo ; les vôtres sont toutes gardées.
+
+Les autres membres forment une **communauté de démonstration**, signalée par l'étiquette « démo » et expliquée dès l'accueil. Ses neuf membres (photographe, développeur, cheffe, randonneur…) publient de temps en temps et répondent sur leur sujet ou quand on les mentionne. Ils aiment, partagent, votent, s'abonnent en retour et répondent aux messages privés.
+
+Cette activité est planifiée avec une seule minuterie, à la prochaine échéance, et rattrapée en partie à la réouverture. Elle se coupe dans les réglages de l'app.
+
 ## Protection de l'appareil
 
 **Réglages → Protection de l'appareil** fait le **bilan de sécurité** de l'appareil et regroupe ses protections :
@@ -333,14 +350,14 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 - **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil est verrouillé et que rien n'est en cours : appel, réveil, musique).
 - **Version retirée** : si l'éditeur retire une version déjà téléchargée, elle est abandonnée et n'est jamais installée.
 
-**Numérotation** : Orion OS est en **0.1 (alpha)**, publication n° 6. Chaque publication porte aussi un numéro d'ordre (`sequence`, +1 à chaque version) : c'est lui qui dit quelle version est la plus récente, même quand le numéro affiché repart en arrière. Les appareils en 0.1.1 (n° 5), en 0.1 (n° 4) ou encore en 1.2.0 (ancienne numérotation) passent donc bien à cette 0.1 n° 6 ; son cache porte le numéro d'ordre (`orion-os-release-0.1-6`), pour ne jamais être confondu avec celui de la 0.1 n° 4.
+**Numérotation** : Orion OS est en **0.1 (alpha)**, publication n° 7. Chaque publication porte aussi un numéro d'ordre (`sequence`, +1 à chaque version) : c'est lui qui dit quelle version est la plus récente, même quand le numéro affiché repart en arrière ou reste le même. Les appareils en 0.1 (n° 4 ou n° 6), en 0.1.1 (n° 5) ou encore en 1.2.0 (ancienne numérotation) passent donc bien à la 0.1 n° 7 ; son cache porte le numéro d'ordre (`orion-os-release-0.1-7`), pour ne jamais être confondu avec celui d'une autre 0.1.
 
 **Publier une version** : changez le numéro, le numéro d'ordre (`sequence` + 1) et les nouveautés dans `src/kernel/version.js`, ajoutez vos fichiers à git (`git add`), lancez `npm run release` (qui régénère `version.json` à partir de l'index git : version, notes, empreinte et taille de chaque fichier tel que GitHub Pages le servira ; il refuse de tourner s'il reste des changements non ajoutés, et de republier sous le même numéro une version déjà poussée sur la branche suivie, que les appareils ne verraient pas), puis `git add version.json`, commitez et poussez. GitHub Pages publie tout ce qui est poussé : chaque push qui change l'interface est une nouvelle version. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
 
 ## Tests
 
 ```bash
-npm test            # 129 tests unitaires (noyau, comptes en ligne, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 130 tests unitaires (noyau, comptes en ligne, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, compte en ligne, 20 apps, gestes, code PIN, profils
 npm run lint        # ESLint
