@@ -3,6 +3,7 @@
  *
  *   events ─ log ─ storage
  *     ├─ accounts        comptes utilisateurs (registre partagé)
+ *     ├─ identity        compte en ligne obligatoire (Google, Microsoft, iCloud…)
  *     ├─ settings        réglages persistants
  *     ├─ fs              système de fichiers virtuel
  *     ├─ packages        gestionnaire de paquets
@@ -40,6 +41,7 @@ import { NetworkService } from './network.js';
 import { BluetoothService } from './bluetooth.js';
 import { LocationService } from './location.js';
 import { MailService } from './mail.js';
+import { IdentityService } from './identity.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
 import { RELEASE, versionLabel } from './version.js';
@@ -127,6 +129,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
   const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
   const mail = new MailService({ bridge, events, log, account: () => accountId });
+  const identity = new IdentityService({ accounts, account: () => accountId, mail, events, log, now, fetch: env.fetch?.bind(env), subtle: env.crypto?.subtle });
 
   const contacts = new ContactsProvider({ fs, events }).load();
   const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);
@@ -166,6 +169,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     os: OS,
     backend: backend.kind,
     accounts,
+    identity,
     /**
      * Compte de la session en cours (null sans registre, ou s'il a été supprimé
      * depuis une autre fenêtre). Une autre fenêtre peut changer le compte

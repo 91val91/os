@@ -26,6 +26,7 @@ import { Banners } from './banners.js';
 import { CallScreen } from './call-screen.js';
 import { AlarmScreen } from './alarm-screen.js';
 import { SetupWizard } from './setup.js';
+import { takeRedirectResult } from './sign-in.js';
 import { DeviceProtection } from './protection.js';
 import { PowerManager, logo } from './power.js';
 import { platform } from './platform.js';
@@ -218,14 +219,19 @@ export class SystemUI {
     this.setState('locked');
     await this.power.hideBoot();
 
+    // Retour d'une connexion Google / Microsoft faite dans la page (app installée sur iPhone).
+    const resumed = takeRedirectResult(k);
     if (!k.settings.get('setupDone')) {
       this.setState('setup');
       // Réinitialisé alors que la protection était activée : le code de l'ancien propriétaire d'abord.
       if ((!k.accounts || k.account?.owner) && k.protection.frp.enabled) await this.protection.challenge();
-      await new SetupWizard(this).run();
+      await new SetupWizard(this).run({ resumed: resumed?.purpose === 'setup' ? resumed : null });
       this.lock.isLocked = false;
       this.lock.el.classList.remove('visible');
       this.setState('home');
+    } else if (resumed) {
+      // Terminée après le déverrouillage (voir onUnlocked).
+      this.pendingSignIn = resumed;
     }
     this.#prefetchApps();
     this.updates.start();
@@ -470,6 +476,32 @@ export class SystemUI {
     this.setState(fg ? 'app' : 'home');
     const account = this.kernel.account;
     if (account) this.kernel.accounts.update(account.id, { lastLogin: Date.now() });
+    if (this.kernel.identity?.required || this.pendingSignIn) {
+      // Compte en ligne obligatoire : rien d'autre (app demandée depuis l'écran verrouillé) avant lui.
+      this.lock.pending = [];
+      this.linkIdentity({ required: this.kernel.identity.required });
+    }
+  }
+
+  /**
+   * Associe un compte en ligne au profil (obligatoire s'il n'en a pas, ou
+   * changement depuis les Réglages). Résout avec l'identité, ou null si annulé.
+   */
+  async linkIdentity({ required = false, provider = null } = {}) {
+    if (this.linking) return this.linking;
+    const resumed = this.pendingSignIn ?? null;
+    this.pendingSignIn = null;
+    this.closeOverlays();
+    this.setState('setup');
+    this.linking = new SetupWizard(this).link({ required, provider, resumed });
+    try {
+      return await this.linking;
+    } finally {
+      this.linking = null;
+      this.setState(this.wm.currentWindow ? 'app' : 'home');
+      // Toujours sans compte (connexion reprise puis échouée, par exemple) : on redemande.
+      if (this.kernel.identity?.required) this.linkIdentity({ required: true });
+    }
   }
 
   lockNow() {

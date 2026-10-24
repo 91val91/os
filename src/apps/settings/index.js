@@ -16,6 +16,8 @@ import { quickTiles } from '../../system/quick-settings.js';
 import { unsupportedReason } from '../../kernel/bluetooth.js';
 import { formatCoordinates } from '../../kernel/location.js';
 import { repairIntegrity } from '../../system/integrity.js';
+import { providerBadge } from '../../system/sign-in.js';
+import { provider as identityProvider } from '../../kernel/identity.js';
 
 export const styles = [new URL('./style.css', import.meta.url).href];
 
@@ -397,20 +399,6 @@ export function mount(root, ctx) {
           items: [
             row({ title: 'Nom', detail: a.name, chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: 'Votre nom', value: a.name }); if (v?.trim()) { s.set('userName', v.trim()); refresh(); } } }),
             accounts
-              ? row({
-                  title: 'Adresse e-mail',
-                  detail: a.email || 'Ajouter',
-                  chevron: true,
-                  onClick: async () => {
-                    const v = await ctx.ui.prompt({ title: 'Adresse e-mail', value: a.email, type: 'email', placeholder: 'nom@exemple.fr' });
-                    if (v == null) return;
-                    if (v.trim() && !EMAIL.test(v.trim())) return ctx.ui.alert({ title: 'Adresse invalide', message: 'Vérifiez l\'adresse e-mail saisie.' });
-                    accounts.update(a.id, { email: v.trim() });
-                    refresh();
-                  },
-                })
-              : null,
-            accounts
               ? h(
                   'div.list-item.account-colors',
                   h('span', 'Couleur'),
@@ -419,15 +407,48 @@ export function mount(root, ctx) {
               : null,
           ].filter(Boolean),
         }),
+        accounts ? identityGroup(a, refresh) : null,
         listGroup({
           items: [
             row({ icon: 'lock', iconColor: '#ff3b30', title: 'Code de verrouillage', detail: s.get('passcode') ? 'Activé' : 'Désactivé', chevron: true, onClick: passcodePage }),
             accounts ? row({ icon: 'users', iconColor: '#8e8e93', title: 'Utilisateurs', detail: String(accounts.list().length), chevron: true, onClick: usersPage }) : null,
             row({ icon: 'phone-fill', iconColor: '#30d158', title: "Nom de l'appareil", detail: s.get('deviceName'), chevron: true, onClick: async () => { const v = await ctx.ui.prompt({ title: "Nom de l'appareil", value: s.get('deviceName') }); if (v?.trim()) { s.set('deviceName', v.trim()); refresh(); } } }),
           ].filter(Boolean),
-          footer: accounts ? `${a.owner ? 'Propriétaire de l\'appareil' : 'Utilisateur de l\'appareil'}${since ? ` · compte créé le ${since}` : ''}. Le compte est enregistré sur ce téléphone uniquement.` : null,
+          footer: accounts ? `${a.owner ? 'Propriétaire de l\'appareil' : 'Utilisateur de l\'appareil'}${since ? ` · profil créé le ${since}` : ''}. Le profil est enregistré sur ce téléphone uniquement.` : null,
         }),
       ];
+    });
+  }
+
+  /** Compte en ligne obligatoire (Google, Microsoft, iCloud…) : état de la vérification, vérifier, changer. */
+  function identityGroup(a, refresh) {
+    const identity = a.identity;
+    const p = identityProvider(identity?.provider ?? 'other');
+    const link = async (options = {}) => {
+      const linked = await ui.linkIdentity(options);
+      if (linked) refresh();
+    };
+    if (!identity) return listGroup({ header: 'Compte en ligne', items: [row({ icon: 'user-plus', iconColor: '#30d158', title: 'Associer un compte en ligne', onClick: () => link({ required: true }) })] });
+    const methods = k.identity.methods(p.id);
+    const canVerify = methods.oidc || methods.mail;
+    const date = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const how = { oidc: `par ${p.name}`, mail: 'par la connexion à votre messagerie' }[identity.method];
+    const footer = identity.verified
+      ? `Adresse vérifiée ${how} le ${date(identity.verifiedAt)}. Elle identifie votre profil ; Orion ne garde aucun mot de passe de ce compte.`
+      : `Adresse non vérifiée. ${canVerify ? 'Touchez « Vérifier l\'adresse » pour vous connecter à ce compte.' : 'La vérification demande Orion installé (connexion à la messagerie) ou la connexion Google / Microsoft activée par l\'éditeur de cette copie d\'Orion.'}`;
+    return listGroup({
+      header: 'Compte en ligne',
+      items: [
+        row({
+          leading: providerBadge(p, 32),
+          title: identity.email,
+          subtitle: p.id === 'other' ? 'Adresse e-mail' : p.id === 'apple' ? 'iCloud (Apple)' : `${p.name} · ${p.service}`,
+          trailing: h(`span.identity-status${identity.verified ? '.verified' : ''}`, identity.verified ? 'Vérifié' : 'Non vérifié'),
+        }),
+        !identity.verified && canVerify ? row({ icon: 'shield', iconColor: '#30d158', title: 'Vérifier l\'adresse', onClick: () => link({ provider: identity.provider }) }) : null,
+        row({ icon: 'refresh', iconColor: '#0a84ff', title: 'Changer de compte en ligne', onClick: () => link() }),
+      ].filter(Boolean),
+      footer,
     });
   }
 

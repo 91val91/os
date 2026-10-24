@@ -544,6 +544,17 @@ class ImapSmtpTest(unittest.TestCase):
         self.assertIn("serveur de réception", caught.exception.message)
         self.assertEqual(len(self.store.all()), 1)
 
+    def test_login_is_verified_without_saving_anything(self):
+        account = self.servers.account()
+        self.assertEqual(self.service.verify_login({**account, "owner": "acc-2"}), {"ok": True, "address": USER})
+        with self.assertRaises(MailError) as caught:
+            self.service.verify_login({**account, "password": "mauvais"})
+        self.assertEqual(caught.exception.status, 401)
+        with self.assertRaises(MailError) as caught:
+            self.service.verify_login({**account, "password": ""})
+        self.assertEqual(caught.exception.status, 400)
+        self.assertEqual(len(self.store.all()), 1)
+
     def test_unreachable_server(self):
         with self.assertRaises(MailError) as caught:
             self.service.add_account(self.servers.account(owner="acc-2", imap={"host": "127.0.0.1", "port": 1, "security": "none"}))
@@ -738,6 +749,12 @@ class MailApiTest(ServerTestCase):
         self.assertEqual(self.api("GET", f"/api/mail/messages?account={acc}&folder=INBOX&before=abc")[0], 400)
         self.assertEqual(self.api("GET", "/api/mail/folders?account=0000000000000000")[0], 404)
         self.assertEqual(self.api("GET", "/api/mail/folders?account=../x")[0], 400)
+
+    def test_verify_login(self):
+        body = {"address": "camille@exemple.fr", "password": "secret", "imap": {"host": "imap.exemple.fr", "port": 993, "security": "ssl"}}
+        self.assertEqual(self.api("POST", "/api/mail/verify", body), (200, {"ok": True, "address": "camille@exemple.fr"}))
+        self.assertEqual(self.api("POST", "/api/mail/verify", {**body, "password": "faux"})[0], 401)
+        self.assertEqual(self.api("GET", "/api/mail")[1]["accounts"], [])
 
     def test_mail_post_requires_the_orion_header(self):
         status, _, _ = self.request("POST", "/api/mail/send", {"account": "x"}, {"Content-Type": "application/json"})

@@ -25,8 +25,12 @@ try {
   await wait(300);
   await page.click('.setup-next');
   await wait(400);
+  await page.click('.setup-provider[data-provider="google"]');
+  await wait(400);
+  await page.fill('.setup-input[type="email"]', 'camille.durand@gmail.com');
+  await page.click('.setup-next');
+  await wait(400);
   await page.fill('.setup-input[type="text"]', 'Camille Durand');
-  await page.fill('.setup-input[type="email"]', 'camille@exemple.fr');
   await page.click('.setup-next');
   for (let i = 0; i < 2; i++) {
     await wait(400);
@@ -40,7 +44,8 @@ try {
   await run(async () => {
     const k = window.orion.kernel;
     for (const pkg of k.packages.list({ installed: null })) await k.packages.install(pkg.id);
-    k.accounts.create({ name: 'Léa Martin', email: 'lea@exemple.fr' });
+    const lea = k.accounts.create({ name: 'Léa Martin' });
+    k.accounts.update(lea.id, { identity: { provider: 'apple', email: 'lea.martin@icloud.com' } });
   });
   await wait(2500);
 

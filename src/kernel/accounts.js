@@ -1,19 +1,21 @@
 /**
  * Comptes utilisateurs : plusieurs personnes partagent l'appareil, chacune
- * avec son profil (nom, e-mail, photo), son code et ses propres données
- * (fichiers, réglages, apps, contacts, messages).
+ * avec son profil (nom, photo, compte en ligne obligatoire : voir
+ * identity.js), son code et ses propres données (fichiers, réglages, apps,
+ * contacts, messages).
  *
  * Le registre des comptes est stocké à part ; les données de chaque compte
  * vivent dans leur propre base. Celle du propriétaire, « orion-os », est la
  * base d'avant les comptes : un appareil déjà configuré garde ses données.
  */
 import { Namespace, openBestBackend, deleteBackend } from './storage.js';
+import { normalizeIdentity } from './identity.js';
 
 export const OWNER_DB = 'orion-os';
 export const REGISTRY_DB = 'orion-accounts';
 
 const COLORS = ['#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f', '#64d2ff', '#5e5ce6', '#ff453a'];
-const EDITABLE = ['name', 'email', 'color', 'photo', 'lastLogin', 'returnTo'];
+const EDITABLE = ['name', 'email', 'color', 'photo', 'lastLogin', 'returnTo', 'identity'];
 const EMPTY = () => ({ accounts: [], current: null, removed: [], developer: null });
 
 export class AccountRegistry {
@@ -127,6 +129,11 @@ export class AccountRegistry {
     if (!this.get(id)) return null;
     const changes = {};
     for (const key of EDITABLE) if (key in patch) changes[key] = typeof patch[key] === 'string' && key !== 'photo' ? patch[key].trim() : patch[key];
+    // Compte en ligne (Google, Microsoft, iCloud…) : son adresse devient celle du profil.
+    if ('identity' in changes) {
+      changes.identity = normalizeIdentity(changes.identity, this.now());
+      if (changes.identity) changes.email = changes.identity.email;
+    }
     // Seulement si le compte existe encore dans la copie enregistrée (pas de résurrection).
     this.#commit((data) => Object.assign(data.accounts.find((a) => a.id === id) ?? {}, changes));
     return this.get(id);

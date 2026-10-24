@@ -88,6 +88,15 @@ export class MailService {
     return account;
   }
 
+  /**
+   * Vérifie seulement l'identifiant et le mot de passe auprès du serveur de
+   * réception (compte en ligne d'Orion), sans rien enregistrer.
+   */
+  async verifyLogin({ address, username = '', password, imap }) {
+    await this.#call('POST', 'mail/verify', { address, username, password, imap }, ADD_TIMEOUT);
+    return true;
+  }
+
   async removeAccount(id) {
     await this.#own(id);
     await this.#call('POST', 'mail/accounts/remove', { id });

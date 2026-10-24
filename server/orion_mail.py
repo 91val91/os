@@ -541,6 +541,12 @@ def valid_address(value: Any, field: str = "address") -> str:
     return value.strip()
 
 
+def valid_password(value: Any) -> str:
+    if not isinstance(value, str) or not value or len(value) > 1024 or "\n" in value or "\r" in value:
+        raise MailError(400, "Mot de passe manquant ou invalide")
+    return value
+
+
 def valid_server(value: Any, kind: str) -> dict:
     if not isinstance(value, dict):
         raise MailError(400, f"Serveur {kind} manquant")
@@ -787,13 +793,24 @@ class MailService:
             "saveSent": body.get("saveSent", True) is not False,
             "createdAt": int(self.clock() * 1000),
         }
-        password = account["password"]
-        if not isinstance(password, str) or not password or len(password) > 1024 or "\n" in password or "\r" in password:
-            raise MailError(400, "Mot de passe manquant ou invalide")
+        valid_password(account["password"])
         self.verify(account)
         self.store.add(account)
         LOG.info("Messagerie : compte ajouté (%s)", address)
         return public(account)
+
+    def verify_login(self, body: dict) -> dict:
+        """Vérifie l'identifiant et le mot de passe (compte en ligne d'Orion) sans rien enregistrer."""
+        address = valid_address(body.get("address"))
+        account = {
+            "address": address,
+            "username": text_field(body, "username", required=False, max_len=256) or address,
+            "password": valid_password(body.get("password")),
+            "imap": valid_server(body.get("imap"), "de réception (IMAP)"),
+        }
+        self.login(account)
+        LOG.info("Messagerie : identifiants vérifiés (%s)", address)
+        return {"ok": True, "address": address}
 
     def remove_account(self, body: dict) -> dict:
         account = self.store.get(body.get("id"))
@@ -951,11 +968,15 @@ class MailService:
             with contextlib.suppress(Exception):
                 smtp.close()
 
-    def verify(self, account: dict) -> None:
-        """Connexion aux deux serveurs avec les identifiants (avant d'enregistrer le compte)."""
+    def login(self, account: dict) -> None:
+        """Connexion au serveur de réception avec les identifiants : seul le titulaire de la boîte y parvient."""
         imap = self._open_imap(account)
         with contextlib.suppress(Exception):
             imap.logout()
+
+    def verify(self, account: dict) -> None:
+        """Connexion aux deux serveurs avec les identifiants (avant d'enregistrer le compte)."""
+        self.login(account)
         self._quit(self._open_smtp(account))
 
     # --- dossiers et messages ---------------------------------------------------
@@ -1245,11 +1266,14 @@ class SimulatedMailService(MailService):
     def _ispdb(self, address: str, domain: str) -> dict | None:
         return None  # pas de réseau en simulation
 
-    def verify(self, account: dict) -> None:
+    def login(self, account: dict) -> None:
         if account["password"] == "faux":
             raise MailError(401, f"Connexion refusée par le serveur de réception (identifiants incorrects). {auth_hint(account['imap']['host'])}")
         if account["imap"]["host"].startswith("introuvable."):
             raise MailError(502, f"Serveur de réception introuvable : {account['imap']['host']}")
+
+    def verify(self, account: dict) -> None:
+        self.login(account)
 
     def _box(self, account: dict) -> dict:
         with self._guard:

@@ -32,13 +32,23 @@ try {
   });
   const wait = (ms) => page.waitForTimeout(ms);
 
-  /** Assistant : compte, thème, navigation, code (ou aucun). */
-  const runSetup = async (name, code) => {
+  /** Compte en ligne de l'assistant : fournisseur, puis adresse (non vérifiée : ni orion-server ni connexion Google). */
+  const signIn = async (provider, email) => {
+    await page.click(`.setup-provider[data-provider="${provider}"]`);
+    await wait(400);
+    await page.fill('.setup-input[type="email"]', email);
+    await page.click('.setup-next');
+    await wait(400);
+  };
+
+  /** Assistant : compte en ligne, profil, thème, navigation, code (ou aucun). */
+  const runSetup = async (name, code, email = 'testeur@gmail.com', provider = 'google') => {
     // Après un changement de compte, le système redémarre : marge pour une machine chargée.
     await page.waitForSelector('.setup-next', { timeout: 30_000 });
     await wait(300);
     await page.click('.setup-next');
     await wait(400);
+    await signIn(provider, email);
     await page.fill('.setup-input[type="text"]', name);
     await page.click('.setup-next');
     for (let i = 0; i < 2; i++) {
@@ -64,6 +74,13 @@ try {
   check(true, 'Démarrage du noyau et assistant de configuration');
   await runSetup('Testeur', '2468');
   check(await page.evaluate(() => window.orion.kernel.account?.name === 'Testeur' && window.orion.kernel.account.owner), "Configuration terminée, compte du propriétaire créé, écran d'accueil affiché");
+  check(
+    await page.evaluate(() => {
+      const identity = window.orion.kernel.account.identity;
+      return identity.provider === 'google' && identity.email === 'testeur@gmail.com' && !identity.verified && window.orion.kernel.account.email === identity.email;
+    }),
+    'Compte en ligne Google associé au profil (non vérifié : pas de connexion Google configurée ici)',
+  );
 
   const ids = await page.evaluate(async () => {
     const k = window.orion.kernel;
@@ -132,10 +149,31 @@ try {
   await wait(800);
   check(await page.evaluate(() => window.orion.ui.state === 'home'), 'Déverrouillage avec le code');
 
+  // Compte en ligne obligatoire : un profil qui n'en a pas le reçoit au déverrouillage, avant tout le reste.
+  await page.evaluate(() => {
+    const k = window.orion.kernel;
+    k.accounts.update(k.account.id, { identity: null });
+    window.orion.ui.lockNow();
+  });
+  await wait(500);
+  await drag(0.5, 0.45, 0.5, 0.1);
+  for (const d of '2468') {
+    await page.click(`.pin-key:has(.pin-digit:text-is("${d}"))`);
+    await wait(80);
+  }
+  await page.waitForSelector('.setup-provider', { timeout: 5000 });
+  check(await page.evaluate(() => window.orion.ui.state === 'setup' && !document.querySelector('.layer-setup .setup-skip')), 'Profil sans compte en ligne : connexion exigée après le déverrouillage, sans possibilité de passer');
+  await signIn('microsoft', 'testeur@orange.fr');
+  check((await page.textContent('.setup-error')).includes('pas une adresse Outlook'), 'Adresse d\'un autre fournisseur refusée');
+  await page.fill('.setup-input[type="email"]', 'testeur@outlook.fr');
+  await page.click('.setup-next');
+  await page.waitForFunction(() => window.orion.ui.state === 'home', null, { timeout: 5000 });
+  check(await page.evaluate(() => window.orion.kernel.account.identity?.provider === 'microsoft' && !window.orion.kernel.identity.required), 'Compte Microsoft associé, accueil affiché');
+
   // Comptes : un second utilisateur dispose d'un espace séparé.
   await page.evaluate(() => window.orion.kernel.accounts.create({ name: 'Invité' }));
   await Promise.all([page.waitForEvent('load'), page.evaluate(() => window.orion.ui.switchAccount(window.orion.kernel.accounts.list().find((a) => !a.owner).id))]);
-  await runSetup('Invité', null);
+  await runSetup('Invité', null, 'invite@icloud.com', 'apple');
   const guest = await page.evaluate(() => ({ account: window.orion.kernel.account, apps: window.orion.kernel.packages.list().length }));
   check(guest.account.name === 'Invité' && !guest.account.owner && guest.apps < ids.length, 'Second compte : session et données séparées');
   await Promise.all([page.waitForEvent('load'), page.evaluate(() => window.orion.ui.switchAccount(window.orion.kernel.accounts.owner.id))]);

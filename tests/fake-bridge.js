@@ -21,7 +21,7 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
     sms: [],
     protection: {},
     // Messagerie (comme orion_mail : comptes sans mot de passe à l'extérieur, un dossier par nom).
-    mail: { accounts: [], boxes: {}, sent: [], next: 1 },
+    mail: { accounts: [], boxes: {}, sent: [], verified: [], next: 1 },
     gps: { available: true, fix: { lat: 48.8566, lon: 2.3522, alt: 35, speed: 0, heading: null, accuracy: 6, time: '2026-01-15T09:00:00Z', satellites: 9 } },
   };
   const requests = [];
@@ -151,6 +151,10 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       state.mail.accounts.push(account);
       state.mail.boxes[account.id] = { INBOX: [{ uid: 1, from: { name: 'Lucas', address: 'lucas@exemple.fr' }, to: [{ name: '', address: account.address }], cc: [], subject: 'Bonjour', date: 1, seen: false, flagged: false, answered: false, size: 10, attachments: false, preview: 'Salut', text: 'Salut' }], Envoyés: [] };
       return ok(publicAccount(account));
+    },
+    'POST mail/verify': (body) => {
+      state.mail.verified.push(body.address);
+      return body.password === 'faux' ? fail(401, 'Connexion refusée par le serveur de réception') : ok({ ok: true, address: body.address });
     },
     'POST mail/accounts/remove': ({ id }) => {
       if (!state.mail.accounts.some((a) => a.id === id)) return fail(404, 'Compte de messagerie introuvable');
