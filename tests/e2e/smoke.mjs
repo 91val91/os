@@ -163,6 +163,19 @@ try {
   }
   await page.waitForSelector('.setup-provider', { timeout: 5000 });
   check(await page.evaluate(() => window.orion.ui.state === 'setup' && !document.querySelector('.layer-setup .setup-skip')), 'Profil sans compte en ligne : connexion exigée après le déverrouillage, sans possibilité de passer');
+  // Écran éteint pendant ce temps : l'appareil se reverrouille (personne ne finit l'écran à la place du titulaire).
+  await page.keyboard.press('Alt+L');
+  await wait(500);
+  check(await page.evaluate(() => window.orion.ui.lock.isLocked && !document.querySelector('.layer-setup.visible')), 'Écran éteint pendant la connexion : appareil reverrouillé');
+  await page.keyboard.press('Alt+L');
+  await wait(500);
+  await drag(0.5, 0.45, 0.5, 0.1);
+  for (const d of '2468') {
+    await page.click(`.pin-key:has(.pin-digit:text-is("${d}"))`);
+    await wait(80);
+  }
+  await page.waitForSelector('.setup-provider', { timeout: 5000 });
+  check(await page.evaluate(() => window.orion.ui.state === 'setup'), 'Après le code : compte en ligne redemandé');
   await signIn('microsoft', 'testeur@orange.fr');
   check((await page.textContent('.setup-error')).includes('pas une adresse Outlook'), 'Adresse d\'un autre fournisseur refusée');
   await page.fill('.setup-input[type="email"]', 'testeur@outlook.fr');

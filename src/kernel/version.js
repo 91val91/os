@@ -21,6 +21,7 @@ export const RELEASE = Object.freeze({
     'Plus rapide : démarrage deux fois plus court, un seul réveil par seconde pour tout le système au lieu de cinq, Horloge et Courrier au repos quand ils sont en arrière-plan.',
     'Messagerie sur Orion installé : vos comptes e-mail dans Réglages → Comptes de messagerie, et l\'autorisation « E-mails » pour les apps qui les utilisent.',
     'Pour les développeurs : Courrier, une app d\'e-mail complète prête à publier (Store → console développeur → nouvelle app → Modèles).',
+    'Corrections : les horloges (barre d\'état, écran verrouillé) changent à la minute pile, le chronomètre et le minuteur ne consomment plus rien en arrière-plan, et la fenêtre de connexion fermée trop tôt ne bloque plus le bouton.',
   ]),
 });
 

@@ -6,12 +6,14 @@
  "codename": "Rigel",
  "date": "2026-10-24",
  "notes": [
-  "Messagerie : sur Orion installé (ordinateur ou machine virtuelle), ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie. Les serveurs sont trouvés d'après l'adresse, la connexion est chiffrée et orion-server relève et envoie le courrier.",
-  "Nouvelle autorisation « E-mails » : une app ne lit et n'envoie vos e-mails que si vous l'acceptez, et ne voit jamais votre mot de passe (Réglages → Applications pour la retirer).",
-  "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → Compte → console développeur → nouvelle app → Modèles). Elle utilise vos comptes, ou fonctionne sans compte.",
-  "Image installable : Orion s'affiche en plein écran et démarre plus vite sur les cartes graphiques sans accélération 3D."
+  "Compte en ligne obligatoire : votre profil est associé à un compte Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo ou à une autre adresse e-mail. L'assistant le demande ; un profil qui n'en a pas encore le reçoit juste après le déverrouillage.",
+  "L'adresse est vérifiée par le fournisseur : « Continuer avec Google / Microsoft » quand cette copie d'Orion l'a activé, ou connexion à votre messagerie sur Orion installé. Sinon, elle est enregistrée « non vérifiée » (Réglages → Compte).",
+  "Plus rapide : démarrage deux fois plus court, un seul réveil par seconde pour tout le système au lieu de cinq, Horloge et Courrier au repos quand ils sont en arrière-plan.",
+  "Messagerie sur Orion installé : vos comptes e-mail dans Réglages → Comptes de messagerie, et l'autorisation « E-mails » pour les apps qui les utilisent.",
+  "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → console développeur → nouvelle app → Modèles).",
+  "Corrections : les horloges (barre d'état, écran verrouillé) changent à la minute pile, le chronomètre et le minuteur ne consomment plus rien en arrière-plan, et la fenêtre de connexion fermée trop tôt ne bloque plus le bouton."
  ],
- "size": 1466470,
+ "size": 1469945,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -334,8 +336,8 @@
    "size": 4795
   },
   "./src/kernel/shell.js": {
-   "hash": "783bcb5359111ae00558788b8c272a7d86f732eab35d2e6268c8721365c0aa99",
-   "size": 46994
+   "hash": "99cfbb26346b58996f000cce260540bc5e0ef3939a81da51c9675621d37def71",
+   "size": 47243
   },
   "./src/kernel/storage.js": {
    "hash": "7c7e48a64f97c3e9edd03c6e492377316e3ef24e840fabe47ce5d6730c969f87",
@@ -350,8 +352,8 @@
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "cdda9de97c1a820c74847c090122e8674c0dc55088f807e2919e93277a9c02bf",
-   "size": 1755
+   "hash": "2a63eed932e45a41cc8677e4a6cb5fbaa84b0cd1c5e41cd103f9469428aeb92c",
+   "size": 2233
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
@@ -490,8 +492,8 @@
    "size": 4970
   },
   "./src/system/setup.js": {
-   "hash": "022e379d3f6118e4c49369446063e2a065773d6e69a69134896dc0ab729c2714",
-   "size": 21674
+   "hash": "7df6ba8a3b7a98d338e2d314bcb4950e4245efcabd254b40a3cf03770f454341",
+   "size": 23615
   },
   "./src/system/shade.js": {
    "hash": "3e453d88252d7eccf7d18edb9bca1d2993336116b6550dca155f215e46f2832d",
@@ -510,8 +512,8 @@
    "size": 6114
   },
   "./src/system/system-ui.js": {
-   "hash": "50d5c25f932ce42f7398dc8876d740dae47cbb0401f64b4b870ed15395472a30",
-   "size": 29256
+   "hash": "50dcee348a401128d8ec1bc1e789dcb1d7c6bc863e85fabd2dae98c60532868f",
+   "size": 30063
   },
   "./src/system/theme.js": {
    "hash": "99c6e8f2aebd4204d53844df1bc0b4d30a6574766e529b237d5238742d01a618",

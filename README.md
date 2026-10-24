@@ -340,7 +340,7 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 ## Tests
 
 ```bash
-npm test            # 128 tests unitaires (noyau, comptes en ligne, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 129 tests unitaires (noyau, comptes en ligne, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
 npm run test:e2e    # parcours complet dans Chromium : configuration, compte en ligne, 20 apps, gestes, code PIN, profils
 npm run lint        # ESLint

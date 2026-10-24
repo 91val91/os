@@ -381,7 +381,9 @@ export class SystemUI {
 
   #checkAutoLock() {
     const seconds = this.kernel.settings.get('autoLock');
-    if (!seconds || ['off', 'boot', 'setup'].includes(this.state)) return;
+    // Premier démarrage : pas de verrouillage automatique (pas encore de code). Compte en ligne
+    // demandé après le déverrouillage : l'appareil se reverrouille comme d'habitude.
+    if (!seconds || ['off', 'boot'].includes(this.state) || (this.state === 'setup' && !this.linking)) return;
     if (this.kernel.telephony.call || this.alarmScreen.isVisible) return;
     if (Date.now() - this.lastActivity > seconds * 1000) this.screenOff();
   }
@@ -495,19 +497,22 @@ export class SystemUI {
    * changement depuis les Réglages). Résout avec l'identité, ou null si annulé.
    */
   async linkIdentity({ required = false, provider = null } = {}) {
-    if (this.linking) return this.linking;
+    if (this.linking) return this.linking.done;
     const resumed = this.pendingSignIn ?? null;
     this.pendingSignIn = null;
     this.closeOverlays();
     this.setState('setup');
-    this.linking = new SetupWizard(this).link({ required, provider, resumed });
+    const wizard = new SetupWizard(this);
+    this.linking = { wizard, done: wizard.link({ required, provider, resumed }) };
     try {
-      return await this.linking;
+      return await this.linking.done;
     } finally {
       this.linking = null;
-      this.setState(this.wm.currentWindow ? 'app' : 'home');
-      // Toujours sans compte (connexion reprise puis échouée, par exemple) : on redemande.
-      if (this.kernel.identity?.required) this.linkIdentity({ required: true });
+      // Écran éteint entre-temps : l'appareil a été reverrouillé, on n'y touche pas.
+      if (this.state === 'setup') this.setState(this.wm.currentWindow ? 'app' : 'home');
+      // Toujours sans compte (connexion reprise puis échouée, par exemple) : on redemande,
+      // après le déverrouillage s'il a été reverrouillé.
+      if (this.kernel.identity?.required && !this.lock.isLocked) this.linkIdentity({ required: true });
     }
   }
 
@@ -529,7 +534,12 @@ export class SystemUI {
 
   screenOff() {
     if (this.state === 'off' || this.state === 'boot') return;
-    if (this.state !== 'setup') this.lockNow();
+    // Compte en ligne demandé après le déverrouillage : l'appareil était protégé, il se
+    // reverrouille (sinon n'importe qui pourrait terminer l'écran et arriver à l'accueil).
+    // Le compte sera redemandé au déverrouillage suivant.
+    const linking = this.linking;
+    linking?.wizard.abort();
+    if (this.state !== 'setup' || linking) this.lockNow();
     this.stateBeforeOff = this.state;
     this.layers.off.replaceChildren();
     this.layers.off.classList.add('visible');

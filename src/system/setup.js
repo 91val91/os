@@ -512,11 +512,25 @@ export class SetupWizard {
     await this.#close(null);
   }
 
+  /** Ferme tout de suite, sans animation (écran éteint : l'appareil se reverrouille). */
+  abort() {
+    if (!this.resolve) return;
+    this.el.classList.remove('visible');
+    this.el.replaceChildren();
+    this.el.getAnimations?.().forEach((a) => a.cancel());
+    const resolve = this.resolve;
+    this.resolve = null;
+    resolve(null);
+  }
+
   async #close(result) {
+    if (!this.resolve) return;
     await animate(this.el, [{ opacity: 1 }, { opacity: 0 }], { duration: this.ui.dur(400), fill: 'forwards' });
     this.el.classList.remove('visible');
     this.el.replaceChildren();
     this.el.getAnimations?.().forEach((a) => a.cancel());
-    this.resolve(result);
+    const resolve = this.resolve;
+    this.resolve = null;
+    resolve?.(result);
   }
 }
