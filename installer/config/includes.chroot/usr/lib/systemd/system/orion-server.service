@@ -1,0 +1,44 @@
+[Unit]
+Description=Orion OS : interface et pont matériel (orion-server)
+Documentation=file:///opt/orion-server/API.md
+After=dbus.service NetworkManager.service ModemManager.service bluetooth.service gpsd.socket
+
+[Service]
+Type=simple
+User=orion
+Group=orion
+# /var/lib/orion appartient à orion (systemd corrige les droits au démarrage).
+StateDirectory=orion
+StateDirectoryMode=0755
+Environment=ORION_PORT=8080 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/etc/default/orion
+# La racine est un lien vers la version en service : une mise à jour est servie sans redémarrage.
+ExecStart=/usr/bin/python3 /opt/orion-server/orion_server.py --root /var/lib/orion/current --host 127.0.0.1 --port ${ORION_PORT}
+Restart=always
+RestartSec=2
+
+# Durcissement. nmcli, bluetoothctl, mmcli et systemctl passent par D-Bus
+# (socket Unix) : ces options ne les gênent pas.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,152 @@
+.app-root.phone {
+  background: var(--bg-plain);
+}
+
+.phone-views {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone .appbar {
+  background: var(--bg-plain);
+}
+
+.phone .list {
+  background: var(--bg-plain);
+}
+
+.phone-filter {
+  margin-bottom: 14px;
+}
+
+.phone-keypad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--sat) 0 22px;
+}
+
+.dial-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 24px 22px;
+  min-height: 110px;
+}
+
+.dial-number {
+  font-size: 2.3rem;
+  font-weight: 400;
+  min-height: 2.8rem;
+  letter-spacing: .02em;
+  text-align: center;
+  word-break: break-all;
+}
+
+.dial-name {
+  min-height: 1.2rem;
+  color: var(--fg-2);
+}
+
+.dial-add {
+  color: var(--accent);
+  font-size: .9rem;
+  visibility: hidden;
+}
+
+.dial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 78px);
+  gap: 16px 28px;
+  justify-content: center;
+}
+
+.dial-key {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--fill);
+  transition: background .1s;
+}
+
+.dial-key:active {
+  background: var(--fill-2);
+}
+
+.dial-digit {
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
+.dial-letters {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: var(--fg-2);
+}
+
+.dial-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, 78px);
+  gap: 28px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.dial-call {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #34c759;
+  color: #fff;
+}
+
+.dial-back {
+  display: grid;
+  place-items: center;
+  color: var(--fg-3);
+  visibility: hidden;
+}
+
+.call-dir {
+  width: 20px;
+  color: var(--fg-3);
+}
+
+.call-dir.missed,
+.missed-text {
+  color: var(--red);
+}
+
+.info-btn {
+  color: var(--accent);
+  padding: 4px;
+}
+
+.fav-call {
+  color: var(--accent);
+}
+
+.vm-call {
+  margin: 24px auto 0;
+}

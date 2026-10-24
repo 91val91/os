@@ -1,0 +1,6 @@
+# Orion OS : gpsd détecte les récepteurs GPS USB branchés (règles udev de gpsd)
+# et lit leur position en continu (-n) pour qu'elle soit prête quand Orion la demande.
+START_DAEMON="true"
+USBAUTO="true"
+DEVICES=""
+GPSD_OPTIONS="-n"

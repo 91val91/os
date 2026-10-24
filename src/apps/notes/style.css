@@ -1,0 +1,83 @@
+.notes-search {
+  margin: 0 0 16px;
+}
+
+.notes-list .li-sub strong {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.note-pin {
+  color: var(--orange);
+}
+
+.notes-toolbar {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 6px 12px calc(var(--sab) + 4px) 52px;
+  background: var(--material);
+  backdrop-filter: blur(24px);
+  border-top: .5px solid var(--sep);
+}
+
+.notes-toolbar .icon-btn {
+  color: #e8a800;
+}
+
+.notes-count {
+  text-align: center;
+  font-size: .75rem;
+  color: var(--fg-2);
+}
+
+.note-page .app-scroll {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-plain);
+}
+
+.note-page .app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-page .appbar,
+.note-page .appbar.collapsed {
+  background: var(--bg-plain);
+}
+
+.note-page .icon-btn {
+  color: #e8a800;
+}
+
+.note-page .appbar-back {
+  color: #e8a800;
+}
+
+.note-status {
+  height: 16px;
+  font-size: .7rem;
+  text-align: center;
+  color: var(--fg-3);
+}
+
+.note-editor {
+  flex: 1;
+  width: 100%;
+  min-height: 60vh;
+  border: 0;
+  outline: none;
+  background: none;
+  resize: none;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0;
+}
+
+.note-editor::first-line {
+  font-weight: 700;
+  font-size: 1.5rem;
+}

@@ -1,0 +1,47 @@
+#!/bin/sh
+# Configuration d'Orion OS dans l'image (exécuté par live-build dans le chroot,
+# après l'installation des paquets et la copie de config/includes.chroot).
+set -e
+
+echo "Orion : langue, clavier et fuseau horaire français"
+sed -i 's/^# *\(fr_FR.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+grep -q '^fr_FR.UTF-8 UTF-8' /etc/locale.gen || echo 'fr_FR.UTF-8 UTF-8' >> /etc/locale.gen
+locale-gen
+update-locale LANG=fr_FR.UTF-8
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="fr"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+echo "Europe/Paris" > /etc/timezone
+
+echo "Orion : nom de la machine"
+echo "orion" > /etc/hostname
+if ! grep -q 'orion' /etc/hosts; then
+	printf '127.0.1.1\torion\n' >> /etc/hosts
+fi
+
+echo "Orion : Bluetooth (appareils trouvés gardés 5 min pour laisser le temps de les appairer)"
+if [ -f /etc/bluetooth/main.conf ]; then
+	sed -i 's/^#\{0,1\} *TemporaryTimeout *=.*/TemporaryTimeout = 300/' /etc/bluetooth/main.conf
+fi
+
+echo "Orion : l'affichage est géré par orion-kiosk, pas par live-config"
+# Avec xinit installé (affichage de secours d'orion-kiosk), le composant « xinit » de
+# live-config ajouterait /etc/profile.d/zz-live-config_xinit.sh, qui lance startx en
+# boucle sur tty1 avant ~/.bash_profile : l'interface d'Orion ne démarrerait jamais.
+rm -f /lib/live/config/*-xinit
+mkdir -p /var/lib/live/config
+touch /var/lib/live/config/xinit
+
+echo "Orion : services"
+chmod 0755 /usr/local/bin/orion-kiosk /opt/orion-server/orion_server.py
+systemctl enable NetworkManager.service ModemManager.service bluetooth.service \
+	gpsd.socket systemd-timesyncd.service orion-server.service orion-update.timer
+# NetworkManager gère toutes les interfaces : pas d'ifupdown en parallèle.
+systemctl disable networking.service 2>/dev/null || true
+# Pas d'écran de connexion graphique : la session d'Orion démarre sur tty1.
+systemctl set-default multi-user.target

@@ -1,0 +1,183 @@
+#!/bin/bash
+# Session graphique d'Orion OS : cage (compositeur Wayland « kiosque ») affiche
+# Chromium en plein écran sur l'interface servie par orion-server. Si cage ne
+# peut pas démarrer, même en rendu logiciel (carte graphique sans « PRIME
+# import », que wlroots exige : carte standard de QEMU, Hyper-V, affichage
+# UEFI générique), Chromium est lancé sous X11 (Xorg, pilote modesetting).
+# Lancé par ~/.bash_profile sur tty1 (connexion automatique de l'utilisateur
+# orion). Si Chromium se ferme ou plante, il est relancé.
+# Journal : journalctl -t orion-kiosk
+set -u
+
+ORION_PORT=8080
+ORION_DISPLAY=plein-ecran
+ORION_KIOSK_FLAGS=""
+if [ -r /etc/default/orion ]; then
+	# shellcheck disable=SC1091
+	. /etc/default/orion
+fi
+ORION_URL="http://127.0.0.1:${ORION_PORT}/"
+# Plein écran : Orion se dessine sur tout l'écran au lieu d'un cadre de téléphone.
+[ "$ORION_DISPLAY" = telephone ] || ORION_URL="${ORION_URL}?fullscreen"
+PROFILE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/orion/chromium"
+mkdir -p "$PROFILE_DIR"
+
+log() {
+	if command -v systemd-cat >/dev/null 2>&1; then
+		printf '%s\n' "$*" | systemd-cat -t orion-kiosk
+	else
+		printf '%s\n' "$*" >&2
+	fi
+}
+
+log "Session graphique d'Orion ($(tty 2>/dev/null || echo '?'))"
+
+# Clavier du système (/etc/default/keyboard) pour cage.
+if [ -r /etc/default/keyboard ]; then
+	# shellcheck disable=SC1091
+	. /etc/default/keyboard
+	export XKB_DEFAULT_LAYOUT="${XKBLAYOUT:-fr}"
+	export XKB_DEFAULT_VARIANT="${XKBVARIANT:-}"
+	export XKB_DEFAULT_MODEL="${XKBMODEL:-pc105}"
+	export XKB_DEFAULT_OPTIONS="${XKBOPTIONS:-}"
+fi
+export XDG_SESSION_TYPE=wayland
+# Dans une machine virtuelle, le curseur matériel est souvent invisible.
+if systemd-detect-virt --quiet --vm 2>/dev/null; then
+	export WLR_NO_HARDWARE_CURSORS=1
+fi
+
+FLAGS=(
+	--kiosk
+	"--app=$ORION_URL"
+	--ozone-platform=wayland
+	"--user-data-dir=$PROFILE_DIR"
+	--lang=fr
+	--no-first-run
+	--no-default-browser-check
+	--noerrdialogs
+	--disable-infobars
+	--disable-session-crashed-bubble
+	--hide-crash-restore-bubble
+	"--disable-features=Translate,TranslateUI,OverscrollHistoryNavigation,MediaRouter,DialMediaRouteProvider,HardwareMediaKeyHandling"
+	--overscroll-history-navigation=0
+	--touch-events=enabled
+	--disable-pinch
+	--enable-features=OverlayScrollbar
+	--enable-wayland-ime
+	--autoplay-policy=no-user-gesture-required
+	--password-store=basic
+	--check-for-update-interval=31536000
+	--disable-component-update
+	--disable-background-networking
+)
+if [ -n "$ORION_KIOSK_FLAGS" ]; then
+	read -r -a extra <<<"$ORION_KIOSK_FLAGS"
+	FLAGS+=("${extra[@]}")
+fi
+
+wait_for_server() {
+	local _
+	for _ in $(seq 1 120); do
+		if (exec 3<>"/dev/tcp/127.0.0.1/$ORION_PORT") 2>/dev/null; then
+			return 0
+		fi
+		sleep 0.5
+	done
+	return 1
+}
+
+# Après un arrêt brutal, Chromium proposerait de « restaurer les pages ».
+mark_clean_exit() {
+	local prefs="$PROFILE_DIR/Default/Preferences"
+	if [ -f "$prefs" ]; then
+		sed -i -e 's/"exited_cleanly":[[:space:]]*false/"exited_cleanly":true/' \
+			-e 's/"exit_type":[[:space:]]*"[^"]*"/"exit_type":"Normal"/' "$prefs" || true
+	fi
+}
+
+# Un Chromium resté en vie après l'arrêt de son compositeur (il démarre lentement et ne
+# voit qu'ensuite que l'affichage a disparu), ou le verrou laissé par un arrêt brutal :
+# le Chromium suivant lui passerait la main et quitterait aussitôt (code 0), en boucle.
+stop_leftovers() {
+	local _
+	rm -f "$PROFILE_DIR"/Singleton{Lock,Socket,Cookie}
+	pgrep -u "$UID" -x chromium >/dev/null 2>&1 || return 0
+	log "Chromium d'une session précédente encore ouvert : arrêt"
+	pkill -u "$UID" -x chromium
+	for _ in $(seq 1 10); do
+		pgrep -u "$UID" -x chromium >/dev/null 2>&1 || break
+		sleep 0.5
+	done
+	pkill -KILL -u "$UID" -x chromium 2>/dev/null || true
+	rm -f "$PROFILE_DIR"/Singleton{Lock,Socket,Cookie}
+}
+
+# Taille de l'écran branché (mode préféré, lu dans /sys) : sans gestionnaire de fenêtres,
+# Chromium ne se met pas de lui-même en plein écran sous X11.
+screen_size() {
+	local connector mode
+	for connector in /sys/class/drm/card*-*; do
+		[ "$(cat "$connector/status" 2>/dev/null)" = connected ] || continue
+		mode="$(head -n 1 "$connector/modes" 2>/dev/null)"
+		if [[ "$mode" =~ ^([0-9]+)x([0-9]+) ]]; then
+			echo "${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
+			return
+		fi
+	done
+	echo "1280,800"
+}
+
+# X11 en dernier recours : même Chromium, plate-forme X11, rendu logiciel.
+launch_x11() {
+	local flags=("${FLAGS[@]/--ozone-platform=wayland/--ozone-platform=x11}")
+	systemd-cat -t orion-kiosk xinit /usr/bin/chromium "${flags[@]}" --disable-gpu \
+		--window-position=0,0 "--window-size=$(screen_size)" \
+		-- /usr/bin/Xorg :0 "vt${XDG_VTNR:-1}" -keeptty -nolisten tcp -s 0 -dpms
+}
+
+failures=0
+gpu_flags=()
+display=wayland
+while :; do
+	wait_for_server || log "orion-server ne répond pas sur le port $ORION_PORT : lancement quand même"
+	stop_leftovers
+	mark_clean_exit
+	started=$(date +%s)
+	if [ "$display" = x11 ]; then
+		log "Lancement de l'interface (X11, rendu logiciel)"
+		launch_x11
+	else
+		log "Lancement de l'interface (${WLR_RENDERER:-rendu matériel})"
+		systemd-cat -t orion-kiosk cage -d -s -- chromium "${FLAGS[@]}" "${gpu_flags[@]}"
+	fi
+	status=$?
+	elapsed=$(($(date +%s) - started))
+	log "L'interface s'est arrêtée (code $status, après ${elapsed} s)"
+	crashed=0
+	if [ "$elapsed" -lt 20 ]; then
+		failures=$((failures + 1))
+		# Arrêt par un signal (SIGSEGV : 139…) sauf SIGTERM (arrêt de la machine) : un
+		# plantage du pilote graphique, qui se reproduira à chaque essai.
+		if [ "$status" -gt 128 ] && [ "$status" -ne 143 ]; then crashed=1; fi
+	else
+		failures=0
+	fi
+	# Cage qui échoue tout de suite : souvent un pilote graphique absent ou inutilisable
+	# (carte virtuelle sans accélération 3D : le rendu de secours de Mesa y plante). Rendu logiciel.
+	if [ "$display" = wayland ] && [ -z "${WLR_RENDERER:-}" ] && { [ "$failures" -ge 3 ] || [ "$crashed" = 1 ]; }; then
+		log "Échec du rendu matériel : passage au rendu logiciel (pixman)"
+		export WLR_RENDERER=pixman
+		gpu_flags=(--disable-gpu)
+		failures=0
+	elif [ "$failures" -ge 2 ] && [ "$display" = wayland ] && [ -x /usr/bin/Xorg ] && command -v xinit >/dev/null 2>&1; then
+		log "Échecs répétés de Wayland (carte graphique non prise en charge par cage) : passage à X11"
+		display=x11
+		failures=0
+	fi
+	if [ "$failures" -ge 5 ]; then
+		sleep 30
+	else
+		sleep 2
+	fi
+done

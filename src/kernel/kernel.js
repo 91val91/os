@@ -1,0 +1,232 @@
+/**
+ * Noyau d'Orion OS : démarre et relie les services système.
+ *
+ *   events ─ log ─ storage
+ *     ├─ accounts        comptes utilisateurs (registre partagé)
+ *     ├─ identity        compte en ligne obligatoire (Google, Microsoft, iCloud…)
+ *     ├─ settings        réglages persistants
+ *     ├─ fs              système de fichiers virtuel
+ *     ├─ packages        gestionnaire de paquets
+ *     ├─ processes / am  processus et activités (intents)
+ *     ├─ notifications   centre de notifications
+ *     ├─ alarms          réveils, minuteurs, rappels
+ *     ├─ permissions     autorisations d'exécution
+ *     ├─ media           session multimédia globale
+ *     ├─ contacts        fournisseur de contacts
+ *     ├─ bridge          pont matériel (orion-server sur Orion installé)
+ *     ├─ network         connexion réelle, Wi‑Fi (NetworkManager), mode avion
+ *     ├─ bluetooth       BlueZ ou Web Bluetooth
+ *     ├─ location        GPS (gpsd) ou géolocalisation du navigateur
+ *     ├─ mail            comptes e-mail IMAP/SMTP (relevés et envoyés par orion-server)
+ *     ├─ net             accès à Internet des apps (autorisation « Internet »)
+ *     ├─ telephony       appels et SMS : modem, apps du téléphone ou simulation
+ *     └─ device          HAL : batterie, vibreur, informations
+ */
+import { EventBus } from './events.js';
+import { SystemLog } from './log.js';
+import { MemoryBackend, Namespace } from './storage.js';
+import { FileSystem } from './vfs.js';
+import { Settings } from './settings.js';
+import { PackageManager } from './packages.js';
+import { ProcessManager } from './processes.js';
+import { ActivityManager } from './intents.js';
+import { NotificationService } from './notifications.js';
+import { AlarmService } from './alarms.js';
+import { PermissionService } from './permissions.js';
+import { MediaService } from './media.js';
+import { ContactsProvider, DEMO_CONTACTS } from './contacts.js';
+import { TelephonyService } from './telephony.js';
+import { DeviceService } from './device.js';
+import { HardwareBridge } from './bridge.js';
+import { NetworkService } from './network.js';
+import { BluetoothService } from './bluetooth.js';
+import { LocationService } from './location.js';
+import { MailService } from './mail.js';
+import { NetService } from './net.js';
+import { WebMail } from './webmail.js';
+import { OIDC_CLIENTS } from '../config/identity.js';
+import { IdentityService } from './identity.js';
+import { seedFilesystem, writeSystemFiles } from './seed.js';
+import { COMMAND_NAMES } from './shell.js';
+import { RELEASE, versionLabel } from './version.js';
+import { StoreService } from './store.js';
+import { ProtectionService } from './protection.js';
+
+export const OS = Object.freeze({
+  name: 'Orion OS',
+  version: RELEASE.version,
+  /** « 0.1 (alpha) » */
+  label: versionLabel(RELEASE),
+  channel: RELEASE.channel ?? null,
+  codename: RELEASE.codename,
+  build: RELEASE.build,
+  kernel: `orion-kernel ${RELEASE.version}${RELEASE.channel ? `-${RELEASE.channel}` : ''}-js`,
+});
+
+/**
+ * @param {object} options
+ * @param {object} [options.backend] pilote de stockage (mémoire par défaut)
+ * @param {import('./accounts.js').AccountRegistry} [options.accounts] registre des comptes
+ * @param {string} [options.accountId] compte de cette session (le registre peut changer de compte courant)
+ * @param {object[]} [options.manifests] manifestes des applications
+ * @param {object} [options.shared] pilote de stockage commun aux comptes de l'appareil (Store)
+ * @param {() => Promise<object>} [options.storeRuntime] module qui exécute les apps publiées sur le Store
+ * @param {object} [options.protectionBackend] base de la protection de l'appareil (gardée lors d'un effacement)
+ * @param {(step: string, progress: number) => void} [options.onProgress]
+ * @param {{ google?: string, microsoft?: string }} [options.clients] identifiants clients OAuth (config/identity.js)
+ */
+export async function bootKernel({ backend = new MemoryBackend(), accounts = null, accountId = accounts?.current?.id ?? null, manifests = [], shared = null, storeRuntime = null, protectionBackend = null, env = globalThis, now = Date.now, timers = globalThis, onProgress = () => {}, echoLog = false, bridge = null, clients = OIDC_CLIENTS } = {}) {
+  const log = new SystemLog({ now, echo: echoLog });
+  const events = new EventBus((error, type) => log.error('events', `${type}: ${error?.stack ?? error}`));
+  log.info('kernel', `${OS.name} ${OS.version} « ${OS.codename} » (${OS.build})`);
+  log.info('kernel', `stockage : ${backend.kind}`);
+  if (accounts) {
+    accounts.events = events;
+    log.info('accounts', `${accounts.list().length} compte(s), session de « ${accounts.get(accountId)?.name || 'nouveau compte'} »`);
+  }
+
+  const snapshot = await backend.getAll();
+  const ns = (name) => new Namespace(backend, name, snapshot);
+  onProgress('storage', 0.1);
+
+  const settings = await new Settings({ store: ns('settings'), events }).load();
+  log.info('settings', `${Object.keys(settings.all()).length} réglages chargés`);
+  onProgress('settings', 0.2);
+
+  const fs = await new FileSystem({ store: ns('fs'), events, now }).mount();
+  const firstBoot = !fs.exists('/home');
+  if (firstBoot) {
+    log.info('vfs', 'premier démarrage : création de l\'arborescence');
+    seedFilesystem(fs, now());
+  }
+  writeSystemFiles(fs, OS, COMMAND_NAMES);
+  log.info('vfs', `monté, ${(fs.du('/') / 1024).toFixed(0)} Ko utilisés`);
+  onProgress('fs', 0.4);
+
+  const packages = new PackageManager({ store: ns('packages'), events, log, now });
+  manifests.forEach((m) => packages.register(m));
+  // Apps publiées sur le Store de l'appareil : enregistrées avant de relire les apps installées.
+  const store = await new StoreService({
+    store: shared ? new Namespace(shared, 'store', await shared.getAll()) : ns('store'),
+    packages,
+    events,
+    log,
+    now,
+    account: () => accountId,
+    runtime: storeRuntime,
+    channel: shared && env.BroadcastChannel ? new env.BroadcastChannel('orion-store') : null,
+  }).load();
+  await packages.load();
+  log.info('pm', `${packages.list().length} applications installées`);
+  onProgress('packages', 0.55);
+
+  const processes = new ProcessManager({ events, log, now });
+  const am = new ActivityManager({ packages, processes, events, log });
+  const notifications = await new NotificationService({ store: ns('notifications'), events, settings, now }).load();
+  const alarms = await new AlarmService({ store: ns('alarms'), events, now, log }).load();
+  const permissions = await new PermissionService({ store: ns('permissions'), events, packages, settings }).load();
+  const media = new MediaService({ events });
+  onProgress('services', 0.7);
+
+  // Matériel réel : pont orion-server (Orion installé) ou API du navigateur.
+  bridge ??= await new HardwareBridge({ env, log }).detect();
+  const network = new NetworkService({ events, settings, env, bridge, log, timers }).init();
+  const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
+  const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
+  // Gmail et Outlook par Internet : requêtes du navigateur lui-même (Microsoft refuse d'émettre
+  // les jetons d'une application « monopage » ailleurs que dans le navigateur).
+  const webmail = await new WebMail({ store: ns('webmail'), net: new NetService({ env, log }), clients, notifications, events, log, now, crypto: env.crypto }).load();
+  const mail = new MailService({ bridge, events, log, account: () => accountId, web: webmail });
+  const net = new NetService({ bridge, env, log });
+  const identity = new IdentityService({ accounts, account: () => accountId, mail, clients, events, log, now, fetch: env.fetch?.bind(env), subtle: env.crypto?.subtle });
+
+  const contacts = new ContactsProvider({ fs, events }).load();
+  const isOwner = () => !accounts || Boolean(accounts.get(accountId)?.owner);
+  const protection = await new ProtectionService({
+    store: protectionBackend ? new Namespace(protectionBackend, 'protection', await protectionBackend.getAll()) : ns('protection'),
+    events,
+    bridge,
+    log,
+    now,
+    account: () => accountId,
+    isOwner,
+  }).load();
+  const telephony = new TelephonyService({ fs, events, contacts, notifications, settings, log, now, timers, env, bridge, isOwner }).load().start();
+  // Le mode avion coupe aussi les radios pilotées par le pont.
+  if (bluetooth.mode === 'bridge') network.radios.push({ name: 'bluetooth', get: () => bluetooth.enabled, set: (on) => bluetooth.setPowered(on) });
+  if (bridge.has('modem')) network.radios.push({ name: 'modem', get: () => telephony.modem?.enabled !== false, set: (on) => telephony.setModemEnabled(on) });
+  // Les premières versions livraient des correspondants fictifs : leurs SMS et appels sont effacés une fois.
+  if (!settings.get('demoDataRemoved')) {
+    telephony.forgetNumbers(DEMO_CONTACTS.map((c) => c.phone));
+    settings.set('demoDataRemoved', true);
+  }
+  const device = await new DeviceService({ events, settings, env, now, log, network }).init();
+  onProgress('hal', 0.85);
+
+  // Désinstallation : arrêt du processus et nettoyage des données de l'app.
+  events.on('package:uninstall', ({ id }) => {
+    processes.killApp(id, 'uninstall');
+    fs.rm(`/data/${id}`, { recursive: true, force: true });
+    notifications.clear({ appId: id });
+    alarms.cancelApp(id);
+    permissions.reset(id);
+    media.clear(id);
+  });
+  events.on('process:exit', ({ appId }) => media.clear(appId));
+
+  const kernel = {
+    os: OS,
+    backend: backend.kind,
+    accounts,
+    identity,
+    /**
+     * Compte de la session en cours (null sans registre, ou s'il a été supprimé
+     * depuis une autre fenêtre). Une autre fenêtre peut changer le compte
+     * courant du registre : cette session reste sur ses propres données.
+     */
+    get account() {
+      return accounts?.get(accountId) ?? null;
+    },
+    firstBoot,
+    now,
+    log,
+    events,
+    settings,
+    fs,
+    packages,
+    store,
+    processes,
+    am,
+    notifications,
+    alarms,
+    permissions,
+    media,
+    contacts,
+    bridge,
+    protection,
+    network,
+    bluetooth,
+    location,
+    mail,
+    net,
+    telephony,
+    device,
+    /** Efface toutes les données (réinitialisation d'usine). */
+    async factoryReset() {
+      log.warn('kernel', 'réinitialisation d\'usine');
+      this.shutdown();
+      await backend.clear();
+    },
+    shutdown() {
+      telephony.shutdown();
+      network.shutdown();
+      bluetooth.shutdown();
+      location.shutdown();
+      store.close();
+      processes.killAll('shutdown');
+    },
+  };
+  log.info('kernel', 'démarrage du noyau terminé');
+  onProgress('ready', 1);
+  return kernel;
+}

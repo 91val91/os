@@ -1,0 +1,79 @@
+.app-root.paint {
+  background: var(--bg);
+}
+
+.paint-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sat) 8px 6px;
+}
+
+.paint-left,
+.paint-right {
+  display: flex;
+  align-items: center;
+}
+
+.paint-board {
+  flex: 1;
+  min-height: 0;
+  margin: 0 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .12);
+}
+
+.paint-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.paint-bottom {
+  padding: 10px 12px calc(var(--sab) + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paint-sizes,
+.paint-palette {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paint-size,
+.paint-tool {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--fill);
+}
+
+.paint-size span {
+  border-radius: 50%;
+}
+
+.paint-size.active,
+.paint-tool.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.paint-color {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15);
+}
+
+.paint-color.active {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg);
+}

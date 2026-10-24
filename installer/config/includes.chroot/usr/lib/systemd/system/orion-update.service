@@ -1,0 +1,39 @@
+[Unit]
+Description=Orion OS : téléchargement de la dernière version publiée
+Documentation=file:///opt/orion-server/API.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=orion
+Group=orion
+StateDirectory=orion
+StateDirectoryMode=0755
+Environment=ORION_UPDATE_SOURCE=https://91val91.github.io/os/ PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/etc/default/orion
+ExecStart=/usr/bin/python3 /opt/orion-server/orion_server.py sync --source ${ORION_UPDATE_SOURCE} --data /var/lib/orion
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+UMask=0022

@@ -1,0 +1,651 @@
+.store-views {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.store-date {
+  margin: 0 0 12px;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.store-feature {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 20px;
+  border-radius: 20px;
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+}
+
+.store-feature small {
+  font-size: .72rem;
+  font-weight: 700;
+  opacity: .85;
+}
+
+.store-feature strong {
+  font-size: 1.7rem;
+  line-height: 1.15;
+}
+
+.store-feature p {
+  margin: 6px 0 70px;
+  opacity: .9;
+  font-size: .92rem;
+}
+
+.store-feature-app {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, .18);
+  backdrop-filter: blur(20px);
+}
+
+.store-feature-app > div:not(.app-icon) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.store-feature-app span {
+  font-size: .78rem;
+  opacity: .8;
+}
+
+.store-feature .get-btn {
+  background: rgba(255, 255, 255, .92);
+  color: #0a84ff;
+}
+
+.store-row {
+  gap: 14px;
+}
+
+.store-row .li-sub {
+  white-space: nowrap;
+}
+
+.store-cat {
+  font-size: .7rem;
+}
+
+.get-btn {
+  --p: 0;
+  flex-shrink: 0;
+  min-width: 74px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 15px;
+  background: var(--fill);
+  color: var(--accent);
+  font-size: .85rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.get-btn.downloading {
+  min-width: 30px;
+  width: 30px;
+  padding: 0;
+  background: transparent;
+  position: relative;
+}
+
+.get-btn .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--p) * 360deg), var(--fill-2) 0);
+  -webkit-mask: radial-gradient(circle, transparent 11px, #000 12px);
+  mask: radial-gradient(circle, transparent 11px, #000 12px);
+}
+
+.get-btn .stop {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.store-detail-head {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.store-detail-head .app-icon {
+  border-radius: 24%;
+}
+
+.store-detail-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.store-detail-head p {
+  margin: 2px 0 12px;
+  color: var(--fg-2);
+}
+
+.store-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 20px;
+  padding: 12px 0;
+  border-top: .5px solid var(--sep);
+  border-bottom: .5px solid var(--sep);
+  text-align: center;
+}
+
+.store-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.store-stats div + div {
+  border-left: .5px solid var(--sep);
+}
+
+.store-stats small {
+  font-size: .62rem;
+  color: var(--fg-2);
+  font-weight: 600;
+}
+
+.store-stats strong {
+  font-size: 1.2rem;
+  color: var(--fg-2);
+}
+
+.store-stats span {
+  font-size: .7rem;
+  color: var(--fg-2);
+}
+
+.store-shots {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin: 0 -16px 18px;
+  padding: 0 16px;
+  touch-action: pan-x;
+}
+
+.store-shot {
+  flex-shrink: 0;
+  width: 150px;
+  height: 260px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+}
+
+.store-description {
+  line-height: 1.5;
+  margin: 0 0 22px;
+}
+
+.store-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.store-suggestions .list-header {
+  flex-basis: 100%;
+  padding-left: 0;
+}
+
+.store-results {
+  margin-top: 14px;
+}
+
+.get-btn.price {
+  min-width: 74px;
+  white-space: nowrap;
+}
+
+.store-stars,
+.store-stats .store-stars {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 1px;
+  color: var(--orange, #ff9f0a);
+}
+
+.store-stars button {
+  padding: 4px 6px;
+  color: inherit;
+}
+
+.store-rate {
+  justify-content: center;
+}
+
+.store-notes {
+  white-space: pre-line;
+  line-height: 1.45;
+}
+
+.store-remove,
+.store .btn.block {
+  margin: 0 auto 14px;
+}
+
+.store-dev-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 4px 0 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #5e5ce6, #0a84ff);
+  color: #fff;
+  text-align: left;
+}
+
+.store-dev-banner div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.store-dev-banner span {
+  font-size: .85rem;
+  opacity: .85;
+}
+
+/* Compte */
+.store-account {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 18px;
+}
+
+.store-account div:not(.avatar) {
+  display: flex;
+  flex-direction: column;
+}
+
+.store-account strong {
+  font-size: 1.2rem;
+}
+
+.store-account span {
+  color: var(--fg-2);
+  font-size: .88rem;
+}
+
+.wallet-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 24px;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(150deg, #1c1c1e, #3a3a3c);
+  color: #fff;
+}
+
+.wallet-card small {
+  font-size: .72rem;
+  font-weight: 700;
+  opacity: .7;
+}
+
+.wallet-card strong {
+  font-size: 2rem;
+}
+
+.wallet-card p {
+  margin: 0 0 10px;
+  font-size: .82rem;
+  opacity: .75;
+}
+
+.wallet-card .btn-tinted {
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+}
+
+.store-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.store-amount.plus {
+  color: var(--green, #30d158);
+}
+
+.store-missing {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--fill);
+  color: var(--fg-2);
+}
+
+/* Feuille de paiement et reçu (boîtes de dialogue) */
+.pay-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.pay-sheet .app-icon {
+  margin-bottom: 4px;
+}
+
+.pay-dev {
+  font-size: .82rem;
+  color: var(--fg-2);
+}
+
+.pay-rows,
+.store-receipt {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.pay-rows div,
+.store-receipt div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .9rem;
+}
+
+.pay-rows span,
+.store-receipt span {
+  color: var(--fg-2);
+}
+
+.pay-note,
+.store-receipt p {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  font-size: .78rem;
+  color: var(--fg-2);
+  text-align: left;
+}
+
+/* Console développeur */
+.devc .dev-error {
+  min-height: 1.2em;
+  margin: 0 4px 10px;
+  font-size: .88rem;
+  color: var(--red);
+}
+
+.devc-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 6px 0 20px;
+  text-align: center;
+}
+
+.devc-hero-icon {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: linear-gradient(150deg, #5e5ce6, #0a84ff);
+  color: #fff;
+}
+
+.devc-hero h2 {
+  margin: 12px 0 4px;
+}
+
+.devc-hero p,
+.devc-intro {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.45;
+}
+
+.devc-intro {
+  margin: 0 4px 16px;
+  font-size: .9rem;
+}
+
+.devc-form {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.devc-form .field {
+  background: transparent;
+}
+
+.devc-profile {
+  display: flex;
+  flex-direction: column;
+  margin: 0 4px 14px;
+}
+
+.devc-profile strong {
+  font-size: 1.15rem;
+}
+
+.devc-profile span {
+  font-size: .85rem;
+  color: var(--fg-2);
+}
+
+.devc-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.devc-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.devc-stats small {
+  font-size: .75rem;
+  color: var(--fg-2);
+}
+
+.devc-stats strong {
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.devc > .btn.block {
+  margin: 0 auto 18px;
+}
+
+.devc-app-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 4px 0 16px;
+}
+
+.devc-app-head div:not(.app-icon) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.devc-app-head strong {
+  font-size: 1.3rem;
+}
+
+.devc-app-head span,
+.devc-app-head small {
+  color: var(--fg-2);
+  font-size: .85rem;
+}
+
+.devc-pending {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--orange, #ff9f0a) 15%, transparent);
+  font-size: .85rem;
+}
+
+.devc-glyphs,
+.devc-palettes {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.devc-glyph,
+.devc-swatch {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--fill);
+  color: var(--fg);
+}
+
+.devc-glyph.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.devc-swatch.active {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.devc-editor {
+  padding: 0;
+}
+
+.devc-code {
+  display: block;
+  width: 100%;
+  min-height: 300px;
+  padding: 12px 14px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  background: #1c1c1e;
+  color: #e5e5ea;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+
+.devc-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.devc-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.devc-review li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: .85rem;
+}
+
+.devc-review li.ok svg {
+  color: var(--green, #30d158);
+}
+
+.devc-review li.ko svg {
+  color: var(--red);
+}
+
+.devc-review li div {
+  display: flex;
+  flex-direction: column;
+}
+
+.devc-review span {
+  color: var(--fg-2);
+}
+
+.devc-terms {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  text-align: left;
+  font-size: .85rem;
+  line-height: 1.45;
+}
+
+.devc-api code {
+  display: block;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--accent);
+  word-break: break-word;
+}
+
+.devc-test {
+  display: flex;
+  flex-direction: column;
+}
+
+.devc-test-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.devc-test-body .app-runtime {
+  padding: 0;
+}

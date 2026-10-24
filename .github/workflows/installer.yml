@@ -1,0 +1,128 @@
+name: Installateur
+
+# Tests du serveur matériel (orion-server) et des scripts, puis construction de
+# l'image ISO d'Orion OS. Pour une étiquette v*, l'image est jointe à la
+# publication GitHub correspondante.
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'server/**'
+      - 'installer/**'
+      - '.github/workflows/installer.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'installer/**'
+      - '.github/workflows/installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests du serveur et des scripts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Tests d'orion-server
+        run: python -m unittest discover -s server -v
+
+      - name: shellcheck
+        run: |
+          shellcheck installer/build.sh installer/run-vm.sh installer/build-in-docker.sh installer/boot-test.sh \
+            installer/config/includes.chroot/usr/local/bin/orion-kiosk \
+            installer/config/includes.chroot/etc/skel/.bash_profile
+          shellcheck -s sh installer/config/hooks/normal/*.hook.chroot
+
+  iso:
+    name: Image ISO (amd64)
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: write
+    container:
+      image: debian:bookworm
+      # live-build monte /proc, /sys et /dev dans le chroot.
+      options: --privileged
+    steps:
+      - name: Outils de construction
+        run: |
+          apt-get update
+          apt-get install -y live-build debootstrap python3 ca-certificates git
+
+      - uses: actions/checkout@v4
+
+      - name: Construction de l'image
+        env:
+          ORION_BUILD_DIR: /build
+        run: installer/build.sh
+
+      - name: Image en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orion-os-amd64-iso
+          path: |
+            installer/out/*.iso
+            installer/out/*.sha256
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Image jointe à la publication
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/out/*.iso
+            installer/out/*.sha256
+
+  boot:
+    name: Démarrage de l'image (QEMU)
+    needs: iso
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: orion-os-amd64-iso
+          path: installer/out
+
+      - name: QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 xorriso imagemagick
+          # KVM quand le runner le permet : le test est alors bien plus rapide.
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+          fi
+
+      - name: Démarrage et vérifications (carte virtio)
+        run: BOOT_TEST_GPU=virtio installer/boot-test.sh "$(ls installer/out/*.iso | head -n 1)" boot-test/virtio
+
+      - name: Démarrage et vérifications (carte standard de QEMU, secours X11)
+        if: ${{ !cancelled() }}
+        run: BOOT_TEST_GPU=std installer/boot-test.sh "$(ls installer/out/*.iso | head -n 1)" boot-test/std
+
+      - name: Journal et capture d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orion-os-boot-test
+          path: boot-test/
+          if-no-files-found: ignore

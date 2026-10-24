@@ -1,0 +1,190 @@
+.app-root.calculator {
+  background: var(--bg-plain);
+  padding: var(--sat) 18px calc(var(--sab) + 12px);
+  justify-content: flex-end;
+}
+
+.calc-display {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  min-height: 0;
+  padding: 0 6px 12px;
+  overflow: hidden;
+}
+
+.calc-top {
+  align-self: stretch;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: auto;
+}
+
+.calc-angle {
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--fg-2);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.calc-angle[hidden] {
+  visibility: hidden;
+  display: block;
+}
+
+.calc-expr {
+  font-size: 4.6rem;
+  font-weight: 300;
+  line-height: 1.1;
+  text-align: right;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+  transition: font-size calc(.15s * var(--anim)), opacity .2s;
+  user-select: text;
+}
+
+.calc-expr.flash {
+  opacity: .4;
+}
+
+.calc-result {
+  min-height: 1.6rem;
+  margin-top: 4px;
+  font-size: 1.4rem;
+  color: var(--fg-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-result.error {
+  color: var(--red);
+  font-size: 1.1rem;
+}
+
+.calc-pad,
+.calc-sci {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  width: 100%;
+  align-self: center;
+}
+
+/* Sur les écrans assez courts, le clavier (touches rondes) rétrécit pour laisser voir l'affichage. */
+.app-root.calculator:not(.scientific) .calc-pad {
+  width: clamp(min(100%, 240px), calc((var(--app-h, 100dvh) - var(--sat) - var(--sab) - 190px) * .8), 100%);
+}
+
+.calc-sci {
+  display: none;
+  margin-bottom: 12px;
+  gap: 10px 14px;
+}
+
+.app-root.scientific .calc-sci {
+  display: grid;
+}
+
+.calc-key {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 400;
+  background: var(--fill-2);
+  color: var(--fg);
+  transition: filter .1s, transform .08s;
+}
+
+.calc-key:active {
+  filter: brightness(1.35);
+  transform: scale(.96);
+}
+
+:root[data-theme="light"] .calc-key:active {
+  filter: brightness(.85);
+}
+
+.calc-key.fn {
+  background: var(--fill);
+  color: var(--fg);
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+:root[data-theme="dark"] .calc-key.fn {
+  background: #a5a5a5;
+  color: #000;
+}
+
+:root[data-theme="dark"] .calc-key:not(.fn):not(.op) {
+  background: #333;
+}
+
+.calc-key.op {
+  background: #ff9f0a;
+  color: #fff;
+  font-size: 2.2rem;
+}
+
+.calc-sci .calc-key {
+  aspect-ratio: auto;
+  height: 40px;
+  border-radius: 20px;
+  font-size: 1rem;
+  background: var(--fill);
+  color: var(--fg);
+}
+
+.app-root.scientific .calc-pad .calc-key {
+  aspect-ratio: auto;
+  height: 64px;
+  border-radius: 32px;
+}
+
+.app-root.scientific .calc-expr {
+  font-size: 3rem !important;
+}
+
+/* Téléphone en paysage, écran partagé : touches en pilule, hauteur prise sur l'espace restant. */
+@media (max-height: 500px) {
+  body.fullscreen .app-root.calculator .calc-pad,
+  body.fullscreen .app-root.calculator .calc-sci {
+    width: 100%;
+    min-height: 0;
+    gap: 6px 12px;
+    grid-auto-rows: 1fr;
+  }
+
+  body.fullscreen .app-root.calculator .calc-pad {
+    flex: 0 1 58%;
+  }
+
+  body.fullscreen .app-root.calculator.scientific .calc-sci {
+    flex: 0 1 30%;
+    margin-bottom: 6px;
+  }
+
+  body.fullscreen .app-root.calculator .calc-key {
+    aspect-ratio: auto;
+    height: auto;
+    min-height: 0;
+    border-radius: 999px;
+    font-size: 1.4rem;
+  }
+
+  body.fullscreen .app-root.calculator .calc-sci .calc-key {
+    font-size: .9rem;
+  }
+
+  body.fullscreen .app-root.calculator .calc-expr {
+    font-size: 2.6rem !important;
+  }
+}
