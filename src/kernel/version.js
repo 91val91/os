@@ -5,15 +5,16 @@
  *
  * `sequence` est le numéro d'ordre de la publication : il augmente de 1 à
  * chaque version publiée et c'est lui qui dit laquelle est la plus récente,
- * même quand le numéro affiché repart de zéro (1.2.0 → 0.1 alpha).
+ * même quand le numéro affiché repart de zéro (1.2.0 → 0.1 alpha) ou est
+ * repris (0.1.1 n° 5 → 0.1 n° 6).
  */
 export const RELEASE = Object.freeze({
-  version: '0.1.1',
+  version: '0.1',
   channel: 'alpha',
-  sequence: 5,
-  build: 'OR0A.261023.002',
+  sequence: 6,
+  build: 'OR0A.261024.001',
   codename: 'Rigel',
-  date: '2026-10-23',
+  date: '2026-10-24',
   notes: Object.freeze([
     'Messagerie : sur Orion installé (ordinateur ou machine virtuelle), ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie. Les serveurs sont trouvés d\'après l\'adresse, la connexion est chiffrée et orion-server relève et envoie le courrier.',
     'Nouvelle autorisation « E-mails » : une app ne lit et n\'envoie vos e-mails que si vous l\'acceptez, et ne voit jamais votre mot de passe (Réglages → Applications pour la retirer).',

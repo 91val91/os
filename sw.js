@@ -13,13 +13,20 @@
  * Une session ne mélange donc jamais deux versions du système.
  *
  * Les versions sont ordonnées par leur numéro d'ordre (sequence), le numéro
- * affiché ayant pu repartir de zéro (1.2.0 → 0.1 alpha). Une installation
+ * affiché ayant pu repartir de zéro (1.2.0 → 0.1 alpha) ou être repris (une
+ * 0.1 n° 6 après la 0.1 n° 4) : une version est identifiée par son numéro ET
+ * son numéro d'ordre, jusque dans le nom de son cache. Une installation
  * d'avant la 0.1 ne voit pas la 0.1 comme plus récente : ce service worker
  * la prépare à son installation et l'applique à son activation (redémarrage).
  */
 const PREFIX = 'orion-os-';
 const META = `${PREFIX}meta`;
-const releaseCache = (version) => `${PREFIX}release-${version}`;
+/** Cache d'une version : nommé au téléchargement ; les versions installées avant ce nommage gardent l'ancien nom. */
+const cacheOf = (manifest) => manifest.cache ?? `${PREFIX}release-${manifest.version}`;
+const nameCache = (manifest) => `${PREFIX}release-${manifest.version}${Number.isInteger(manifest.sequence) ? `-${manifest.sequence}` : ''}`;
+/** Même version publiée : même numéro et même numéro d'ordre. */
+const same = (a, b) => Boolean(a && b) && a.version === b.version && (a.sequence ?? null) === (b.sequence ?? null);
+const releaseId = (manifest) => `${manifest.version}#${manifest.sequence ?? ''}`;
 
 const at = (path) => new URL(path, self.registration.scope).href;
 const inScope = (url) => url.origin === self.location.origin && url.href.startsWith(self.registration.scope);
@@ -70,7 +77,8 @@ async function broadcast(message) {
  * interrompu, anciens caches) : s'il a la bonne empreinte, il est repris tel quel.
  */
 async function download(manifest, onProgress = () => {}) {
-  const target = await caches.open(releaseCache(manifest.version));
+  manifest.cache = nameCache(manifest);
+  const target = await caches.open(manifest.cache);
   const entries = Object.entries(manifest.files);
   let done = 0;
   let downloaded = 0;
@@ -98,13 +106,13 @@ function prepareLatest() {
   downloading ??= (async () => {
     const manifest = await fetchManifest();
     const before = await readState();
-    if (before.current?.version === manifest.version) return { upToDate: true };
+    if (same(before.current, manifest)) return { upToDate: true };
     await download(manifest, (progress) => broadcast({ type: 'update-progress', ...progress }));
     const now = await readState();
     await writeState({ ...now, staged: manifest });
     // Une version prête plus ancienne (remplacée par celle-ci) n'a plus lieu d'être gardée.
-    const old = now.staged?.version;
-    if (old && old !== manifest.version && old !== now.current?.version) await caches.delete(releaseCache(old));
+    const old = now.staged && cacheOf(now.staged);
+    if (old && old !== manifest.cache && old !== (now.current && cacheOf(now.current))) await caches.delete(old);
     return { staged: summary(manifest) };
   })().finally(() => (downloading = null));
   return downloading;
@@ -120,7 +128,7 @@ function prepareLatest() {
  */
 async function prepareMigration(current) {
   const manifest = await fetchManifest();
-  if (legacy(manifest) || manifest.version === current.version) return null;
+  if (legacy(manifest) || same(manifest, current)) return null;
   await download(manifest);
   await (await caches.open(META)).put('migration', json(manifest));
   return manifest;
@@ -141,7 +149,7 @@ async function applyMigration() {
 
 /** Remet en état le cache d'une version : renvoie le nombre de fichiers retéléchargés. */
 async function repair(manifest) {
-  const cache = await caches.open(releaseCache(manifest.version));
+  const cache = await caches.open(cacheOf(manifest));
   let repaired = 0;
   for (const [path, file] of Object.entries(manifest.files)) {
     const url = at(path);
@@ -159,8 +167,8 @@ async function repair(manifest) {
 
 /** Une version installée ou prête n'est utilisable que si son cache est complet. */
 async function complete(manifest) {
-  if (!manifest || !(await caches.has(releaseCache(manifest.version)))) return false;
-  const cache = await caches.open(releaseCache(manifest.version));
+  if (!manifest || !(await caches.has(cacheOf(manifest)))) return false;
+  const cache = await caches.open(cacheOf(manifest));
   const keys = new Set((await cache.keys()).map((request) => request.url));
   return Object.keys(manifest.files).every((path) => keys.has(at(path)));
 }
@@ -173,7 +181,12 @@ self.addEventListener('install', (event) => {
     (async () => {
       const { current } = await readState();
       if (await complete(current)) {
+        // Installation d'avant la 0.1 : la nouvelle version s'applique au prochain redémarrage.
         if (legacy(current)) await prepareMigration(current);
+        // Sinon, ce service worker continue de servir la même version installée : il prend
+        // la main tout de suite (sans attendre la fermeture de toutes les fenêtres d'Orion),
+        // pour que la prochaine mise à jour soit téléchargée avec ses règles.
+        else self.skipWaiting();
         return;
       }
       const manifest = await fetchManifest();
@@ -193,7 +206,7 @@ self.addEventListener('activate', (event) => {
       state = null;
       await applyMigration().catch(() => {});
       const { current, staged } = await readState();
-      const keep = new Set([META, current && releaseCache(current.version), staged && releaseCache(staged.version)]);
+      const keep = new Set([META, current && cacheOf(current), staged && cacheOf(staged)]);
       // Seuls les anciens caches d'Orion sont supprimés : l'origine github.io est partagée avec d'autres sites.
       for (const key of await caches.keys()) if (key.startsWith(PREFIX) && !keep.has(key)) await caches.delete(key);
       await self.clients.claim();
@@ -221,7 +234,7 @@ self.addEventListener('message', (event) => {
         .then((result) => {
           reply({ ok: true, ...result });
           // Les autres pages (fenêtre redémarrée, deuxième fenêtre) suivent aussi la fin du téléchargement.
-          if (result.staged) broadcast({ type: 'update-ready', version: result.staged.version, staged: result.staged });
+          if (result.staged) broadcast({ type: 'update-ready', version: result.staged.version, sequence: result.staged.sequence, staged: result.staged });
         })
         .catch((error) => {
           reply({ ok: false, error: error.message });
@@ -234,9 +247,9 @@ self.addEventListener('message', (event) => {
       (async () => {
         await downloading?.catch(() => {});
         const s = await readState();
-        if (s.staged && s.staged.version !== event.data.keep) {
+        if (s.staged && releaseId(s.staged) !== event.data.keep) {
           await writeState({ ...s, staged: null });
-          if (s.staged.version !== s.current?.version) await caches.delete(releaseCache(s.staged.version));
+          if (!s.current || cacheOf(s.staged) !== cacheOf(s.current)) await caches.delete(cacheOf(s.staged));
         }
         reply({ ok: true });
       })(),
@@ -265,10 +278,10 @@ self.addEventListener('message', (event) => {
           return reply({ ok: false, error: 'La mise à jour téléchargée est incomplète : téléchargez-la à nouveau.' });
         }
         await writeState({ current: staged, staged: null });
-        if (current && current.version !== staged.version) await caches.delete(releaseCache(current.version));
+        if (current && cacheOf(current) !== cacheOf(staged)) await caches.delete(cacheOf(current));
         reply({ ok: true, version: staged.version });
         // Les autres fenêtres d'Orion redémarrent aussi sur la nouvelle version.
-        broadcast({ type: 'update-installed', version: staged.version });
+        broadcast({ type: 'update-installed', version: staged.version, channel: staged.channel, sequence: staged.sequence });
       })(),
     );
   }
@@ -286,7 +299,7 @@ self.addEventListener('fetch', (event) => {
 async function respond(request, url) {
   const { current } = await readState();
   // caches.has : ne pas recréer (vide) le cache d'une version disparue.
-  const name = current && releaseCache(current.version);
+  const name = current && cacheOf(current);
   const cache = name && (await caches.has(name)) ? await caches.open(name) : null;
   const page = request.mode === 'navigate' && (url.origin + url.pathname === at('./') || url.pathname.endsWith('/index.html'));
   // La version installée est servie telle quelle (les paramètres comme ?fullscreen sont ignorés).

@@ -1,17 +1,17 @@
 {
- "version": "0.1.1",
+ "version": "0.1",
  "channel": "alpha",
- "sequence": 5,
- "build": "OR0A.261023.002",
+ "sequence": 6,
+ "build": "OR0A.261024.001",
  "codename": "Rigel",
- "date": "2026-10-23",
+ "date": "2026-10-24",
  "notes": [
   "Messagerie : sur Orion installé (ordinateur ou machine virtuelle), ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie. Les serveurs sont trouvés d'après l'adresse, la connexion est chiffrée et orion-server relève et envoie le courrier.",
   "Nouvelle autorisation « E-mails » : une app ne lit et n'envoie vos e-mails que si vous l'acceptez, et ne voit jamais votre mot de passe (Réglages → Applications pour la retirer).",
   "Pour les développeurs : Courrier, une app d'e-mail complète prête à publier (Store → Compte → console développeur → nouvelle app → Modèles). Elle utilise vos comptes, ou fonctionne sans compte.",
   "Image installable : Orion s'affiche en plein écran et démarre plus vite sur les cartes graphiques sans accélération 3D."
  ],
- "size": 1424281,
+ "size": 1424703,
  "files": {
   "./assets/icon-192.png": {
    "hash": "5550b85845e630cc4277f8f8bd4c6a7132c2194642d8d6857835a063e2dc4236",
@@ -334,8 +334,8 @@
    "size": 25085
   },
   "./src/kernel/version.js": {
-   "hash": "ac0190db465765cf37cffe14262422313a948118cd647feaf096413e3b264eb5",
-   "size": 1712
+   "hash": "cdda9de97c1a820c74847c090122e8674c0dc55088f807e2919e93277a9c02bf",
+   "size": 1755
   },
   "./src/kernel/vfs.js": {
    "hash": "071640ab0b600d5053d772f21098b16560427fd2f633e59577e39169237a8267",
@@ -442,8 +442,8 @@
    "size": 20583
   },
   "./src/system/integrity.js": {
-   "hash": "0eaa99931c402e2ccf4667b1c45c28ae94848e84414256fc9e3a5c5c928843ca",
-   "size": 3408
+   "hash": "eefcabe2654930ce45c386317e767165f7bc1c9577395754a767a32575e43aef",
+   "size": 3532
   },
   "./src/system/lockscreen.js": {
    "hash": "425642f5ee7d7f1aec656b172287052d1247241e862f25c10fd9444909750f34",
@@ -498,8 +498,8 @@
    "size": 2235
   },
   "./src/system/updates.js": {
-   "hash": "2f93d3a736fc14942c9ac2de0c229d14225ab4fe9cbe6929f9aeb30d937e0520",
-   "size": 11319
+   "hash": "f1bafef5e921b3da8684773905bbf90e8989c0876df4339893e434a1353354ea",
+   "size": 11574
   },
   "./src/system/wallpapers.js": {
    "hash": "dffd49888bdd864365f125ecf38eaba8d4e8d75fa45382a0972822c2ca9bf6f9",

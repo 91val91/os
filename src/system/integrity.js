@@ -25,7 +25,8 @@ export async function checkIntegrity({ env = globalThis, bridge = null, onProgre
     const saved = (await caches.has(`${PREFIX}meta`)) ? await (await caches.open(`${PREFIX}meta`)).match('state') : null;
     const current = saved ? (await saved.json()).current : null;
     if (current?.files) {
-      const name = `${PREFIX}release-${current.version}`;
+      // Nom du cache donné par le service worker au téléchargement (ancien nommage : le numéro seul).
+      const name = current.cache ?? `${PREFIX}release-${current.version}`;
       const cache = (await caches.has(name)) ? await caches.open(name) : null;
       const base = new URL('./', env.location.href);
       const entries = Object.entries(current.files);

@@ -42,6 +42,9 @@ export function compareReleases(a, b) {
 }
 
 const newer = (release) => compareReleases(release, RELEASE) > 0;
+/** Même version publiée : même numéro et même numéro d'ordre (une 0.1 n° 6 n'est pas la 0.1 n° 4). */
+const same = (a, b) => Boolean(a && b) && a.version === b.version && (a.sequence ?? null) === (b.sequence ?? null);
+const releaseId = (release) => `${release.version}#${release.sequence ?? ''}`;
 
 const summary = (manifest, download = manifest.size) => ({
   version: manifest.version,
@@ -177,14 +180,14 @@ export class UpdateManager {
       this.k.notifications.clear({ appId: 'settings', tag: 'update' });
       return;
     }
-    const known = this.available?.version === manifest.version;
+    const known = same(this.available, manifest);
     let staged = (await this.#ask({ type: 'status' }))?.staged;
-    if (staged && staged.version !== manifest.version) {
-      await this.#ask({ type: 'discard', keep: manifest.version });
+    if (staged && !same(staged, manifest)) {
+      await this.#ask({ type: 'discard', keep: releaseId(manifest) });
       staged = null;
     }
     const estimate = await this.#ask({ type: 'estimate', files: manifest.files });
-    this.#set(staged?.version === manifest.version ? 'ready' : 'available', { available: summary(manifest, estimate?.size) });
+    this.#set(same(staged, manifest) ? 'ready' : 'available', { available: summary(manifest, estimate?.size) });
     if (!known) this.#notify();
     if (auto && this.status === 'available' && this.k.settings.get('updates.autoDownload')) await this.download();
   }
@@ -231,7 +234,7 @@ export class UpdateManager {
   #onMessage(message) {
     if (message.type === 'update-progress' && newer(message)) {
       if (['installing', 'checking'].includes(this.status)) return;
-      if (this.status !== 'downloading') this.available = this.available?.version === message.version ? this.available : summary({ version: message.version, channel: message.channel, sequence: message.sequence, size: 0 });
+      if (this.status !== 'downloading') this.available = same(this.available, message) ? this.available : summary({ version: message.version, channel: message.channel, sequence: message.sequence, size: 0 });
       this.#set('downloading', { progress: message });
       this.#watch();
     } else if (message.type === 'update-ready' && this.status === 'downloading') {
