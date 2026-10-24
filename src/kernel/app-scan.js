@@ -12,7 +12,7 @@ const RULES = [
   { level: 'danger', id: 'miner', pattern: /coinhive|cryptonight|coinimp|webminepool|crypto-?loot|monero[\s\S]{0,40}min(?:er|ing)/i, message: 'Contient un mineur de cryptomonnaie' },
   { level: 'danger', id: 'impersonation', pattern: /(?:code de verrouillage|mot de passe (?:d'|de l'|du )?(?:orion|compte|appareil|développeur)|identifiants? (?:d')?orion|compte orion)[\s\S]{0,160}<input/i, message: 'Imite une demande d\'identifiants d\'Orion (hameçonnage)' },
   // Avertissement : comportements suspects ou interdits (bloqués à l'exécution).
-  { level: 'warning', id: 'network', pattern: /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b|(?:src|href|action)\s*=\s*["']?(?:https?:)?\/\//i, message: 'Essaie de contacter Internet (bloqué : les apps du Store n\'ont pas d\'accès au réseau)' },
+  { level: 'warning', id: 'network', pattern: /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b|(?:src|href|action)\s*=\s*["']?(?:https?:)?\/\//i, message: 'Essaie de contacter Internet directement (bloqué : une app passe par orion.net, avec l\'autorisation « Internet »)' },
   { level: 'warning', id: 'dynamic', pattern: /\beval\s*\(|\bnew\s+Function\s*\(|setTimeout\s*\(\s*["'`]|setInterval\s*\(\s*["'`]/, message: 'Exécute du code construit à la volée (eval)' },
   { level: 'warning', id: 'obfuscated', test: obfuscated, message: 'Code illisible ou masqué (obfuscation)' },
   { level: 'warning', id: 'credentials', pattern: /<input[^>]*type\s*=\s*["']?password|num[ée]ro de (?:carte|cb)|card number|\b(?:cvv|cvc|iban)\b/i, message: 'Demande un mot de passe ou des coordonnées bancaires' },

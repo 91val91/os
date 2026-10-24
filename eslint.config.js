@@ -15,7 +15,7 @@ export default [
         performance: 'readonly', structuredClone: 'readonly', fetch: 'readonly', URL: 'readonly', URLSearchParams: 'readonly',
         AbortController: 'readonly', Blob: 'readonly', FileReader: 'readonly', Audio: 'readonly', Node: 'readonly',
         TextEncoder: 'readonly', TextDecoder: 'readonly', atob: 'readonly', btoa: 'readonly', MediaRecorder: 'readonly', ResizeObserver: 'readonly',
-        sessionStorage: 'readonly', BroadcastChannel: 'readonly', Buffer: 'readonly',
+        sessionStorage: 'readonly', BroadcastChannel: 'readonly', Buffer: 'readonly', Headers: 'readonly',
         getComputedStyle: 'readonly', getSelection: 'readonly', globalThis: 'readonly', self: 'readonly', caches: 'readonly',
         history: 'readonly', Request: 'readonly', Response: 'readonly', process: 'readonly', crypto: 'readonly', MessageChannel: 'readonly', MutationObserver: 'readonly', Image: 'readonly', setImmediate: 'readonly',
       },

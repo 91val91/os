@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   location: { label: 'Localisation', icon: 'location', reason: 'connaître votre position' },
   contacts: { label: 'Contacts', icon: 'user', reason: 'accéder à vos contacts' },
   mail: { label: 'E-mails', icon: 'mail', reason: 'lire, classer et envoyer vos e-mails (comptes ajoutés dans les Réglages)' },
+  internet: { label: 'Internet', icon: 'globe', reason: 'se connecter à des sites et services en ligne (jamais à votre réseau local)' },
 };
 
 export class PermissionService {

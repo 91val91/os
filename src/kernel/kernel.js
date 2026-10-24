@@ -18,6 +18,7 @@
  *     ├─ bluetooth       BlueZ ou Web Bluetooth
  *     ├─ location        GPS (gpsd) ou géolocalisation du navigateur
  *     ├─ mail            comptes e-mail IMAP/SMTP (relevés et envoyés par orion-server)
+ *     ├─ net             accès à Internet des apps (autorisation « Internet »)
  *     ├─ telephony       appels et SMS : modem, apps du téléphone ou simulation
  *     └─ device          HAL : batterie, vibreur, informations
  */
@@ -41,6 +42,7 @@ import { NetworkService } from './network.js';
 import { BluetoothService } from './bluetooth.js';
 import { LocationService } from './location.js';
 import { MailService } from './mail.js';
+import { NetService } from './net.js';
 import { IdentityService } from './identity.js';
 import { seedFilesystem, writeSystemFiles } from './seed.js';
 import { COMMAND_NAMES } from './shell.js';
@@ -129,6 +131,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
   const bluetooth = new BluetoothService({ events, settings, env, bridge, log, timers }).init();
   const location = new LocationService({ events, settings, env, bridge, log, now, timers }).init();
   const mail = new MailService({ bridge, events, log, account: () => accountId });
+  const net = new NetService({ bridge, env, log });
   const identity = new IdentityService({ accounts, account: () => accountId, mail, events, log, now, fetch: env.fetch?.bind(env), subtle: env.crypto?.subtle });
 
   const contacts = new ContactsProvider({ fs, events }).load();
@@ -199,6 +202,7 @@ export async function bootKernel({ backend = new MemoryBackend(), accounts = nul
     bluetooth,
     location,
     mail,
+    net,
     telephony,
     device,
     /** Efface toutes les données (réinitialisation d'usine). */

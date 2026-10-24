@@ -1,7 +1,8 @@
 /**
- * Retour de la connexion Google ou Microsoft (src/auth.html) : le jeton d'identité
- * est renvoyé à Orion, qui le vérifie (voir kernel/identity.js et
- * system/sign-in.js). Il ne reste ni dans l'adresse ni dans l'historique.
+ * Retour d'une connexion (src/auth.html) : Google ou Microsoft pour le compte
+ * en ligne (jeton d'identité vérifié par kernel/identity.js), ou le service
+ * d'une app (orion.net.authorize). Les paramètres sont renvoyés à Orion
+ * (voir system/sign-in.js) et ne restent ni dans l'adresse ni dans l'historique.
  */
 const params = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
 const message = {
@@ -10,6 +11,8 @@ const message = {
   idToken: params.get('id_token') ?? '',
   error: params.get('error') ?? '',
   description: params.get('error_description') ?? '',
+  // Tous les paramètres du retour, pour les apps qui se connectent à leur service (orion.net.authorize).
+  params: Object.fromEntries([...params].slice(0, 30).map(([k, v]) => [k.slice(0, 64), v.slice(0, 4096)])),
 };
 history.replaceState(null, '', location.pathname);
 const status = document.getElementById('status');

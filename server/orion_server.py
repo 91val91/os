@@ -6,8 +6,9 @@ Sur une machine Orion (image installable, voir installer/), ce programme :
 * sert les fichiers de l'interface (index.html, sw.js, version.json,
   manifest.webmanifest, assets/, src/) sur http://127.0.0.1:8080 ;
 * expose sous /api/ le Wi-Fi (NetworkManager), le Bluetooth (BlueZ), le
-  réseau mobile (ModemManager), le GPS (gpsd), l'alimentation (systemd) et
-  la messagerie (comptes IMAP/SMTP, voir orion_mail.py), selon le contrat
+  réseau mobile (ModemManager), le GPS (gpsd), l'alimentation (systemd),
+  la messagerie (comptes IMAP/SMTP, voir orion_mail.py) et les requêtes
+  Internet des apps autorisées (voir orion_net.py), selon le contrat
   décrit dans server/API.md ;
 * avec --simulate, imite tout ce matériel en mémoire pour développer et
   tester l'interface dans un navigateur ordinaire ;
@@ -53,6 +54,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from orion_mail import MailError, MailService, MailStore, SimulatedMailService
+from orion_net import MAX_REQUEST as NET_MAX_REQUEST, NetError, NetProxy
 
 BRIDGE_NAME = "orion-server"
 BRIDGE_VERSION = "1.0.0"
@@ -2076,6 +2078,18 @@ def _mail_call(action: Callable[[], Any]) -> Any:
         raise ApiError(error.status, error.message) from None
 
 
+def net_routes(net: NetProxy) -> dict[str, dict[str, Handler]]:
+    """Requêtes Internet des apps qui ont l'autorisation « Internet » (voir orion_net.py)."""
+
+    def request(hw: Any, body: dict, q: dict) -> dict:
+        try:
+            return net.request(body)
+        except NetError as error:
+            raise ApiError(error.status, error.message) from None
+
+    return {"/api/net/request": {"POST": request}}
+
+
 def mail_routes(mail: MailService) -> dict[str, dict[str, Handler]]:
     """Messagerie : comptes de l'utilisateur et opérations IMAP/SMTP (voir orion_mail.py)."""
     return {
@@ -2296,7 +2310,7 @@ class OrionHandler(BaseHTTPRequestHandler):
         site = self.headers.get("Sec-Fetch-Site")
         return site is None or site.strip().lower() in ("same-origin", "none")
 
-    def _read_json(self) -> dict:
+    def _read_json(self, limit: int = MAX_BODY) -> dict:
         if self.headers.get("Transfer-Encoding"):
             raise ApiError(411, "Longueur de la requête requise")
         raw_length = self.headers.get("Content-Length")
@@ -2306,7 +2320,7 @@ class OrionHandler(BaseHTTPRequestHandler):
             raise ApiError(400, "Longueur de la requête invalide") from None
         if length < 0:
             raise ApiError(400, "Longueur de la requête invalide")
-        if length > MAX_BODY:
+        if length > limit:
             raise ApiError(413, "Requête trop volumineuse")
         data = self.rfile.read(length) if length else b""
         if len(data) != length:
@@ -2375,7 +2389,8 @@ class OrionHandler(BaseHTTPRequestHandler):
                 self._error(403, "Requête refusée : « Content-Type: application/json » attendu", close=True)
                 return
             try:
-                body = self._read_json()
+                # Requêtes Internet des apps : corps jusqu'à 1 Mo, encodé en base64 dans le JSON.
+                body = self._read_json(NET_MAX_REQUEST * 2 if path == "/api/net/request" else MAX_BODY)
             except ApiError as error:
                 self._error(error.status, error.message, close=True)
                 return
@@ -2440,6 +2455,7 @@ class OrionHTTPServer(ThreadingHTTPServer):
         allow_hosts: tuple[str, ...] = (),
         protection: ProtectionStore | None = None,
         mail: MailService | None = None,
+        net: NetProxy | None = None,
     ):
         if ":" in address[0]:
             self.address_family = socket.AF_INET6
@@ -2452,11 +2468,12 @@ class OrionHTTPServer(ThreadingHTTPServer):
         self.routes = dict(API_ROUTES)
         self.routes.update(server_routes(self.protection, self.root))
         self.routes.update(mail_routes(self.mail))
+        self.routes.update(net_routes(net if net is not None else NetProxy()))
         hardware_status = self.routes["/api/status"]["GET"]
 
         def status(hw: Any, body: dict, query: dict) -> dict:
             data = hardware_status(hw, body, query)
-            return {**data, "capabilities": {**data.get("capabilities", {}), "protection": True, "integrity": True, "mail": True}}
+            return {**data, "capabilities": {**data.get("capabilities", {}), "protection": True, "integrity": True, "mail": True, "net": True}}
 
         self.routes["/api/status"] = {"GET": status}
         if simulated:
@@ -2482,8 +2499,9 @@ def make_server(
     allow_hosts: tuple[str, ...] = (),
     protection: ProtectionStore | None = None,
     mail: MailService | None = None,
+    net: NetProxy | None = None,
 ) -> OrionHTTPServer:
-    return OrionHTTPServer((host, port), root, hardware, allow_hosts, protection, mail)
+    return OrionHTTPServer((host, port), root, hardware, allow_hosts, protection, mail, net)
 
 
 # --------------------------------------------------------------------------

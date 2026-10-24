@@ -901,7 +901,7 @@ class SimulatedFlowsTest(ServerTestCase):
         status, payload = self.api("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertTrue(payload["simulated"])
-        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network", "protection", "integrity", "mail"})
+        self.assertEqual(set(payload["capabilities"]), {"wifi", "bluetooth", "modem", "gps", "power", "network", "protection", "integrity", "mail", "net"})
 
     def test_wifi(self):
         wifi = self.api("GET", "/api/wifi?rescan=1")[1]

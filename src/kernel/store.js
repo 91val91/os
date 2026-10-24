@@ -41,7 +41,7 @@ export const PALETTES = [
   ['#8e8e93', '#3a3a3c'],
 ];
 /** Autorisations qu'une app du Store peut demander. */
-export const STORE_PERMISSIONS = ['location', 'mail'];
+export const STORE_PERMISSIONS = ['location', 'mail', 'internet'];
 
 /** « 1,99 € » */
 export function formatPrice(cents) {

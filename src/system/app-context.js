@@ -6,6 +6,7 @@
  */
 import { EventBus } from '../kernel/events.js';
 import { sandbox, USER_SPACE } from '../kernel/vfs.js';
+import { authorizeInWindow, redirectUri } from './sign-in.js';
 
 /**
  * Façade d'un service : seulement les méthodes et propriétés listées. Les
@@ -101,6 +102,30 @@ export function createAppContext({ ui, proc, pkg }) {
     send: mailCall('send'),
   };
 
+  /**
+   * Internet (autorisation « Internet ») : Orion fait les requêtes de l'app,
+   * jamais vers Orion lui-même ni vers le réseau local (voir kernel/net.js).
+   */
+  const allowNet = async () => {
+    if (!(await kernel.permissions.request(appId, 'internet'))) throw new Error('Accès à Internet refusé');
+  };
+  const net = {
+    permission: () => kernel.permissions.check(appId, 'internet'),
+    get proxied() {
+      return kernel.net.proxied;
+    },
+    async request(url, options) {
+      await allowNet();
+      return kernel.net.request(url, options);
+    },
+    /** Connexion à un service en ligne (OAuth) : fenêtre du service, retour sur src/auth.html. */
+    async authorize(url) {
+      await allowNet();
+      return authorizeInWindow(url);
+    },
+    redirectUri: () => redirectUri(),
+  };
+
   const storage = {
     get(key, fallback = null) {
       storageCache ??= kernel.fs.readJSON(storageFile, {});
@@ -138,6 +163,7 @@ export function createAppContext({ ui, proc, pkg }) {
     device: expose(kernel.device, DEVICE_API, ['battery', 'connectivity']),
     location,
     mail,
+    net,
     sound: expose(ui.sound, SOUND_API),
     now: () => kernel.now(),
     log: (message) => kernel.log.info(appId, message),

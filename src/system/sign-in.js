@@ -1,10 +1,13 @@
 /**
+ * Connexions par la page d'un service en ligne.
+ *
  * « Continuer avec Google / Microsoft » : la page de connexion du fournisseur
  * s'ouvre dans une fenêtre, qui revient sur src/auth.html ; celle-ci renvoie
  * le jeton à Orion (BroadcastChannel, ou la fenêtre qui l'a ouverte). Quand
  * aucune fenêtre ne peut s'ouvrir (bloquée, app installée sur iPhone), la
  * connexion se fait dans la page même et Orion la termine au redémarrage.
- * Le jeton est vérifié par le noyau (kernel/identity.js).
+ * Le jeton est vérifié par le noyau (kernel/identity.js). Les apps du Store se
+ * connectent de la même façon à leurs services (authorizeInWindow).
  */
 import { h } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
@@ -48,6 +51,20 @@ export function signInWithProvider(kernel, provider, { loginHint = '', purpose =
     location.assign(again.url);
     return { promise: new Promise(() => {}), cancel() {} };
   }
+  const wait = waitForCallback(popup, state);
+  const promise = wait.promise.then((message) => {
+    if (message.error || !message.idToken) throw failure(message);
+    return kernel.identity.completeOidc(provider, { idToken: message.idToken, nonce });
+  });
+  return { promise, cancel: wait.cancel };
+}
+
+/**
+ * Attend le retour de la fenêtre `popup` sur src/auth.html (BroadcastChannel, ou
+ * la fenêtre qui l'a ouverte). La fenêtre du fournisseur ne dit pas toujours
+ * qu'elle a été fermée : délai, et `cancel` (bouton Annuler).
+ */
+function waitForCallback(popup, state) {
   let cancel = () => {};
   const promise = new Promise((resolve, reject) => {
     const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel(CHANNEL) : null;
@@ -63,18 +80,41 @@ export function signInWithProvider(kernel, provider, { loginHint = '', purpose =
       fn(value);
     };
     const onMessage = (message) => {
-      if (message?.type !== 'orion-auth' || message.state !== state) return;
-      if (message.error || !message.idToken) return finish(reject, failure(message));
-      kernel.identity.completeOidc(provider, { idToken: message.idToken, nonce }).then((result) => finish(resolve, result), (error) => finish(reject, error));
+      if (message?.type === 'orion-auth' && message.state === state) finish(resolve, message);
     };
     const onWindowMessage = (event) => event.origin === location.origin && onMessage(event.data);
     if (channel) channel.onmessage = (event) => onMessage(event.data);
     window.addEventListener('message', onWindowMessage);
-    // La fenêtre du fournisseur ne dit pas toujours qu'elle a été fermée : délai, et bouton Annuler.
     const timer = setTimeout(() => finish(reject, new IdentityError('Connexion expirée')), TIMEOUT);
     cancel = () => finish(reject, new IdentityError('Connexion annulée'));
   });
   return { promise, cancel: () => cancel() };
+}
+
+/**
+ * Connexion d'une app à un service en ligne (OAuth, SDK orion.net.authorize) :
+ * Orion ouvre la page du service dans une fenêtre, avec son propre `state`,
+ * et renvoie à l'app les paramètres du retour (code, jeton ou erreur).
+ * L'app indique src/auth.html comme adresse de retour (orion.net.redirectUri()).
+ */
+export function authorizeInWindow(rawUrl, { self = location.origin } = {}) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return Promise.reject(new IdentityError('Adresse de connexion invalide'));
+  }
+  if (url.protocol !== 'https:' || url.origin === self) return Promise.reject(new IdentityError('La connexion doit se faire sur un site en https'));
+  const state = `p${randomToken()}`;
+  url.searchParams.set('state', state);
+  const popup = window.open(url.href, 'orion-sign-in', 'popup,width=500,height=720');
+  if (!popup) return Promise.reject(new IdentityError('La fenêtre de connexion a été bloquée : réessayez'));
+  return waitForCallback(popup, state).promise.then((message) => {
+    const params = { ...message.params };
+    delete params.state;
+    if (params.error === 'access_denied') throw new IdentityError('Connexion annulée');
+    return params;
+  });
 }
 
 /**

@@ -19,17 +19,25 @@
  *   orion.mail.status() · accounts() · folders() · messages() · message()
  *     · setFlags() · move() · remove() · send()   autorisation « E-mails » déclarée
  *                                     (comptes des Réglages, relevés par orion-server)
+ *   orion.net.request(url, options) · authorize(url) · redirectUri() · status()
+ *                                     autorisation « Internet » déclarée : Orion fait
+ *                                     les requêtes (jamais vers lui ni le réseau local)
  *   orion.on('pause' | 'resume' | 'theme', fn) · orion.onBack(fn) · orion.close()
  *
  * Limite connue : une boucle infinie dans l'app peut ralentir Orion (le
  * navigateur décide si l'iframe a son propre processus).
  */
 import { h } from '../lib/dom.js';
+import { authorizeInWindow } from './sign-in.js';
 
 export const styles = [];
 
 const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'";
 const MAX_STORAGE = 1_048_576;
+/** Requêtes Internet d'une app : au plus NET_LIMIT par minute, NET_PARALLEL à la fois. */
+const NET_LIMIT = 300;
+const NET_PARALLEL = 6;
+const NET_BODY = 1_500_000; // caractères (1 Mo encodé en base64)
 /** Envois d'e-mails par une app : au plus SEND_LIMIT par fenêtre de SEND_WINDOW. */
 const SEND_LIMIT = 10;
 const SEND_WINDOW = 600_000;
@@ -104,6 +112,12 @@ const SDK = `(() => {
       info: () => call('device.info'),
     }),
     location: Object.freeze({ current: () => call('location.current') }),
+    net: Object.freeze({
+      status: () => call('net.status'),
+      request: (url, options) => call('net.request', url, options || {}),
+      authorize: (url) => call('net.authorize', url),
+      redirectUri: () => call('net.redirectUri'),
+    }),
     mail: Object.freeze({
       status: () => call('mail.status'),
       accounts: () => call('mail.accounts'),
@@ -165,8 +179,33 @@ export function hostFromContext(ctx, { test = false } = {}) {
     location: () => (test ? Promise.reject(new Error('Position indisponible pendant un essai')) : ctx.location.current()),
     // Pendant un essai, l'app n'est pas installée : pas d'accès aux vrais e-mails.
     mail: test ? null : ctx.mail,
+    net: test ? trialNet(ctx) : ctx.net,
     close: () => (test ? null : ctx.exit()),
     log: (message) => ctx.log(message),
+  };
+}
+
+/** Internet pendant un essai de la console : l'app n'est pas installée, on demande une fois. */
+function trialNet(ctx) {
+  let answer = null;
+  const allow = async () => {
+    answer ??= ctx.ui.confirm({ title: 'Accès à Internet', message: 'Pendant cet essai, l\'app peut contacter des sites sur Internet (jamais votre réseau local).', confirmLabel: 'Autoriser' }).then(Boolean);
+    if (!(await answer)) throw new Error('Accès à Internet refusé');
+  };
+  return {
+    permission: () => 'prompt',
+    get proxied() {
+      return ctx.kernel.net.proxied;
+    },
+    request: async (url, options) => {
+      await allow();
+      return ctx.kernel.net.request(url, options);
+    },
+    authorize: async (url) => {
+      await allow();
+      return authorizeInWindow(url);
+    },
+    redirectUri: () => new URL('src/auth.html', new URL('./', location.href)).href,
   };
 }
 
@@ -215,6 +254,30 @@ export function runApp(root, { app, code, host, onStop = null }) {
 
   const storageSize = (data) => new Blob([JSON.stringify(data)]).size;
   const sends = [];
+  const netTimes = [];
+  const netQueue = [];
+  let netActive = 0;
+  let authorizing = false;
+  const internet = () => {
+    if (!host.net) throw new Error('Internet indisponible');
+    return host.net;
+  };
+  /** Une requête à la fois par créneau : NET_PARALLEL en cours, les autres attendent. */
+  async function netSlot(run) {
+    const now = Date.now();
+    while (netTimes.length && now - netTimes[0] > 60_000) netTimes.shift();
+    if (netTimes.length >= NET_LIMIT) throw new Error('Trop de requêtes Internet : attendez une minute');
+    netTimes.push(now);
+    if (netActive >= NET_PARALLEL) await new Promise((resolve) => netQueue.push(resolve));
+    netActive++;
+    try {
+      return await run();
+    } finally {
+      netActive--;
+      netQueue.shift()?.();
+    }
+  }
+  const headerMap = (value) => Object.fromEntries(Object.entries(value && typeof value === 'object' ? value : {}).slice(0, 50).map(([k, v]) => [text(k, 64), text(v, 4096)]));
 
   const mailbox = () => {
     if (!host.mail) throw new Error('Messagerie indisponible pendant un essai : publiez l\'app et installez-la pour utiliser vos comptes');
@@ -280,6 +343,27 @@ export function runApp(root, { app, code, host, onStop = null }) {
       const fix = await host.location();
       return fix && { lat: fix.lat, lon: fix.lon, accuracy: fix.accuracy ?? null, altitude: fix.alt ?? null, time: fix.time ?? null };
     },
+    'net.status': () => ({ available: Boolean(host.net), permission: host.net ? host.net.permission() : 'denied', proxied: Boolean(host.net?.proxied) }),
+    'net.request': (url, o = {}) =>
+      netSlot(() =>
+        internet().request(text(url, 4096), {
+          method: text(o.method, 10) || 'GET',
+          headers: headerMap(o.headers),
+          body: o.body == null ? null : text(o.body, NET_BODY),
+          bodyEncoding: o.bodyEncoding === 'base64' ? 'base64' : 'text',
+          responseType: ['json', 'base64'].includes(o.responseType) ? o.responseType : 'text',
+        }),
+      ),
+    'net.authorize': async (url) => {
+      if (authorizing) throw new Error('Une connexion est déjà en cours');
+      authorizing = true;
+      try {
+        return await internet().authorize(text(url, 4096));
+      } finally {
+        authorizing = false;
+      }
+    },
+    'net.redirectUri': () => internet().redirectUri(),
     'mail.status': () => ({ available: Boolean(host.mail?.available), permission: host.mail ? host.mail.permission() : 'denied', test: !host.mail }),
     'mail.accounts': () => mailbox().accounts(),
     'mail.folders': (account) => mailbox().folders(text(account, 64)),

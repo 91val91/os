@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 
-export function fakeBridge({ capabilities = { wifi: true, network: true, bluetooth: true, modem: true, gps: true, power: true, mail: true } } = {}) {
+export function fakeBridge({ capabilities = { wifi: true, network: true, bluetooth: true, modem: true, gps: true, power: true, mail: true, net: true } } = {}) {
   const state = {
     wifi: {
       enabled: true,
@@ -22,6 +22,8 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
     protection: {},
     // Messagerie (comme orion_mail : comptes sans mot de passe à l'extérieur, un dossier par nom).
     mail: { accounts: [], boxes: {}, sent: [], verified: [], next: 1 },
+    netRequests: [],
+    web: () => ({ status: 404, body: 'introuvable' }),
     gps: { available: true, fix: { lat: 48.8566, lon: 2.3522, alt: 35, speed: 0, heading: null, accuracy: 6, time: '2026-01-15T09:00:00Z', satellites: 9 } },
   };
   const requests = [];
@@ -151,6 +153,12 @@ export function fakeBridge({ capabilities = { wifi: true, network: true, bluetoo
       state.mail.accounts.push(account);
       state.mail.boxes[account.id] = { INBOX: [{ uid: 1, from: { name: 'Lucas', address: 'lucas@exemple.fr' }, to: [{ name: '', address: account.address }], cc: [], subject: 'Bonjour', date: 1, seen: false, flagged: false, answered: false, size: 10, attachments: false, preview: 'Salut', text: 'Salut' }], Envoyés: [] };
       return ok(publicAccount(account));
+    },
+    // Internet (orion-server fait la requête) : `state.web(requête)` imite les sites.
+    'POST net/request': (body) => {
+      state.netRequests.push(body);
+      const reply = state.web(body);
+      return reply.error ? fail(reply.status, reply.error) : ok({ ok: reply.status < 300, url: body.url, headers: {}, encoding: 'text', ...reply });
     },
     'POST mail/verify': (body) => {
       state.mail.verified.push(body.address);

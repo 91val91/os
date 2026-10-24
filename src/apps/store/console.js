@@ -52,7 +52,8 @@ const TEMPLATES = [
 /** Autorisations qu'une app du Store peut déclarer (l'utilisateur les accorde au premier usage). */
 const PERMISSION_TOGGLES = [
   { perm: 'location', title: 'Utilise la position', subtitle: 'L\'utilisateur devra l\'autoriser' },
-  { perm: 'mail', title: 'Accède aux e-mails', subtitle: 'Comptes des Réglages (Orion installé) ; l\'utilisateur devra l\'autoriser' },
+  { perm: 'mail', title: 'Accède aux e-mails', subtitle: 'Comptes des Réglages ; l\'utilisateur devra l\'autoriser' },
+  { perm: 'internet', title: 'Accède à Internet', subtitle: 'Par orion.net (jamais au réseau local) ; l\'utilisateur devra l\'autoriser' },
 ];
 
 /** Valeurs d'une app qui vient d'être créée (store.createApp) : un exemple peut les remplacer. */
@@ -61,7 +62,7 @@ const UNSET = { subtitle: '', description: '', category: 'Utilitaires', icon: GL
 const TERMS = [
   'Vous publiez des apps dont vous détenez les droits, sans contenu illégal, trompeur ou dangereux.',
   'Chaque version est examinée automatiquement avant sa publication ; une app qui tente de sortir de son environnement isolé, de miner de la cryptomonnaie ou de voler des identifiants est refusée.',
-  'Les apps s\'exécutent isolées, sans accès à Internet ni aux données des autres apps.',
+  'Les apps s\'exécutent isolées, sans accès aux données des autres apps ; elles n\'accèdent à Internet que par Orion, avec l\'autorisation de l\'utilisateur.',
   `Le Store retient ${Math.round(COMMISSION * 100)} % du prix de chaque vente ; le reste est versé sur votre solde. Les clients peuvent être remboursés pendant 2 heures après l'achat.`,
   `L'inscription coûte ${formatMoney(DEVELOPER_FEE)}, payés une fois. Pendant la version alpha d'Orion, tous les paiements sont fictifs (solde de test).`,
 ];
