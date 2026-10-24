@@ -209,3 +209,15 @@ test('noyau : le service d\'identité suit le compte de la session', async () =>
   assert.equal(kernel.identity.required, false);
   kernel.shutdown();
 });
+
+test('shell : « users » montre le compte en ligne de chaque profil', async () => {
+  const { registry, owner } = await registryWith('Camille');
+  const lea = registry.create({ name: 'Léa' });
+  registry.update(owner.id, { identity: { provider: 'google', email: 'camille@gmail.com', verified: true, method: 'oidc', subject: '1' } });
+  const kernel = await bootKernel({ accounts: registry, accountId: owner.id, env: {} });
+  const { Shell } = await import('../src/kernel/shell.js');
+  const out = (await new Shell(kernel).run('users')).output;
+  assert.match(out, /\* Camille \(propriétaire\)\n {4}camille@gmail\.com · Google, vérifié/);
+  assert.match(out, new RegExp(`${lea.name}\\n {4}sans compte en ligne`));
+  kernel.shutdown();
+});

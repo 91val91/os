@@ -8,6 +8,7 @@
 import { resolve, isTextMime, mimeFromName, inUserSpace } from './vfs.js';
 import { evaluate, clean } from '../lib/expr.js';
 import { displayName } from './contacts.js';
+import { provider } from './identity.js';
 
 export const ansi = {
   reset: '\x1b[0m',
@@ -826,7 +827,10 @@ const COMMANDS = {
       const current = k.account?.id;
       return k.accounts
         .list()
-        .map((a) => `${a.id === current ? '*' : ' '} ${a.name || '—'}${a.owner ? ' (propriétaire)' : ''}${a.email ? `\n    ${a.email}` : ''}`)
+        .map((a) => {
+          const online = a.identity ? `\n    ${a.identity.email} · ${provider(a.identity.provider)?.name ?? ''}${a.identity.verified ? ', vérifié' : ', non vérifié'}` : '\n    sans compte en ligne';
+          return `${a.id === current ? '*' : ' '} ${a.name || '—'}${a.owner ? ' (propriétaire)' : ''}${online}`;
+        })
         .join('\n');
     },
   },

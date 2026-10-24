@@ -9,7 +9,7 @@ import { h, animate } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar } from '../lib/ui.js';
 import { createPasscode } from '../kernel/settings.js';
-import { PROVIDERS, provider as providerById } from '../kernel/identity.js';
+import { PROVIDERS, provider as providerById, providerFor } from '../kernel/identity.js';
 import { platform } from './platform.js';
 import { signInWithProvider, providerBadge, nameFromEmail } from './sign-in.js';
 
@@ -74,7 +74,7 @@ export class SetupWizard {
       h(
         'div.setup-footer',
         next ? h('button.btn.btn-filled.block.setup-next', { type: 'button', onclick: next }, nextLabel) : null,
-        skip ? h('button.btn.btn-plain.block.setup-skip', { type: 'button', onclick: skip.action }, skip.label) : null,
+        ...[skip ?? []].flat().map((x) => h('button.btn.btn-plain.block.setup-skip', { type: 'button', onclick: x.action }, x.label)),
         back ? h('button.setup-back', { type: 'button', onclick: back }, icon('chevron-left', { size: 20 }), 'Retour') : null,
       ),
     );
@@ -161,7 +161,8 @@ export class SetupWizard {
 
   #provider() {
     const pick = (id) => {
-      if (id !== this.values.provider) this.values.email = '';
+      // Adresse déjà connue (profil d'avant les comptes en ligne) : gardée si elle va avec ce fournisseur.
+      if (this.values.email && id !== 'other' && providerFor(this.values.email) !== id) this.values.email = '';
       this.values.provider = id;
       this.values.manual = false;
       this.values.error = '';
@@ -212,27 +213,30 @@ export class SetupWizard {
 
     // « Continuer avec Google / Microsoft » : le fournisseur authentifie la personne.
     if (methods.oidc && !this.values.manual) {
+      // La fenêtre du fournisseur peut être fermée sans prévenir : un nouvel appui relance la connexion.
       let attempt = null;
-      const page = this.#screen(
+      const status = h('p.setup-note');
+      this.#screen(
         [
           ...head,
           h('p.setup-lead', `Connectez-vous sur la page de ${p.name}. Orion reçoit seulement votre nom, votre adresse et l'identifiant de votre compte, jamais votre mot de passe.`),
+          status,
           error,
         ],
         {
           next: async () => {
-            const button = page.querySelector('.setup-next');
-            button.disabled = true;
-            button.textContent = 'En attente de la connexion…';
+            attempt?.cancel();
             error.textContent = '';
+            let current = null;
             try {
-              attempt = signInWithProvider(this.k, p.id, { loginHint: this.values.email, purpose: this.mode === 'setup' ? 'setup' : 'link' });
-              const { identity, name } = await attempt.promise;
+              current = attempt = signInWithProvider(this.k, p.id, { loginHint: this.values.email, purpose: this.mode === 'setup' ? 'setup' : 'link' });
+              status.textContent = `Terminez la connexion dans la fenêtre de ${p.name}. Fenêtre fermée ? Touchez à nouveau « Continuer avec ${p.name} ».`;
+              const { identity, name } = await current.promise;
               succeeded(identity, name);
             } catch (e) {
+              if (current && attempt !== current) return; // remplacée par un nouvel essai
+              status.textContent = '';
               error.textContent = e.message;
-              button.disabled = false;
-              button.textContent = `Continuer avec ${p.name}`;
             }
           },
           nextLabel: `Continuer avec ${p.name}`,
@@ -305,10 +309,33 @@ export class SetupWizard {
       {
         next: submit,
         nextLabel: methods.mail ? 'Se connecter' : 'Continuer',
-        skip: methods.oidc ? { label: `Continuer avec ${p.name} à la place`, action: () => { this.values.manual = false; this.#go('signin'); } } : null,
+        skip: [
+          methods.oidc ? { label: `Continuer avec ${p.name} à la place`, action: () => { this.values.manual = false; this.#go('signin'); } } : null,
+          // Connexion par mot de passe refusée par le fournisseur (Outlook, par exemple) : l'adresse reste enregistrable.
+          methods.mail ? { label: 'Continuer sans vérifier', action: () => this.#unverified(p, email) } : null,
+        ].filter(Boolean),
         back,
       },
     );
+  }
+
+  /** Adresse enregistrée « non vérifiée » (vérifiable plus tard dans Réglages → Compte). */
+  async #unverified(p, email) {
+    const error = this.el.lastElementChild?.querySelector('.setup-error');
+    try {
+      const identity = this.k.identity.linkUnverified({ provider: p.id, email: email.value });
+      this.values.email = identity.email;
+      this.values.provider = identity.provider;
+      if (this.mode !== 'setup') {
+        this.ui.dialogs?.toast('Compte en ligne enregistré (non vérifié)');
+        return this.#close(identity);
+      }
+      if (!this.values.userName.trim()) this.values.userName = nameFromEmail(identity.email);
+      this.#go('profile');
+    } catch (e) {
+      if (error) error.textContent = e.message;
+      this.#shake(email);
+    }
   }
 
   /** Retour d'une connexion faite dans la page (app installée sur iPhone). */

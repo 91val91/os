@@ -67,7 +67,8 @@ Vous préférez la navigation Android à trois boutons (◁ ○ ▢) ? **Réglag
 ## Fonctionnalités
 
 **Système**
-- **Comptes et utilisateurs** : l'assistant crée votre compte (nom, e-mail facultatif) ; d'autres personnes peuvent avoir le leur sur le même téléphone (**Réglages → Compte → Utilisateurs**). Chaque compte a ses apps, fichiers, photos, contacts, messages, réglages et code ; on change d'utilisateur depuis l'écran verrouillé ou le volet de notifications. Les comptes sont enregistrés sur l'appareil uniquement (pas de synchronisation en ligne).
+- **Compte en ligne obligatoire** : l'assistant associe votre profil à un compte **Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo** ou à une autre adresse e-mail (Orange, Free, SFR, La Poste…). Voir [Compte en ligne](#compte-en-ligne).
+- **Profils et utilisateurs** : d'autres personnes peuvent avoir leur profil sur le même téléphone (**Réglages → Compte → Utilisateurs**), chacun avec son compte en ligne. Chaque profil a ses apps, fichiers, photos, contacts, messages, réglages et code ; on change d'utilisateur depuis l'écran verrouillé ou le volet de notifications. Les profils sont enregistrés sur l'appareil uniquement (pas de synchronisation en ligne).
 - Écran verrouillé avec horloge, notifications, lecture en cours, lampe et appareil photo ; code PIN haché (SHA-256 salé), appel d'urgence. Les erreurs de code sont comptées même après un redémarrage (attente d'1 min après 5 erreurs, puis 5 min, 15 min, 1 h).
 - **Protection de l'appareil** : voir [Protection de l'appareil](#protection-de-lappareil).
 - Accueil à pages avec dock, widgets (horloge, météo), badges, icônes vivantes (date du Calendrier, aiguilles de l'Horloge), mode édition par glisser-déposer.
@@ -274,8 +275,27 @@ Une page web n'a pas le droit de piloter les radios d'un téléphone : c'est And
 | Localisation | GPS du téléphone (API Geolocation, en https), avec votre accord et celui du navigateur | Récepteur GPS USB (gpsd) : position, altitude, vitesse, satellites |
 | Mode avion | Coupe les services d'Orion (appels, SMS, Bluetooth) | Coupe réellement le Wi‑Fi, le Bluetooth et le modem, puis les rallume comme avant |
 | E-mails | Indisponible (un navigateur ne peut pas se connecter à un serveur de messagerie) : les apps d'e-mail fonctionnent sans compte | Vrais comptes IMAP/SMTP (voir [Messagerie](#messagerie)) |
+| Compte en ligne | Vérifié par « Continuer avec Google / Microsoft » si activé, sinon enregistré « non vérifié » | Vérifié aussi par la connexion à la messagerie (IMAP) |
 
 Sur un ordinateur sans modem, **Réglages → Réseau mobile** permet de choisir le mode démonstration (appels et SMS simulés, correspondants qui répondent).
+
+## Compte en ligne
+
+Chaque profil d'Orion est associé à un compte en ligne : **Google (Gmail), Microsoft (Outlook, Hotmail, Live), Apple (iCloud), Yahoo** ou une autre adresse e-mail. Il est **obligatoire** : l'assistant de premier démarrage le demande (sans bouton pour passer), et un profil créé avant la 0.1 n° 6 le reçoit juste après le déverrouillage, avant d'accéder à l'accueil. On le change ou on le vérifie dans **Réglages → Compte → Compte en ligne**.
+
+Orion n'a pas de serveur de comptes : l'adresse est vérifiée **par le fournisseur lui-même**, de la meilleure façon disponible.
+
+1. **« Continuer avec Google » / « Continuer avec Microsoft »** (OpenID Connect) : la page de connexion du fournisseur s'ouvre ; Orion reçoit un jeton d'identité signé dont il vérifie la signature (clés publiées par le fournisseur), l'émetteur, le destinataire, la date et le nonce. Il n'obtient que le nom, l'adresse et l'identifiant du compte, jamais le mot de passe.
+2. **Connexion à la messagerie** (Orion installé) : `orion-server` se connecte au serveur de réception (IMAP) de l'adresse avec le mot de passe (ou le mot de passe d'application de Gmail, iCloud, Yahoo). Seul le titulaire de la boîte y parvient. Au choix, la boîte est aussi ajoutée à la messagerie d'Orion.
+3. Sinon, l'adresse est enregistrée **« non vérifiée »** : c'est le cas sur un téléphone tant que la connexion Google/Microsoft n'est pas activée. Aucun mot de passe n'est alors demandé.
+
+**Activer « Continuer avec Google / Microsoft »** sur votre copie d'Orion (GitHub Pages ou autre) : créez un identifiant client et inscrivez-le dans [`src/config/identity.js`](src/config/identity.js), puis publiez une version.
+
+- Google : [console.cloud.google.com](https://console.cloud.google.com) → API et services → Identifiants → « ID client OAuth », type **Application Web** ;
+- Microsoft : [entra.microsoft.com](https://entra.microsoft.com) → Inscriptions d'applications → Nouvelle inscription (« Comptes Microsoft personnels et professionnels »), plateforme **Web**, cocher **Jetons d'ID** ;
+- **URI de redirection** autorisée dans les deux cas : l'adresse d'Orion suivie de `src/auth.html` (par exemple `https://votre-nom.github.io/os/src/auth.html`).
+
+Un identifiant client n'est pas un secret : il peut être publié. Apple (« Se connecter avec Apple ») et Yahoo demandent un serveur pour ce type de connexion : leurs adresses sont vérifiées par la messagerie.
 
 ## Messagerie
 
@@ -313,26 +333,27 @@ Le téléphone garde la version installée, entièrement en cache, jusqu'à ce q
 - **Automatique** : le téléchargement est automatique par défaut ; l'installation peut l'être aussi (quand l'appareil est verrouillé et que rien n'est en cours : appel, réveil, musique).
 - **Version retirée** : si l'éditeur retire une version déjà téléchargée, elle est abandonnée et n'est jamais installée.
 
-**Numérotation** : Orion OS est en **0.1.1 (alpha)**. Chaque publication porte aussi un numéro d'ordre (`sequence`, +1 à chaque version) : c'est lui qui dit quelle version est la plus récente. Les appareils encore en 1.2.0 (ancienne numérotation) passent donc bien à la 0.1 : le nouveau service worker la télécharge en arrière-plan et l'applique au redémarrage suivant d'Orion.
+**Numérotation** : Orion OS est en **0.1 (alpha)**, publication n° 6. Chaque publication porte aussi un numéro d'ordre (`sequence`, +1 à chaque version) : c'est lui qui dit quelle version est la plus récente, même quand le numéro affiché repart en arrière. Les appareils en 0.1.1 (n° 5), en 0.1 (n° 4) ou encore en 1.2.0 (ancienne numérotation) passent donc bien à cette 0.1 n° 6 ; son cache porte le numéro d'ordre (`orion-os-release-0.1-6`), pour ne jamais être confondu avec celui de la 0.1 n° 4.
 
 **Publier une version** : changez le numéro, le numéro d'ordre (`sequence` + 1) et les nouveautés dans `src/kernel/version.js`, ajoutez vos fichiers à git (`git add`), lancez `npm run release` (qui régénère `version.json` à partir de l'index git : version, notes, empreinte et taille de chaque fichier tel que GitHub Pages le servira ; il refuse de tourner s'il reste des changements non ajoutés, et de republier sous le même numéro une version déjà poussée sur la branche suivie, que les appareils ne verraient pas), puis `git add version.json`, commitez et poussez. GitHub Pages publie tout ce qui est poussé : chaque push qui change l'interface est une nouvelle version. Les téléphones la proposent à la vérification suivante. Les tests échouent si `version.json` n'est plus à jour.
 
 ## Tests
 
 ```bash
-npm test            # 117 tests unitaires (noyau, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
+npm test            # 128 tests unitaires (noyau, comptes en ligne, Store, protection, messagerie, matériel avec un faux orion-server, mises à jour ; node:test, sans dépendance)
 npm install && npx playwright install chromium
-npm run test:e2e    # parcours complet dans Chromium : configuration, 20 apps, gestes, code PIN, comptes
+npm run test:e2e    # parcours complet dans Chromium : configuration, compte en ligne, 20 apps, gestes, code PIN, profils
 npm run lint        # ESLint
 npm run screenshots # régénère les captures du README
 npm run release     # régénère version.json avant de publier une version
-python3 -m unittest discover -s server   # 99 tests d'orion-server (pont matériel, protection, messagerie avec de faux serveurs IMAP et SMTP, synchronisation)
+python3 -m unittest discover -s server   # 101 tests d'orion-server (pont matériel, protection, messagerie avec de faux serveurs IMAP et SMTP, synchronisation)
 ```
 
 ## Structure du projet
 
 ```
 index.html, manifest.webmanifest, sw.js   PWA (plein écran, hors ligne, mises à jour)
+src/auth.html, src/config/identity.js     retour de connexion Google / Microsoft, identifiants clients
 version.json                              version publiée (npm run release)
 src/main.js                               point d'entrée
 src/kernel/                               noyau (services, shell, stockage)
@@ -350,7 +371,7 @@ installer/                                image ISO installable (live-build), ma
 
 Orion OS est un système d'exploitation **applicatif** : il gère ses propres processus, fichiers, paquets et périphériques virtuels, et s'appuie sur le navigateur (donc sur Android ou iOS) ou sur `orion-server` (Orion installé) pour le matériel. Concrètement :
 
-- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi et e-mails (Orion installé), plein écran et hors ligne ;
+- **réels** : appareil photo, micro, localisation, niveau de batterie, vibreur, son, état du réseau, appels et SMS (modem d'Orion installé, ou apps du téléphone), Bluetooth (Orion installé, ou appareils basse consommation dans Chrome), Wi‑Fi et e-mails (Orion installé), vérification du compte en ligne (Google/Microsoft une fois activés, ou messagerie d'Orion installé), plein écran et hors ligne ;
 - **simulés** : le mode démonstration de la téléphonie (au choix, sur un ordinateur sans modem), la lampe torche, la batterie sur un ordinateur sans batterie, et les **paiements du Store** (solde de test : pas encore de service de paiement ni de serveur du Store).
 
 Installé avec l'image prévue pour cela, Orion devient le système principal de la machine, à la manière de Firefox OS (B2G) ou KaiOS : un noyau Linux, un navigateur en mode kiosque lancé au démarrage et `orion-server` pour le matériel.

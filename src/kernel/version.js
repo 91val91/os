@@ -16,10 +16,11 @@ export const RELEASE = Object.freeze({
   codename: 'Rigel',
   date: '2026-10-24',
   notes: Object.freeze([
-    'Messagerie : sur Orion installé (ordinateur ou machine virtuelle), ajoutez vos comptes e-mail dans Réglages → Comptes de messagerie. Les serveurs sont trouvés d\'après l\'adresse, la connexion est chiffrée et orion-server relève et envoie le courrier.',
-    'Nouvelle autorisation « E-mails » : une app ne lit et n\'envoie vos e-mails que si vous l\'acceptez, et ne voit jamais votre mot de passe (Réglages → Applications pour la retirer).',
-    'Pour les développeurs : Courrier, une app d\'e-mail complète prête à publier (Store → Compte → console développeur → nouvelle app → Modèles). Elle utilise vos comptes, ou fonctionne sans compte.',
-    'Image installable : Orion s\'affiche en plein écran et démarre plus vite sur les cartes graphiques sans accélération 3D.',
+    'Compte en ligne obligatoire : votre profil est associé à un compte Google (Gmail), Microsoft (Outlook, Hotmail, Live), iCloud, Yahoo ou à une autre adresse e-mail. L\'assistant le demande ; un profil qui n\'en a pas encore le reçoit juste après le déverrouillage.',
+    'L\'adresse est vérifiée par le fournisseur : « Continuer avec Google / Microsoft » quand cette copie d\'Orion l\'a activé, ou connexion à votre messagerie sur Orion installé. Sinon, elle est enregistrée « non vérifiée » (Réglages → Compte).',
+    'Plus rapide : démarrage deux fois plus court, un seul réveil par seconde pour tout le système au lieu de cinq, Horloge et Courrier au repos quand ils sont en arrière-plan.',
+    'Messagerie sur Orion installé : vos comptes e-mail dans Réglages → Comptes de messagerie, et l\'autorisation « E-mails » pour les apps qui les utilisent.',
+    'Pour les développeurs : Courrier, une app d\'e-mail complète prête à publier (Store → console développeur → nouvelle app → Modèles).',
   ]),
 });
 
