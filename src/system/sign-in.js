@@ -97,24 +97,26 @@ function waitForCallback(popup, state) {
  * et renvoie à l'app les paramètres du retour (code, jeton ou erreur).
  * L'app indique src/auth.html comme adresse de retour (orion.net.redirectUri()).
  */
-export function authorizeInWindow(rawUrl, { self = location.origin } = {}) {
+export async function authorizeInWindow(rawUrl, { self = location.origin, confirm = null } = {}) {
   let url;
   try {
     url = new URL(rawUrl);
   } catch {
-    return Promise.reject(new IdentityError('Adresse de connexion invalide'));
+    throw new IdentityError('Adresse de connexion invalide');
   }
-  if (url.protocol !== 'https:' || url.origin === self) return Promise.reject(new IdentityError('La connexion doit se faire sur un site en https'));
+  if (url.protocol !== 'https:' || url.origin === self) throw new IdentityError('La connexion doit se faire sur un site en https');
   const state = `p${randomToken()}`;
   url.searchParams.set('state', state);
-  const popup = window.open(url.href, 'orion-sign-in', 'popup,width=500,height=720');
-  if (!popup) return Promise.reject(new IdentityError('La fenêtre de connexion a été bloquée : réessayez'));
-  return waitForCallback(popup, state).promise.then((message) => {
-    const params = { ...message.params };
-    delete params.state;
-    if (params.error === 'access_denied') throw new IdentityError('Connexion annulée');
-    return params;
-  });
+  const open = () => window.open(url.href, 'orion-sign-in', 'popup,width=500,height=720');
+  let popup = open();
+  // Fenêtre bloquée (l'app a d'abord attendu le réseau, le toucher est trop ancien) : un nouveau toucher l'ouvre.
+  if (!popup && confirm && (await confirm({ title: 'Connexion', message: `Ouvrir la page de connexion de ${url.hostname} ?`, confirmLabel: 'Ouvrir' }))) popup = open();
+  if (!popup) throw new IdentityError('La fenêtre de connexion a été bloquée : réessayez');
+  const message = await waitForCallback(popup, state).promise;
+  const params = { ...message.params };
+  delete params.state;
+  if (params.error === 'access_denied') throw new IdentityError('Connexion annulée');
+  return params;
 }
 
 /**

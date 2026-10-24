@@ -203,7 +203,7 @@ function trialNet(ctx) {
     },
     authorize: async (url) => {
       await allow();
-      return authorizeInWindow(url);
+      return authorizeInWindow(url, { confirm: (options) => ctx.ui.confirm(options) });
     },
     redirectUri: () => new URL('src/auth.html', new URL('./', location.href)).href,
   };

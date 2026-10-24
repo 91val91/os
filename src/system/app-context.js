@@ -121,7 +121,7 @@ export function createAppContext({ ui, proc, pkg }) {
     /** Connexion à un service en ligne (OAuth) : fenêtre du service, retour sur src/auth.html. */
     async authorize(url) {
       await allowNet();
-      return authorizeInWindow(url);
+      return authorizeInWindow(url, { confirm: (options) => ui.dialogs.confirm(options) });
     },
     redirectUri: () => redirectUri(),
   };

@@ -43,10 +43,11 @@ const TEMPLATES = [
     },
     listing: {
       subtitle: 'Publiez, suivez, échangez',
-      description: 'Agora est un réseau social complet : fil d\'actualité, publications avec mots-dièse, mentions, fond coloré, sondage ou citation, j\'aime, partages, commentaires, profils, abonnements, recherche, tendances, notifications et messages privés. Sans accès à Internet, tout reste sur l\'appareil ; les autres membres forment une communauté de démonstration qui réagit à vos publications.',
+      description: 'Agora est un réseau social complet : fil d\'actualité, publications avec mots-dièse, mentions, fond coloré, sondage ou citation, j\'aime, partages, commentaires, profils, abonnements, recherche, tendances, notifications et messages privés. Avec l\'autorisation « Internet », Agora se connecte à Mastodon et au fédivers (n\'importe quelle instance) : vous y retrouvez les vraies personnes. Sinon, tout reste sur l\'appareil, avec une communauté de démonstration qui réagit à vos publications.',
       category: 'Divertissement',
       icon: 'heart',
     },
+    permissions: ['internet'],
   },
 ];
 /** Autorisations qu'une app du Store peut déclarer (l'utilisateur les accorde au premier usage). */

@@ -71,6 +71,7 @@
   .bar-title small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
   .bar .logo { flex: 1; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
   .bar .logo span { color: var(--accent); }
+  .bar .logo .instance { margin-left: 8px; color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; }
   .ibtn { position: relative; display: grid; place-items: center; min-width: 40px; height: 40px; border-radius: 20px; color: var(--fg); }
   .ibtn:active { background: var(--field); }
   .link { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 10px; border-radius: 20px; color: var(--accent); font-size: 16px; white-space: nowrap; }
@@ -142,7 +143,9 @@
   .poll-meta { color: var(--muted); font-size: 13px; }
 
   /* Avatars */
-  .av { display: grid; flex: none; place-items: center; overflow: hidden; border-radius: 50%; color: #fff; font-weight: 700; line-height: 1; user-select: none; }
+  .av { position: relative; display: grid; flex: none; place-items: center; overflow: hidden; border-radius: 50%; color: #fff; font-weight: 700; line-height: 1; user-select: none; }
+  .av-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+  .av-img.ready { opacity: 1; }
   .av.emoji { background: var(--field); }
 
   /* Détail d'une publication */
@@ -185,7 +188,9 @@
   .minis button[aria-pressed='true'] { background: var(--card); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); font-weight: 600; }
 
   /* Profil */
-  .cover { height: 120px; }
+  .cover { position: relative; height: 120px; overflow: hidden; }
+  .cover-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+  .cover-img.ready { opacity: 1; }
   .profile-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin: -40px 14px 0; }
   .profile-top .av { border: 4px solid var(--bg); }
   .profile-info { padding: 8px 14px 12px; }
@@ -262,6 +267,9 @@
   .welcome .cell > span:first-child { width: 92px; }
   .error { min-height: 20px; margin: -12px 30px 12px; color: var(--danger); font-size: 14px; text-align: left; }
   .primary { display: block; width: calc(100% - 28px); min-height: 50px; margin: 0 14px; border-radius: 25px; background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; }
+  .or { margin: 12px 0; color: var(--muted); font-size: 14px; }
+  .secondary { display: block; width: calc(100% - 28px); min-height: 50px; margin: 0 14px; border: 1.5px solid var(--accent); border-radius: 25px; color: var(--accent); font-size: 17px; font-weight: 700; }
+  .primary:disabled { opacity: 0.6; }
   .note { display: flex; gap: 10px; margin: 18px 14px; padding: 12px 14px; border-radius: 12px; background: var(--field); color: var(--muted); font-size: 13px; text-align: left; }
   .note svg { color: var(--accent); }
   .interests { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 14px 24px; }
@@ -297,6 +305,36 @@
   #snack.show { opacity: 1; pointer-events: auto; transform: none; }
   #snack span { flex: 1; }
   #snack button { color: #a5a4ff; font-weight: 700; }
+
+  /* Fédivers : médias, avertissements, chargement, visionneuse */
+  .media { position: relative; display: grid; gap: 3px; margin-top: 8px; overflow: hidden; border: 0.5px solid var(--line); border-radius: 14px; aspect-ratio: 16 / 9; }
+  .media.n2, .media.n4 { grid-template-columns: 1fr 1fr; }
+  .media.n3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .media.n3 .media-item:first-child { grid-row: span 2; }
+  .media.n4 { grid-template-rows: 1fr 1fr; }
+  .media-item { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--field); }
+  .media-item img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+  .media-item img.ready { opacity: 1; }
+  .media-badge { position: absolute; bottom: 6px; left: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 12px; font-weight: 600; }
+  .media.veiled .media-item img { filter: blur(22px); }
+  .media-veil { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; background: rgba(0, 0, 0, 0.35); color: #fff; font-size: 14px; font-weight: 600; }
+  .cw { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding: 10px 12px; border-radius: 12px; background: var(--field); font-size: 15px; }
+  .cw span { min-width: 0; overflow-wrap: anywhere; }
+  .spinner { display: inline-block; width: 26px; height: 26px; border: 3px solid var(--field); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #viewer { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.94); color: #fff; }
+  #viewer[hidden] { display: none; }
+  .viewer-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: 15px; }
+  .viewer-bar .ibtn { color: #fff; }
+  .viewer-stage { position: relative; display: grid; flex: 1; place-items: center; min-height: 0; padding: 0 8px; }
+  .viewer-stage > * { grid-area: 1 / 1; }
+  .viewer-stage img, .viewer-stage video { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .viewer-stage img.ready + .spinner { display: none; }
+  .viewer-stage audio { width: min(100%, 420px); }
+  .viewer-alt { margin: 0; padding: 12px 16px 20px; color: rgba(255, 255, 255, 0.8); font-size: 14px; text-align: center; }
+  .viewer-nav { position: absolute; top: 50%; width: 44px; height: 44px; border-radius: 22px; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 30px; line-height: 1; transform: translateY(-50%); }
+  .viewer-nav.prev { left: 8px; }
+  .viewer-nav.next { right: 8px; }
 </style>
 
 <div id="app"></div>
@@ -571,7 +609,7 @@ const state = {
   sim: { queue: [], ambientAt: 0, lastRun: 0, cursor: {} }, // activité de la communauté (voir plus bas)
   draft: null,
 };
-const ui = { tab: 'home', view: 'loading', params: {}, feed: 'following', shown: PAGE, fresh: 0, query: '', typing: new Set(), profileTab: 'posts' };
+const ui = { tab: 'home', view: 'loading', params: {}, feed: 'following', shown: PAGE, fresh: 0, query: '', typing: new Set(), profileTab: 'posts', opened: new Set(), viewer: null };
 const stack = [];
 let paused = false;
 
@@ -581,9 +619,9 @@ const esc = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&am
 const fold = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 let serial = 0;
 const newId = () => Date.now().toString(36) + (serial++ % 1296).toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 7);
-const me = () => state.profile?.handle;
+const me = () => (online() ? fedi.account.me?.handle : state.profile?.handle);
 const isMe = (handle) => Boolean(handle) && handle === me();
-const person = (handle) => (isMe(handle) ? { ...state.profile, me: true } : PERSON.get(handle) || null);
+const person = (handle) => (online() ? fedi.people.get(handle) || null : isMe(handle) ? { ...state.profile, me: true } : PERSON.get(handle) || null);
 const nameOf = (handle) => person(handle)?.name || `@${handle}`;
 const firstName = () => state.profile.name.split(/\s+/)[0];
 const shuffle = (list) => list.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
@@ -613,19 +651,28 @@ function avatarOf(p, px = 40) {
   const box = `width:${px}px;height:${px}px`;
   if (p.emoji) return `<span class="av emoji" style="${box};font-size:${Math.round(px * 0.56)}px;background:${p.color}2e">${p.emoji}</span>`;
   const initials = (p.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-  return `<span class="av" style="${box};font-size:${Math.round(px * 0.4)}px;background:${p.color}">${esc(initials)}</span>`;
+  // Fédivers : la photo remplace les initiales une fois téléchargée.
+  return `<span class="av" style="${box};font-size:${Math.round(px * 0.4)}px;background:${p.color}">${esc(initials)}${p.avatar ? `<img class="av-img" data-src="${esc(p.avatar)}" alt="">` : ''}</span>`;
 }
-const badge = (handle) => (PERSON.has(handle) ? '<span class="demo" title="Membre de démonstration">démo</span>' : '');
+const badge = (handle) => (online() ? (person(handle)?.bot ? '<span class="demo">robot</span>' : '') : PERSON.has(handle) ? '<span class="demo" title="Membre de démonstration">démo</span>' : '');
 
 /** Texte d'une publication : mots-dièse et mentions cliquables. */
-function rich(text) {
-  return esc(text)
-    .replace(TAG_RE, (all, before, tag) => `${before}<a data-act="tag" data-tag="${esc(fold(tag))}">#${tag}</a>`)
-    .replace(MENTION_RE, (all, before, raw) => {
-      const handle = raw.toLowerCase().replace(/\.+$/, '');
-      if (!person(handle)) return all;
-      return `${before}<a data-act="profile" data-user="${handle}">@${raw.slice(0, handle.length)}</a>${raw.slice(handle.length)}`;
+const FEDI_MENTION = /(^|[^\p{L}\p{N}_@/])@([a-z0-9_]+(?:@[a-z0-9-]+(?:\.[a-z0-9-]+)+)?)/giu;
+function rich(text, mentions = []) {
+  const html = esc(text).replace(TAG_RE, (all, before, tag) => `${before}<a data-act="tag" data-tag="${esc(fold(tag))}">#${tag}</a>`);
+  if (online()) {
+    // « @lea » dans le texte : le compte mentionné (lea@son-instance), pas un homonyme de votre instance.
+    return html.replace(FEDI_MENTION, (all, before, raw) => {
+      const lower = raw.toLowerCase();
+      const acct = mentions.find((m) => m.toLowerCase() === lower) || mentions.find((m) => m.split('@')[0].toLowerCase() === lower) || lower;
+      return `${before}<a data-act="profile" data-user="${esc(acct)}">@${raw}</a>`;
     });
+  }
+  return html.replace(MENTION_RE, (all, before, raw) => {
+    const handle = raw.toLowerCase().replace(/\.+$/, '');
+    if (!person(handle)) return all;
+    return `${before}<a data-act="profile" data-user="${handle}">@${raw.slice(0, handle.length)}</a>${raw.slice(handle.length)}`;
+  });
 }
 const tagsOf = (text) => [...String(text || '').matchAll(TAG_RE)].map((m) => fold(m[2]));
 const mentionsOf = (text) => [...new Set([...String(text || '').matchAll(MENTION_RE)].map((m) => m[2].toLowerCase().replace(/\.+$/, '')))].filter((h) => person(h));
@@ -674,10 +721,12 @@ function changed() {
 }
 function find(id) {
   if (!id) return null;
+  if (online()) return fedi.posts.get(id) || null;
   index ??= new Map(state.posts.map((p) => [p.id, p]));
   return index.get(id) || null;
 }
 function repliesTo(id) {
+  if (online()) return find(id)?.replies || 0;
   if (!replyCounts) {
     replyCounts = new Map();
     for (const p of state.posts) if (p.replyTo && !hidden(p)) replyCounts.set(p.replyTo, (replyCounts.get(p.replyTo) || 0) + 1);
@@ -716,19 +765,20 @@ const original = (entry) => (entry.repostOf ? find(entry.repostOf) : entry);
 function feed(kind) {
   const follows = new Set(state.follows);
   const seen = new Set();
-  return state.posts
-    .filter((p) => !p.replyTo && !hidden(p) && (kind === 'foryou' ? !p.repostOf : isMe(p.author) || follows.has(p.author)))
-    .sort((a, b) => b.at - a.at)
-    .filter((p) => {
-      // Une publication partagée n'apparaît qu'une fois, à sa place la plus récente.
-      const id = p.repostOf || p.id;
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+  const list = online()
+    ? (listOf(kind === 'foryou' ? 'trending' : 'home')?.ids || []).map(find).filter((p) => p && !hidden(p))
+    : state.posts.filter((p) => !p.replyTo && !hidden(p) && (kind === 'foryou' ? !p.repostOf : isMe(p.author) || follows.has(p.author))).sort((a, b) => b.at - a.at);
+  return list.filter((p) => {
+    // Une publication partagée n'apparaît qu'une fois, à sa place la plus récente.
+    const id = p.repostOf || p.id;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
-const thread = (id) => state.posts.filter((p) => p.replyTo === id && !hidden(p)).sort((a, b) => a.at - b.at);
+const thread = (id) => (online() ? (fedi.contexts.get(id)?.descendants || []).map(find).filter((p) => p && !hidden(p)) : state.posts.filter((p) => p.replyTo === id && !hidden(p)).sort((a, b) => a.at - b.at));
 function ancestors(post) {
+  if (online()) return (fedi.contexts.get(post.id)?.ancestors || []).map(find).filter(Boolean);
   const chain = [];
   for (let p = find(post.replyTo); p && chain.length < 8; p = find(p.replyTo)) chain.unshift(p);
   return chain;
@@ -736,13 +786,15 @@ function ancestors(post) {
 const postsBy = (handle) => state.posts.filter((p) => p.author === handle && !p.replyTo && !hidden(p)).sort((a, b) => b.at - a.at);
 const repliesBy = (handle) => state.posts.filter((p) => p.author === handle && p.replyTo && !hidden(p)).sort((a, b) => b.at - a.at);
 // Les membres de démonstration ont aussi publié avant votre arrivée (et ailleurs que sur cet appareil).
-const postCount = (handle) => state.posts.filter((p) => p.author === handle && !p.repostOf).length + (PERSON.has(handle) ? Math.round(PERSON.get(handle).base / 12) : 0);
-const followerCount = (handle) => (isMe(handle) ? state.followers.length : PERSON.get(handle).base + (state.follows.includes(handle) ? 1 : 0));
-const followingCount = (handle) => (isMe(handle) ? state.follows.length : 80 + (PERSON.get(handle).base % 260));
-const followsMe = (handle) => state.followers.includes(handle);
+const postCount = (handle) => (online() ? person(handle)?.statuses || 0 : state.posts.filter((p) => p.author === handle && !p.repostOf).length + (PERSON.has(handle) ? Math.round(PERSON.get(handle).base / 12) : 0));
+const followerCount = (handle) => (online() ? person(handle)?.followers || 0 : isMe(handle) ? state.followers.length : PERSON.get(handle).base + (state.follows.includes(handle) ? 1 : 0));
+const followingCount = (handle) => (online() ? person(handle)?.following || 0 : isMe(handle) ? state.follows.length : 80 + (PERSON.get(handle).base % 260));
+const followsMe = (handle) => (online() ? Boolean(relation(handle).followed_by) : state.followers.includes(handle));
+const following = (handle) => (online() ? Boolean(relation(handle).following || relation(handle).requested) : state.follows.includes(handle));
 
-/** Tendances : mots-dièse des trois derniers jours. */
+/** Tendances : mots-dièse des trois derniers jours (ceux de l'instance une fois connecté). */
 function trends() {
+  if (online()) return fedi.trends || [];
   const counts = new Map();
   const since = Date.now() - 3 * DAY;
   for (const p of state.posts) if (p.at > since && !p.repostOf && !hidden(p)) for (const tag of new Set(tagsOf(p.text))) counts.set(tag, (counts.get(tag) || 0) + 1);
@@ -752,6 +804,7 @@ function trends() {
 function search(query) {
   const q = fold(query.trim().replace(/^[@#]/, ''));
   if (!q) return null;
+  if (online()) return remoteSearch(query.trim());
   const people = [...PEOPLE.map((p) => p.handle), me()].filter((h) => {
     const p = person(h);
     return fold(`${p.name} ${h} ${p.bio || ''}`).includes(q);
@@ -795,8 +848,8 @@ function notify(kind, actor, post = null, text = '') {
   save('notifs');
   return { kind, actor, post, text };
 }
-const unreadNotifs = () => state.notifs.filter((n) => !n.read).length;
-const unreadDms = () => Object.keys(state.dms).filter((h) => state.dms[h].some((m) => !m.me && m.at > (state.dmRead[h] || 0))).length;
+const unreadNotifs = () => (online() ? (fedi.lists.get('notifs')?.items || []).filter((n) => !n.read).length : state.notifs.filter((n) => !n.read).length);
+const unreadDms = () => (online() ? (fedi.convs || []).filter((c) => c.unread).length : Object.keys(state.dms).filter((h) => state.dms[h].some((m) => !m.me && m.at > (state.dmRead[h] || 0))).length);
 
 // ───────────── Communauté de démonstration ─────────────
 // Activité planifiée (réactions à vos publications, réponses, abonnements) dans
@@ -805,7 +858,7 @@ const unreadDms = () => Object.keys(state.dms).filter((h) => state.dms[h].some((
 // prochaine échéance : rien ne tourne pour rien.
 
 let simTimer = 0;
-const simOn = () => Boolean(state.profile) && state.settings.simulate;
+const simOn = () => !online() && Boolean(state.profile) && state.settings.simulate;
 
 function plan(delayMs, event) {
   if (!simOn()) return;
@@ -986,11 +1039,611 @@ function reactTo(post) {
   }
 }
 
+// ───────────── Fédivers (Mastodon et compatibles) ─────────────
+// Avec l'autorisation « Internet », Agora se connecte à une instance du fédivers :
+// Orion fait les requêtes (orion.net.request) et ouvre la page de connexion de
+// l'instance (orion.net.authorize). Agora s'inscrit auprès de l'instance (pas
+// d'identifiant à demander à l'avance) et le mot de passe se saisit chez elle.
+
+const INSTANCES = ['mastodon.social', 'piaille.fr', 'mastodon.online', 'framapiaf.org', 'mamot.fr'];
+const SCOPES = 'read write follow';
+const POLL_EVERY = 60_000;
+const fedi = {
+  account: null, // enregistré : { domain, token, client: { id, secret }, me: { id, handle }, seen }
+  instance: null, // { title, max }
+  posts: new Map(), // id → publication (format d'Agora)
+  people: new Map(), // acct → personne
+  lists: new Map(), // clé → { ids, next, loading, error }
+  contexts: new Map(), // id → { ancestors, descendants }
+  relations: new Map(), // acct → { following, followed_by, muting, requested }
+  results: new Map(), // recherche → { people, tags, posts }
+  convs: null, // conversations privées
+  pollTimer: 0,
+};
+const online = () => Boolean(fedi.account);
+
+function htmlText(html) {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const out = [];
+  const walk = (node) => {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) out.push(child.textContent);
+      else if (child.nodeName === 'BR') out.push('\n');
+      else if (child.nodeName === 'P') {
+        if (out.length) out.push('\n\n');
+        walk(child);
+      } else if (child.nodeName === 'A') out.push(child.textContent);
+      else walk(child);
+    }
+  };
+  walk(doc.body.firstChild);
+  return out.join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+const hue = (text) => [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const newer = (a, b) => (a.length !== b.length ? a.length > b.length : a > b); // identifiants Mastodon : nombres en texte
+
+function personFrom(a) {
+  const p = {
+    id: a.id,
+    handle: a.acct,
+    name: (a.display_name || a.username).trim(),
+    bio: htmlText(a.note),
+    note: a.source?.note ?? null,
+    avatar: a.avatar_static || a.avatar || '',
+    header: /missing/.test(a.header_static || '') ? '' : a.header_static || '',
+    color: COLORS[hue(a.acct) % COLORS.length],
+    cover: hue(a.acct) % GRADIENTS.length,
+    since: Date.parse(a.created_at) || Date.now(),
+    followers: a.followers_count || 0,
+    following: a.following_count || 0,
+    statuses: a.statuses_count || 0,
+    bot: Boolean(a.bot),
+    locked: Boolean(a.locked),
+  };
+  fedi.people.set(p.handle, p);
+  return p;
+}
+
+function postFrom(s) {
+  personFrom(s.account);
+  if (s.reblog) postFrom(s.reblog);
+  for (const m of s.mentions || []) if (!fedi.people.has(m.acct)) fedi.people.set(m.acct, { id: m.id, handle: m.acct, name: m.username, color: COLORS[hue(m.acct) % COLORS.length], cover: 0, partial: true });
+  const poll = s.poll && {
+    id: s.poll.id,
+    options: s.poll.options.map((o) => ({ text: o.title, votes: o.votes_count || 0 })),
+    ends: s.poll.expires_at ? Date.parse(s.poll.expires_at) : Infinity,
+    mine: s.poll.own_votes?.length ? s.poll.own_votes[0] : null,
+    multiple: s.poll.multiple,
+  };
+  if (poll && s.poll.expired) poll.ends = Math.min(poll.ends, Date.now() - 1);
+  const p = {
+    id: s.id,
+    author: s.account.acct,
+    text: htmlText(s.content),
+    at: Date.parse(s.created_at),
+    likes: s.favourites_count || 0,
+    liked: Boolean(s.favourited),
+    reposts: s.reblogs_count || 0,
+    reposted: Boolean(s.reblogged),
+    replies: s.replies_count || 0,
+    replyTo: s.in_reply_to_id || null,
+    repostOf: s.reblog?.id || null,
+    bookmarked: Boolean(s.bookmarked),
+    pinned: Boolean(s.pinned),
+    cw: s.spoiler_text || '',
+    sensitive: Boolean(s.sensitive),
+    media: (s.media_attachments || []).map((m) => ({ type: m.type, preview: m.preview_url || m.url, url: m.url, alt: m.description || '' })),
+    mentions: (s.mentions || []).map((m) => m.acct),
+    visibility: s.visibility,
+    edited: Boolean(s.edited_at),
+    url: s.url || '',
+    poll,
+  };
+  if (p.replyTo && s.in_reply_to_account_id) p.replyToId = s.in_reply_to_account_id;
+  fedi.posts.set(p.id, p);
+  return p;
+}
+
+const KINDS = { favourite: 'like', reblog: 'repost', follow: 'follow', poll: 'poll', mention: 'mention' };
+function notifsFrom(list) {
+  const out = [];
+  for (const n of list) {
+    if (n.account) personFrom(n.account);
+    if (n.status) postFrom(n.status);
+    let kind = KINDS[n.type];
+    if (!kind || (kind === 'mention' && n.status?.visibility === 'direct')) continue;
+    if (kind === 'mention' && n.status?.in_reply_to_account_id === fedi.account.me.id) kind = 'reply';
+    const read = Boolean(fedi.account.seen) && !newer(n.id, fedi.account.seen);
+    const last = out.at(-1);
+    // « Léa et 2 autres personnes ont aimé… » : regroupées comme dans la démonstration.
+    if (last && ['like', 'repost', 'follow'].includes(kind) && last.kind === kind && last.post === (n.status?.id || null) && last.read === read) {
+      last.actors.push(n.account.acct);
+      continue;
+    }
+    out.push({ id: n.id, kind, actors: n.account ? [n.account.acct] : [], post: n.status?.id || null, text: kind === 'reply' || kind === 'mention' ? htmlText(n.status.content) : '', at: Date.parse(n.created_at), read });
+  }
+  return out;
+}
+
+/** Prochaine page (en-tête Link de Mastodon). */
+const nextLink = (link) => /<([^>]+)>;\s*rel="next"/.exec(link || '')?.[1] || null;
+
+async function api(path, { method = 'GET', body = null, query = null, auth = true, domain = fedi.account?.domain } = {}) {
+  const url = path.startsWith('https://') ? path : `https://${domain}${path}${query ? `?${new URLSearchParams(query)}` : ''}`;
+  if (new URL(url).hostname !== domain) throw new Error('Adresse inattendue');
+  const headers = { Accept: 'application/json' };
+  if (auth && fedi.account?.token) headers.Authorization = `Bearer ${fedi.account.token}`;
+  if (body) headers['Content-Type'] = 'application/json';
+  const r = await orion.net.request(url, { method, headers, body: body ? JSON.stringify(body) : null, responseType: 'json' });
+  if (r.status === 401 && auth) {
+    disconnect({ expired: true });
+    throw new Error('Session expirée : reconnectez-vous à votre instance');
+  }
+  if (!r.ok) throw new Error(r.body?.error_description || r.body?.error || `L'instance a répondu ${r.status}`);
+  return { data: r.body, next: nextLink(r.headers.link) };
+}
+
+// Connexion : instance → inscription d'Agora → page de connexion de l'instance → jeton.
+const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function cleanDomain(value) {
+  const text = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^@?[^@\s]+@/, '').replace(/[/?#].*$/, '');
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(text) ? text : '';
+}
+async function connect(rawDomain, status = () => {}) {
+  const domain = cleanDomain(rawDomain);
+  if (!domain) throw new Error('Indiquez l\'adresse d\'une instance, par exemple mastodon.social');
+  const net = await orion.net.status();
+  if (!net.available) throw new Error('Internet est indisponible pour Agora');
+  status(`Connexion à ${domain}…`);
+  const info = (await api('/api/v1/instance', { auth: false, domain })).data;
+  if (!info?.uri && !info?.domain) throw new Error(`${domain} n'est pas une instance Mastodon (ou compatible)`);
+  const redirect = await orion.net.redirectUri();
+  const apps = (await orion.storage.get('fediApps')) || {};
+  let client = apps[domain]?.redirect === redirect ? apps[domain] : null;
+  if (!client) {
+    const app = (await api('/api/v1/apps', { method: 'POST', auth: false, domain, body: { client_name: 'Agora (Orion OS)', redirect_uris: redirect, scopes: SCOPES } })).data;
+    client = { id: app.client_id, secret: app.client_secret, redirect };
+    await orion.storage.set('fediApps', { ...apps, [domain]: client });
+  }
+  // PKCE : le code de retour ne sert qu'à cette connexion-ci.
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const query = new URLSearchParams({ response_type: 'code', client_id: client.id, redirect_uri: redirect, scope: SCOPES, code_challenge: challenge, code_challenge_method: 'S256', lang: 'fr' });
+  status(`Connectez-vous dans la fenêtre de ${domain}…`);
+  const params = await orion.net.authorize(`https://${domain}/oauth/authorize?${query}`);
+  if (params.error || !params.code) throw new Error(params.error_description || 'Connexion annulée');
+  status('Connexion acceptée, un instant…');
+  const token = (await api('/oauth/token', { method: 'POST', auth: false, domain, body: { grant_type: 'authorization_code', code: params.code, client_id: client.id, client_secret: client.secret, redirect_uri: redirect, code_verifier: verifier, scope: SCOPES } })).data;
+  if (!token?.access_token) throw new Error('L\'instance n\'a pas donné d\'accès');
+  fedi.account = { domain, token: token.access_token, client: { id: client.id, secret: client.secret }, me: null, seen: null, max: Number(info.configuration?.statuses?.max_characters || info.max_toot_chars) || 500 };
+  const me = personFrom((await api('/api/v1/accounts/verify_credentials')).data);
+  fedi.account.me = { id: me.id, handle: me.handle };
+  await orion.storage.set('fedi', fedi.account);
+  return me;
+}
+
+async function disconnect({ expired = false } = {}) {
+  const account = fedi.account;
+  if (!account) return;
+  clearTimeout(fedi.pollTimer);
+  fedi.account = null;
+  for (const key of ['posts', 'people', 'lists', 'contexts', 'relations', 'results']) fedi[key].clear();
+  fedi.convs = null;
+  await orion.storage.remove('fedi').catch(() => {});
+  if (!expired) orion.net.request(`https://${account.domain}/oauth/revoke`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: account.client.id, client_secret: account.client.secret, token: account.token }) }).catch(() => {});
+  stack.length = 0;
+  Object.assign(ui, { tab: 'home', view: state.profile ? 'home' : 'welcome', params: {}, shown: PAGE, fresh: 0 });
+  render();
+  if (state.profile) catchUp();
+  if (expired) snack(`Session ${account.domain} expirée : reconnectez-vous dans les réglages`);
+}
+
+/** Listes chargées de l'instance (fils, profils, notifications…), page par page. */
+function source(key) {
+  const [kind, arg] = key.split(':');
+  const id = arg && encodeURIComponent(arg);
+  switch (kind) {
+    case 'home': return ['/api/v1/timelines/home', { limit: 30 }];
+    case 'trending': return ['/api/v1/trends/statuses', { limit: 30 }];
+    case 'local': return ['/api/v1/timelines/public', { local: true, limit: 30 }];
+    case 'tag': return [`/api/v1/timelines/tag/${id}`, { limit: 30 }];
+    case 'posts': return [`/api/v1/accounts/${id}/statuses`, { exclude_replies: true, limit: 30 }];
+    case 'replies': return [`/api/v1/accounts/${id}/statuses`, { limit: 30 }];
+    case 'likes': return ['/api/v1/favourites', { limit: 30 }];
+    case 'saved': return ['/api/v1/bookmarks', { limit: 30 }];
+    case 'notifs': return ['/api/v1/notifications', { limit: 30 }];
+    case 'followers': return [`/api/v1/accounts/${id}/followers`, { limit: 40 }];
+    case 'following': return [`/api/v1/accounts/${id}/following`, { limit: 40 }];
+    default: throw new Error(`Liste inconnue : ${key}`);
+  }
+}
+function listOf(key) {
+  const entry = fedi.lists.get(key);
+  if (!entry) load(key);
+  return fedi.lists.get(key);
+}
+async function load(key, { more = false } = {}) {
+  let entry = fedi.lists.get(key);
+  if (!entry) fedi.lists.set(key, (entry = { ids: [], next: null, loading: false, error: '', loaded: false }));
+  if (entry.loading || (more && !entry.next)) return;
+  entry.loading = true;
+  entry.error = '';
+  try {
+    let r;
+    if (more) r = await api(entry.next);
+    else {
+      try {
+        r = await api(source(key)[0], { query: source(key)[1] });
+      } catch (error) {
+        // Instance sans « tendances » : son fil local à la place.
+        if (key !== 'trending') throw error;
+        r = await api(source('local')[0], { query: source('local')[1] });
+      }
+    }
+    const kind = key.split(':')[0];
+    let ids;
+    if (kind === 'notifs') {
+      // Première connexion : les notifications d'avant comptent comme lues.
+      if (!fedi.account.seen) {
+        fedi.account.seen = r.data[0]?.id || '0';
+        orion.storage.set('fedi', fedi.account).catch(() => {});
+      }
+      const items = notifsFrom(r.data);
+      entry.items = more ? [...entry.items, ...items] : items;
+      ids = items.map((n) => n.id);
+      if (!more && r.data[0] && (!fedi.account.latest || newer(r.data[0].id, fedi.account.latest))) fedi.account.latest = r.data[0].id;
+      loadRelations(items.filter((n) => n.kind === 'follow').flatMap((n) => n.actors));
+    } else if (kind === 'followers' || kind === 'following') {
+      ids = r.data.map((a) => personFrom(a).handle);
+      loadRelations(ids);
+    }
+    else ids = r.data.map((s) => postFrom(s)).filter((p) => (kind === 'replies' ? p.replyTo : true)).map((p) => p.id);
+    entry.ids = more ? [...entry.ids, ...ids.filter((x) => !entry.ids.includes(x))] : ids;
+    entry.next = r.data.length ? r.next : null;
+  } catch (error) {
+    entry.error = error.message;
+  } finally {
+    entry.loading = false;
+    entry.loaded = true;
+    if (online()) afterLoad();
+  }
+}
+/** Après un chargement : l'écran est redessiné (sans perdre la saisie). */
+function afterLoad() {
+  if (!['compose', 'edit', 'connect', 'welcome'].includes(ui.view)) rerender();
+}
+function listState(entry, emptyText) {
+  if (!entry || (entry.loading && !entry.ids.length)) return '<div class="empty"><span class="spinner"></span></div>';
+  if (entry.error && !entry.ids.length) return empty('Chargement impossible', esc(entry.error), '<button class="pill-btn" data-act="retry">Réessayer</button>');
+  if (!entry.ids.length) return empty('', emptyText);
+  return '';
+}
+const moreRemote = (entry) => (entry?.next ? `<button class="more-btn" data-act="more-remote">${entry.loading ? 'Chargement…' : entry.error ? 'Réessayer' : 'Afficher plus'}</button>` : '');
+
+async function loadContext(id) {
+  if (!find(id)) postFrom((await api(`/api/v1/statuses/${encodeURIComponent(id)}`)).data);
+  const c = (await api(`/api/v1/statuses/${encodeURIComponent(id)}/context`)).data;
+  fedi.contexts.set(id, { ancestors: c.ancestors.map((s) => postFrom(s).id), descendants: c.descendants.map((s) => postFrom(s).id) });
+}
+async function lookup(handle) {
+  let p = fedi.people.get(handle);
+  if (!p || p.partial) {
+    try {
+      p = personFrom((await api('/api/v1/accounts/lookup', { query: { acct: handle } })).data);
+    } catch (error) {
+      // Compte d'une autre instance pas encore connu de la vôtre : elle va le chercher.
+      const found = (await api('/api/v2/search', { query: { q: `@${handle}`, type: 'accounts', resolve: true, limit: 1 } })).data.accounts[0];
+      if (!found) throw new Error(`Compte introuvable : @${handle}`, { cause: error });
+      p = personFrom(found);
+    }
+  }
+  if (!fedi.relations.has(handle) && !isMe(handle)) {
+    const [rel] = (await api('/api/v1/accounts/relationships', { query: { 'id[]': p.id } })).data;
+    if (rel) fedi.relations.set(handle, rel);
+  }
+  return p;
+}
+const relation = (handle) => fedi.relations.get(handle) || {};
+/** Relations (abonné, abonnement) de plusieurs personnes, en une requête. */
+function loadRelations(handles) {
+  const wanted = [...new Set(handles)].filter((h) => !fedi.relations.has(h) && !isMe(h) && person(h)?.id).slice(0, 40);
+  if (!wanted.length) return;
+  const byId = new Map(wanted.map((h) => [person(h).id, h]));
+  api('/api/v1/accounts/relationships', { query: [...byId.keys()].map((id) => ['id[]', id]) })
+    .then(({ data }) => {
+      for (const rel of data) if (byId.has(rel.id)) fedi.relations.set(byId.get(rel.id), rel);
+      afterLoad();
+    })
+    .catch(() => {});
+}
+
+/** Nouvelles publications et notifications : relevées chaque minute (toutes les 3 en arrière-plan). */
+function schedulePoll() {
+  clearTimeout(fedi.pollTimer);
+  if (online()) fedi.pollTimer = setTimeout(pollInstance, paused ? 3 * POLL_EVERY : POLL_EVERY);
+}
+async function pollInstance() {
+  if (fedi.polling || !online()) return;
+  fedi.polling = true;
+  try {
+    const home = fedi.lists.get('home');
+    if (home?.ids.length && !paused) {
+      const fresh = (await api('/api/v1/timelines/home', { query: { min_id: home.ids[0], limit: 40 } })).data.map(postFrom).map((p) => p.id);
+      if (fresh.length) {
+        home.ids = [...fresh.reverse().filter((x) => !home.ids.includes(x)), ...home.ids];
+        if (ui.view === 'home' && ui.feed === 'following' && scrollTop() > 80) {
+          ui.fresh += fresh.length;
+          updateFreshPill();
+        } else if (ui.view === 'home') rerender({ highlight: fresh });
+      }
+    }
+    const since = fedi.account.latest;
+    const r = (await api('/api/v1/notifications', { query: { limit: 30, ...(since ? { since_id: since } : {}) } })).data;
+    if (r.length) {
+      fedi.account.latest = r[0].id;
+      const items = notifsFrom(r);
+      const entry = fedi.lists.get('notifs');
+      if (entry?.items) entry.items = [...items, ...entry.items];
+      // Nouveaux messages privés : la liste des conversations est rechargée.
+      const dms = since ? r.filter((n) => n.type === 'mention' && n.status?.visibility === 'direct') : [];
+      if (dms.length) loadConvs();
+      announceRemote(items, dms.map((n) => ({ kind: 'dm', actor: n.account.acct, text: dmBody(find(n.status.id)) })));
+    }
+    updateTabs();
+  } catch {
+    /* hors ligne ou instance indisponible : nouvel essai plus tard */
+  } finally {
+    fedi.polling = false;
+  }
+  schedulePoll();
+}
+function announceRemote(items, dms = []) {
+  const fresh = [...dms, ...items.filter((n) => !n.read).map((n) => ({ kind: n.kind, actor: n.actors[0], post: n.post, text: n.text }))];
+  if (!fresh.length) return;
+  if (paused) {
+    if (state.settings.background) notifyLater(fresh.filter(wanted));
+    return;
+  }
+  const dm = fresh.find((f) => f.kind === 'dm' && wanted(f));
+  const reply = fresh.find((f) => (f.kind === 'reply' || f.kind === 'mention') && wanted(f));
+  if (dm && !(ui.view === 'chat' && ui.params.user === dm.actor)) {
+    snack(DESCRIBE.dm(dm), { label: 'Lire', run: () => openChat(dm.actor) });
+    orion.device.vibrate([10, 50, 10]).catch(() => {});
+  } else if (reply && !['notifs', 'compose'].includes(ui.view)) snack(DESCRIBE[reply.kind](reply), { label: 'Voir', run: () => openPost(reply.post) });
+  if (ui.view === 'notifs') rerender();
+}
+const maxText = () => (online() ? fedi.account.max || 500 : MAX_TEXT);
+
+/** Liste de l'instance affichée à l'écran (« Afficher plus », « Réessayer »). */
+function currentKey() {
+  switch (ui.view) {
+    case 'home':
+      return ui.feed === 'foryou' ? 'trending' : 'home';
+    case 'tag':
+      return `tag:${ui.params.tag}`;
+    case 'notifs':
+      return 'notifs';
+    case 'people':
+      return `${ui.params.list}:${fedi.account.me.id}`;
+    case 'profile': {
+      const handle = ui.params.user || me();
+      const p = person(handle);
+      if (!p?.id) return null;
+      const tabs = isMe(handle) ? ['posts', 'replies', 'likes', 'saved'] : ['posts', 'replies'];
+      const tab = tabs.includes(ui.profileTab) ? ui.profileTab : 'posts';
+      return { posts: `posts:${p.id}`, replies: `replies:${p.id}`, likes: 'likes', saved: 'saved' }[tab];
+    }
+    default:
+      return null;
+  }
+}
+
+function updateFreshPill() {
+  const pill = $app.querySelector('.new-pill');
+  if (pill) pill.outerHTML = freshPill();
+  else $app.querySelector('.scroll')?.insertAdjacentHTML('afterbegin', freshPill());
+  updateTabs();
+}
+
+function markNotifsRead() {
+  if (!fedi.account.latest || fedi.account.seen === fedi.account.latest) return;
+  fedi.account.seen = fedi.account.latest;
+  orion.storage.set('fedi', fedi.account).catch(() => {});
+}
+
+// Images (photos de profil, médias) : téléchargées par Orion, gardées en mémoire.
+const images = new Map(); // adresse → data: (ou '' en cas d'échec)
+const imageQueue = [];
+let imageActive = 0;
+function loadImages(root = document) {
+  for (const img of root.querySelectorAll('img[data-src]:not([src])')) {
+    const url = img.dataset.src;
+    const known = images.get(url);
+    if (typeof known === 'string') {
+      if (known) showImage(img, known);
+    } else if (!known) {
+      images.set(url, null);
+      imageQueue.push(url);
+    }
+  }
+  pumpImages();
+}
+function showImage(img, data) {
+  img.src = data;
+  img.classList.add('ready');
+}
+function pumpImages() {
+  while (imageActive < 4 && imageQueue.length) {
+    const url = imageQueue.shift();
+    imageActive++;
+    orion.net
+      .request(url, { responseType: 'base64' })
+      .then((r) => (r.ok && /^image\//.test(r.headers['content-type'] || '') ? `data:${r.headers['content-type'].split(';')[0]};base64,${r.body}` : ''))
+      .catch(() => '')
+      .then((data) => {
+        images.set(url, data);
+        if (images.size > 400) images.delete(images.keys().next().value);
+        if (data) document.querySelectorAll('img[data-src]').forEach((img) => img.dataset.src === url && showImage(img, data));
+        imageActive--;
+        pumpImages();
+      });
+  }
+}
+
+// Visionneuse : photo en grand ; vidéo, GIF et son téléchargés par Orion (8 Mo au plus).
+const $viewer = document.createElement('div');
+$viewer.id = 'viewer';
+$viewer.hidden = true;
+$viewer.setAttribute('role', 'dialog');
+$viewer.setAttribute('aria-modal', 'true');
+document.body.append($viewer);
+let viewerUrl = '';
+function viewMedia(id, i) {
+  const p = find(id);
+  const m = p?.media?.[i];
+  if (!m) return;
+  closeViewer();
+  const token = {};
+  ui.viewer = { id, i, token };
+  const many = p.media.length > 1;
+  const still = m.type === 'image' || !m.url;
+  $viewer.innerHTML = `<div class="viewer-bar"><span>${many ? `${i + 1} / ${p.media.length}` : ''}</span><button class="ibtn" data-viewer="close" aria-label="Fermer">${icon('close', 24)}</button></div>
+    <div class="viewer-stage">${still ? `<img data-src="${esc(m.url || m.preview)}" alt="${esc(m.alt)}">` : ''}<span class="spinner"></span></div>
+    ${m.alt ? `<p class="viewer-alt">${esc(m.alt)}</p>` : ''}
+    ${many ? `<button class="viewer-nav prev" data-viewer="${(i + p.media.length - 1) % p.media.length}" aria-label="Précédent">‹</button><button class="viewer-nav next" data-viewer="${(i + 1) % p.media.length}" aria-label="Suivant">›</button>` : ''}`;
+  $viewer.hidden = false;
+  if (still) return loadImages($viewer);
+  orion.net
+    .request(m.url, { responseType: 'base64' })
+    .then((r) => {
+      if (ui.viewer?.token !== token) return;
+      const type = (r.headers['content-type'] || '').split(';')[0];
+      if (!r.ok || !/^(video|audio)\//.test(type)) throw new Error('média');
+      viewerUrl = URL.createObjectURL(new Blob([Uint8Array.from(atob(r.body), (c) => c.charCodeAt(0))], { type }));
+      const tag = m.type === 'audio' ? 'audio' : 'video';
+      $viewer.querySelector('.viewer-stage').innerHTML = `<${tag} src="${viewerUrl}" controls playsinline${m.type === 'gifv' ? ' autoplay loop muted' : ''}></${tag}>`;
+    })
+    .catch(() => {
+      if (ui.viewer?.token === token) $viewer.querySelector('.viewer-stage').innerHTML = '<p class="viewer-alt">Média indisponible, ou trop volumineux (8 Mo au plus).</p>';
+    });
+}
+function closeViewer() {
+  if (viewerUrl) URL.revokeObjectURL(viewerUrl);
+  viewerUrl = '';
+  ui.viewer = null;
+  $viewer.hidden = true;
+  $viewer.innerHTML = '';
+}
+$viewer.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-viewer]');
+  if (!button && event.target.closest('video, audio')) return;
+  const target = button?.dataset.viewer;
+  if (target && target !== 'close' && ui.viewer) viewMedia(ui.viewer.id, Number(target));
+  else closeViewer();
+});
+
+/** Actions envoyées à l'instance : l'écran change tout de suite, et revient si elle refuse. */
+async function remote(path, options, undo) {
+  try {
+    const r = await api(path, { method: 'POST', ...options });
+    if (r.data?.id && 'content' in r.data) postFrom(r.data);
+    return r.data;
+  } catch (error) {
+    undo?.();
+    snack(error.message);
+    return null;
+  }
+}
+
+// Recherche (personnes, mots-dièse, publications) faite par l'instance, en attendant la fin de la saisie.
+let searchTimer = 0;
+let searchPending = '';
+function remoteSearch(query) {
+  const key = query.toLowerCase();
+  const cached = fedi.results.get(key);
+  if (cached) return cached;
+  const result = { people: [], tags: [], posts: [], loading: true };
+  if (fedi.results.get(searchPending)?.loading) fedi.results.delete(searchPending);
+  fedi.results.set(key, result);
+  searchPending = key;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    try {
+      const r = (await api('/api/v2/search', { query: { q: query, resolve: true, limit: 10 } })).data;
+      Object.assign(result, { people: r.accounts.map((a) => personFrom(a).handle), tags: r.hashtags.map((t) => t.name.toLowerCase()), posts: r.statuses.map(postFrom) });
+      loadRelations(result.people);
+    } catch (error) {
+      result.error = error.message;
+    }
+    result.loading = false;
+    if (ui.view === 'explore' && ui.query.trim().toLowerCase() === key) refreshExplore();
+  }, 400);
+  return result;
+}
+async function loadExplore() {
+  if (fedi.trends) return;
+  fedi.trends = [];
+  fedi.suggest = [];
+  try {
+    fedi.trends = (await api('/api/v1/trends/tags', { query: { limit: 8 } })).data.map((t) => [t.name.toLowerCase(), (t.history || []).slice(0, 2).reduce((n, h) => n + Number(h.accounts || 0), 0)]);
+  } catch {
+    /* instance sans tendances */
+  }
+  try {
+    fedi.suggest = (await api('/api/v2/suggestions', { query: { limit: 6 } })).data.map((x) => personFrom(x.account).handle);
+  } catch {
+    /* pas de suggestions */
+  }
+  if (ui.view === 'explore' && !ui.query.trim()) refreshExplore();
+}
+function refreshExplore() {
+  const box = document.getElementById('explore');
+  if (!box) return;
+  box.innerHTML = exploreContent();
+  loadImages(box);
+}
+
+// Messages privés : conversations de l'instance (publications « mentionnées seulement »).
+async function loadConvs() {
+  try {
+    const r = (await api('/api/v1/conversations', { query: { limit: 30 } })).data;
+    fedi.convs = r.filter((c) => c.last_status).map((c) => ({ id: c.id, accounts: c.accounts.map((a) => personFrom(a).handle), last: postFrom(c.last_status).id, unread: c.unread }));
+    fedi.convsError = '';
+  } catch (error) {
+    fedi.convs ??= [];
+    fedi.convsError = error.message;
+  }
+  if (['messages', 'chat'].includes(ui.view)) rerender();
+  else updateTabs();
+}
+const convWith = (handle) => (fedi.convs || []).find((c) => c.accounts.includes(handle));
+const dmBody = (p) => p.text.replace(/^(?:@[\w.@-]+\s+)+/, '');
+function chatPosts(conv) {
+  if (!conv) return [];
+  const c = fedi.contexts.get(conv.last);
+  const ids = c ? [...c.ancestors, conv.last, ...c.descendants] : [conv.last];
+  return ids.map(find).filter((p) => p && p.visibility === 'direct').sort((a, b) => a.at - b.at);
+}
+
+/** Chargements à la demande des écrans (une seule fois à la fois). */
+const fetching = new Set();
+function once(key, run) {
+  if (fetching.has(key)) return;
+  fetching.add(key);
+  run()
+    .catch((error) => snack(error.message))
+    .finally(() => {
+      fetching.delete(key);
+      afterLoad();
+    });
+}
+
 // ───────────── Écrans ─────────────
 
 const count = (n) => (n ? compact(n) : '');
 const plural = (n, one, many) => `${compact(n)} ${n > 1 ? many : one}`;
-const marked = (id) => state.bookmarks.includes(id);
+const marked = (id) => (online() ? Boolean(find(id)?.bookmarked) : state.bookmarks.includes(id));
 const backBtn = () => `<button class="ibtn" data-act="back" aria-label="Retour">${icon('back', 22)}</button>`;
 const spacer = '<span style="width:40px;flex:none"></span>';
 const header = (title, { left = backBtn(), right = spacer, sub = '' } = {}) => `<header class="bar">${left}<div class="bar-title">${title}${sub ? `<small>${sub}</small>` : ''}</div>${right}</header>`;
@@ -1013,8 +1666,20 @@ function tabs() {
 }
 
 function body(p) {
+  // Avertissement de contenu (fédivers) : le texte et les médias restent cachés jusqu'au toucher.
+  if (p.cw && !ui.opened.has(p.id)) return `<div class="cw"><span>⚠️ ${esc(p.cw)}</span><button class="pill-btn ghost small" data-act="cw" data-id="${p.id}">Afficher</button></div>`;
   if (p.bg != null && GRADIENTS[p.bg]) return `<div class="bgcard" data-act="open" data-id="${p.id}" style="background:${GRADIENTS[p.bg]}">${rich(p.text)}</div>`;
-  return p.text ? `<div class="post-text" data-act="open" data-id="${p.id}">${rich(p.text)}${p.edited ? ' <span class="edited">· modifié</span>' : ''}</div>` : '';
+  const text = p.text ? `<div class="post-text" data-act="open" data-id="${p.id}">${rich(p.text, p.mentions)}${p.edited ? ' <span class="edited">· modifié</span>' : ''}</div>` : '';
+  return text + mediaHtml(p);
+}
+function mediaHtml(p) {
+  if (!p.media?.length) return '';
+  const veiled = p.sensitive && !ui.opened.has(`${p.id}:media`);
+  const items = p.media.slice(0, 4).map((m, i) => {
+    const label = { gifv: 'GIF', video: '▶ Vidéo', audio: '♪ Audio' }[m.type];
+    return `<button class="media-item" data-act="media" data-id="${p.id}" data-i="${i}" aria-label="${esc(m.alt || 'Média')}">${m.type !== 'audio' && m.preview ? `<img data-src="${esc(m.preview)}" alt="${esc(m.alt)}">` : ''}${label ? `<span class="media-badge">${label}</span>` : ''}</button>`;
+  });
+  return `<div class="media n${Math.min(4, p.media.length)}${veiled ? ' veiled' : ''}">${items.join('')}${veiled ? `<button class="media-veil" data-act="unveil" data-id="${p.id}">Contenu sensible · toucher pour afficher</button>` : ''}</div>`;
 }
 function quoteHtml(p) {
   if (!p.quoteOf) return '';
@@ -1088,15 +1753,16 @@ function detailCard(p) {
 }
 
 const moreButton = (total) => (total > ui.shown ? '<button class="more-btn" data-act="more-posts">Afficher plus</button>' : '');
-const followButton = (handle, small = true) => (isMe(handle) ? '' : state.follows.includes(handle)
-  ? `<button class="pill-btn ghost${small ? ' small' : ''}" data-act="follow" data-user="${handle}">Abonné·e</button>`
+const followButton = (handle, small = true) => (isMe(handle) ? '' : following(handle)
+  ? `<button class="pill-btn ghost${small ? ' small' : ''}" data-act="follow" data-user="${handle}">${online() && !relation(handle).following ? 'Demande envoyée' : 'Abonné·e'}</button>`
   : `<button class="pill-btn${small ? ' small' : ''}" data-act="follow" data-user="${handle}">${followsMe(handle) ? 'Suivre en retour' : 'Suivre'}</button>`);
 function personRow(handle, { bio = true } = {}) {
   const p = person(handle);
+  if (!p) return '';
   return `<div class="person"><button data-act="profile" data-user="${handle}" aria-label="Profil">${avatar(handle, 46)}</button>
-    <button class="who" data-act="profile" data-user="${handle}"><b>${esc(p.name)}${badge(handle)}</b><span>@${handle}${followsMe(handle) ? ' · vous suit' : ''}</span>${bio && p.bio ? `<p>${esc(p.bio)}</p>` : ''}</button>${followButton(handle)}</div>`;
+    <button class="who" data-act="profile" data-user="${handle}"><b>${esc(p?.name || handle)}${badge(handle)}</b><span>@${handle}${followsMe(handle) ? ' · vous suit' : ''}</span>${bio && p.bio ? `<p>${esc(p.bio)}</p>` : ''}</button>${followButton(handle)}</div>`;
 }
-const suggestions = (n = 4) => shuffle(PEOPLE.filter((p) => !state.follows.includes(p.handle))).slice(0, n).map((p) => personRow(p.handle)).join('');
+const suggestions = (n = 4) => (online() ? (fedi.suggest || []).filter((h) => !following(h)) : shuffle(PEOPLE.filter((p) => !state.follows.includes(p.handle))).map((p) => p.handle)).slice(0, n).map((h) => personRow(h)).join('');
 
 const VIEWS = {
   loading: () => '<div class="empty">Chargement…</div>',
@@ -1104,29 +1770,42 @@ const VIEWS = {
   home() {
     const list = feed(ui.feed);
     const dms = unreadDms();
-    const content = list.length
-      ? list.slice(0, ui.shown).map((p) => postCard(p)).join('') + moreButton(list.length)
+    const entry = online() && fedi.lists.get(ui.feed === 'foryou' ? 'trending' : 'home');
+    const waiting = online() && listState(entry, ui.feed === 'following' ? 'Votre fil est vide : suivez des comptes depuis Explorer.' : 'Rien de populaire pour le moment.');
+    const content = waiting || (list.length
+      ? online() ? list.map((p) => postCard(p)).join('') + moreRemote(entry) : list.slice(0, ui.shown).map((p) => postCard(p)).join('') + moreButton(list.length)
       : ui.feed === 'following'
         ? empty('Votre fil est vide', 'Suivez des personnes pour voir leurs publications ici.') + suggestions() + `<div class="empty" style="padding-top:12px"><button class="pill-btn" data-act="feed" data-feed="foryou">Découvrir « Pour vous »</button></div>`
-        : empty('Rien pour le moment', 'Revenez dans un instant.');
-    return `<header class="bar"><div class="logo">agora<span>.</span></div><button class="ibtn" data-act="messages" aria-label="Messages">${icon('chat', 23)}${dms ? `<span class="badge">${dms}</span>` : ''}</button></header>
-      <div class="seg"><button data-act="feed" data-feed="following" aria-pressed="${ui.feed === 'following'}">Abonnements</button><button data-act="feed" data-feed="foryou" aria-pressed="${ui.feed === 'foryou'}">Pour vous</button></div>
+        : empty('Rien pour le moment', 'Revenez dans un instant.'));
+    return `<header class="bar"><div class="logo">agora<span>.</span>${online() ? `<small class="instance">${esc(fedi.account.domain)}</small>` : ''}</div><button class="ibtn" data-act="messages" aria-label="Messages">${icon('chat', 23)}${dms ? `<span class="badge">${dms}</span>` : ''}</button></header>
+      <div class="seg"><button data-act="feed" data-feed="following" aria-pressed="${ui.feed === 'following'}">Abonnements</button><button data-act="feed" data-feed="foryou" aria-pressed="${ui.feed === 'foryou'}">${online() ? 'Tendances' : 'Pour vous'}</button></div>
       <main class="scroll">${freshPill()}${content}</main>${tabs()}`;
   },
 
   explore() {
-    return `<header class="bar"><label class="search">${icon('search', 18)}<input id="q" data-keep type="search" enterkeyhint="search" placeholder="Rechercher sur Agora" autocomplete="off" value="${esc(ui.query)}"></label></header>
+    if (online()) loadExplore();
+    return `<header class="bar"><label class="search">${icon('search', 18)}<input id="q" data-keep type="search" enterkeyhint="search" placeholder="${online() ? `Rechercher sur ${esc(fedi.account.domain)} et au-delà` : 'Rechercher sur Agora'}" autocomplete="off" value="${esc(ui.query)}"></label></header>
       <main class="scroll" id="explore">${exploreContent()}</main>${tabs()}`;
   },
 
   tag() {
     const tag = ui.params.tag;
+    if (online()) {
+      const entry = listOf(`tag:${tag}`);
+      const list = entry.ids.map(find).filter((p) => p && !hidden(p));
+      return `${header(`#${esc(tag)}`)}<main class="scroll">${listState(entry, 'Aucune publication avec ce mot-dièse.') || list.map((p) => postCard(p)).join('') + moreRemote(entry)}</main>${tabs()}`;
+    }
     const list = state.posts.filter((p) => !p.repostOf && !hidden(p) && tagsOf(p.text).includes(tag)).sort((a, b) => b.at - a.at);
     return `${header(`#${esc(tag)}`, { sub: plural(list.length, 'publication', 'publications') })}
       <main class="scroll">${list.length ? list.slice(0, ui.shown).map((p) => postCard(p)).join('') + moreButton(list.length) : empty('Aucune publication', 'Soyez la première personne à utiliser ce mot-dièse.')}</main>${tabs()}`;
   },
 
   notifs() {
+    if (online()) {
+      const entry = listOf('notifs');
+      const list = (entry.items || []).filter((n) => !n.actors.some((a) => state.settings.mutedUsers.includes(a)));
+      return `${header('Notifications', { left: spacer })}<main class="scroll">${listState(entry, 'Les j\'aime, réponses et abonnements apparaîtront ici.') || list.map(notifRow).join('') + moreRemote(entry)}</main>${tabs()}`;
+    }
     const list = state.notifs.filter((n) => !n.actors.some((a) => state.settings.mutedUsers.includes(a)));
     return `${header('Notifications', { left: spacer })}
       <main class="scroll">${list.length ? list.map(notifRow).join('') : empty('Aucune notification', 'Les j\'aime, réponses et abonnements apparaîtront ici.')}</main>${tabs()}`;
@@ -1135,7 +1814,9 @@ const VIEWS = {
   profile() {
     const handle = ui.params.user || me();
     const p = person(handle);
-    if (!p) return `${header('Profil')}<main class="scroll">${empty('Profil introuvable')}</main>${tabs()}`;
+    // Fédivers : profil et relation chargés à la demande.
+    if (online() && (!p || p.partial || (!isMe(handle) && !fedi.relations.has(handle)))) once(`lookup:${handle}`, () => lookup(handle));
+    if (!p) return `${header('Profil')}<main class="scroll">${online() ? '<div class="empty"><span class="spinner"></span></div>' : empty('Profil introuvable')}</main>${tabs()}`;
     const mine = isMe(handle);
     const root = !stack.length && ui.tab === 'me';
     const right = mine ? `<button class="ibtn" data-act="settings" aria-label="Réglages">${icon('gear', 22)}</button>` : `<button class="ibtn" data-act="profile-more" data-user="${handle}" aria-label="Plus">${icon('more', 22)}</button>`;
@@ -1143,7 +1824,11 @@ const VIEWS = {
     const tab = sections.some(([id]) => id === ui.profileTab) ? ui.profileTab : 'posts';
     let list;
     let pinned = null;
-    if (tab === 'posts') {
+    let entry = null;
+    if (online()) {
+      entry = p.id ? listOf({ posts: `posts:${p.id}`, replies: `replies:${p.id}`, likes: 'likes', saved: 'saved' }[tab]) : null;
+      list = (entry?.ids || []).map(find).filter((x) => x && !hidden(x));
+    } else if (tab === 'posts') {
       list = postsBy(handle);
       pinned = mine && state.profile.pinned ? find(state.profile.pinned) : null;
       if (pinned) list = list.filter((x) => x.id !== pinned.id);
@@ -1154,26 +1839,30 @@ const VIEWS = {
     const actions = mine
       ? '<button class="pill-btn ghost" data-act="edit-profile">Modifier le profil</button>'
       : `<span style="display:flex;gap:8px"><button class="pill-btn ghost" data-act="chat" data-user="${handle}" aria-label="Message">${icon('chat', 18)}</button>${followButton(handle, false)}</span>`;
-    const stat = (n, label, list) => (mine && list ? `<button data-act="people" data-list="${list}"><b>${compact(n)}</b> ${label}</button>` : `<span class="muted"><b style="color:var(--fg)">${compact(n)}</b> ${label}</span>`);
+    const stat = (n, label, list) => (mine && list && (!online() || p.id) ? `<button data-act="people" data-list="${list}"><b>${compact(n)}</b> ${label}</button>` : `<span class="muted"><b style="color:var(--fg)">${compact(n)}</b> ${label}</span>`);
     return `${header(esc(p.name), { left: root ? spacer : backBtn(), right, sub: plural(postCount(handle), 'publication', 'publications') })}
       <main class="scroll">
-        <div class="cover" style="background:${GRADIENTS[p.cover] || GRADIENTS[0]}"></div>
+        <div class="cover" style="background:${GRADIENTS[p.cover] || GRADIENTS[0]}">${p.header ? `<img class="cover-img" data-src="${esc(p.header)}" alt="">` : ''}</div>
         <div class="profile-top">${avatarOf(p, 84)}${actions}</div>
         <div class="profile-info">
           <h2>${esc(p.name)}${badge(handle)}</h2>
           <div class="handle">@${handle}${!mine && followsMe(handle) ? '<span class="follows-you">Vous suit</span>' : ''}</div>
-          ${p.bio ? `<p class="bio rich">${rich(p.bio)}</p>` : ''}
+          ${p.bio ? `<p class="bio rich">${rich(p.bio)}</p>` : ''}${p.locked ? '<div class="muted" style="margin-top:6px;font-size:14px">🔒 Compte privé : il accepte ses abonnés</div>' : ''}
           <div class="profile-meta">${p.place ? `<span>📍 ${esc(p.place)}</span>` : ''}<span>${icon('calendar', 14).replace('<svg', '<svg style="display:inline;vertical-align:-2px"')} Membre depuis ${since(p.since)}</span></div>
           <div class="stats">${stat(followingCount(handle), 'abonnements', 'following')}${stat(followerCount(handle), followerCount(handle) > 1 ? 'abonnés' : 'abonné', 'followers')}</div>
         </div>
         <div class="seg">${sections.map(([id, label]) => `<button data-act="profile-tab" data-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join('')}</div>
         ${pinned && !hidden(pinned) ? postCard(pinned, { pinned: true }) : ''}
-        ${list.length ? list.slice(0, ui.shown).map((x) => postCard(x)).join('') + moreButton(list.length) : pinned ? '' : empty('', emptyText)}
+        ${online() ? listState(entry, emptyText) || list.map((x) => postCard(x, { pinned: x.pinned && tab === 'posts' })).join('') + moreRemote(entry) : list.length ? list.slice(0, ui.shown).map((x) => postCard(x)).join('') + moreButton(list.length) : pinned ? '' : empty('', emptyText)}
       </main>${tabs()}`;
   },
 
   people() {
     const following = ui.params.list === 'following';
+    if (online()) {
+      const entry = listOf(`${ui.params.list}:${fedi.account.me.id}`);
+      return `${header(following ? 'Abonnements' : 'Abonnés')}<main class="scroll">${listState(entry, following ? 'Vous ne suivez personne pour le moment.' : 'Personne ne vous suit encore.') || entry.ids.map((h) => personRow(h)).join('') + moreRemote(entry)}</main>${tabs()}`;
+    }
     const list = following ? state.follows : state.followers;
     return `${header(following ? 'Abonnements' : 'Abonnés')}
       <main class="scroll">${list.length ? list.filter((h) => person(h)).map((h) => personRow(h)).join('') : empty('', following ? 'Vous ne suivez personne pour le moment.' : 'Personne ne vous suit encore.')}</main>${tabs()}`;
@@ -1181,20 +1870,24 @@ const VIEWS = {
 
   post() {
     const p = find(ui.params.id);
+    const loading = online() && !fedi.contexts.has(ui.params.id);
+    if (loading) once(`context:${ui.params.id}`, () => loadContext(ui.params.id));
+    if (!p && loading) return `${header('Publication')}<main class="scroll"><div class="empty"><span class="spinner"></span></div></main>`;
     if (!p || hidden(p)) return `${header('Publication')}<main class="scroll">${empty('Publication indisponible', 'Elle a été supprimée ou masquée.')}</main>`;
     const chain = ancestors(p).filter((x) => !hidden(x));
     const replies = thread(p.id);
     return `${header('Publication')}
-      <main class="scroll">${chain.map((x) => postCard(x, { line: true })).join('')}${detailCard(p)}${replies.map((r) => postCard(r)).join('') || empty('', 'Aucune réponse pour le moment.')}</main>
-      <div class="composer"><textarea id="reply-text" data-keep rows="1" maxlength="${MAX_TEXT}" placeholder="Répondre à @${p.author}…"></textarea><button class="send" data-act="send-reply" aria-label="Publier la réponse">${icon('send', 18)}</button></div>`;
+      <main class="scroll">${chain.map((x) => postCard(x, { line: true })).join('')}${detailCard(p)}${replies.map((r) => postCard(r)).join('') || (loading ? '<div class="empty"><span class="spinner"></span></div>' : empty('', 'Aucune réponse pour le moment.'))}</main>
+      <div class="composer"><textarea id="reply-text" data-keep rows="1" maxlength="${maxText()}" placeholder="Répondre à @${p.author}…"></textarea><button class="send" data-act="send-reply" aria-label="Publier la réponse">${icon('send', 18)}</button></div>`;
   },
 
   compose() {
     const d = state.draft;
     const target = find(d.replyTo || d.quoteOf);
     const title = d.edit ? 'Modifier' : d.replyTo ? 'Répondre' : d.quoteOf ? 'Citer' : 'Nouvelle publication';
-    const bg = d.bg != null && !d.poll;
-    const canStyle = !d.poll && !d.replyTo && !d.quoteOf;
+    const bg = d.bg != null && !d.poll && !online();
+    // Le fond coloré n'existe pas sur le fédivers.
+    const canStyle = !d.poll && !d.replyTo && !d.quoteOf && !online();
     return `<header class="bar"><button class="link" data-act="cancel-compose">Annuler</button><div class="bar-title">${title}</div><button class="pill-btn small" id="publish" data-act="publish">${d.edit ? 'Enregistrer' : d.replyTo ? 'Répondre' : 'Publier'}</button></header>
       <main class="scroll">
         ${d.replyTo && target ? `<div class="compose-parent">En réponse à <b>@${target.author}</b><div class="q-text">${esc(target.text)}</div></div>` : ''}
@@ -1215,6 +1908,16 @@ const VIEWS = {
   },
 
   messages() {
+    if (online()) {
+      if (!fedi.convs) once('convs', loadConvs);
+      const rows = (fedi.convs || []).map((c) => {
+        const last = find(c.last);
+        const h = c.accounts[0];
+        return `<button class="person" data-act="chat" data-user="${esc(h)}" data-conv="${c.id}">${avatar(h, 50)}<span class="who"><b>${esc(c.accounts.map(nameOf).join(', '))}</b><p style="${c.unread ? 'color:var(--fg);font-weight:600' : ''}">${last && isMe(last.author) ? 'Vous : ' : ''}${esc(last ? dmBody(last) : '')}</p></span><span class="muted" style="font-size:13px">${last ? ago(last.at) : ''}</span>${c.unread ? '<span class="dot"></span>' : ''}</button>`;
+      });
+      const body = !fedi.convs ? '<div class="empty"><span class="spinner"></span></div>' : rows.length ? rows.join('') : empty('Aucun message', fedi.convsError ? esc(fedi.convsError) : 'Les messages privés du fédivers (visibles seulement par les personnes mentionnées) apparaissent ici.', '<button class="pill-btn" data-act="new-dm">Nouveau message</button>');
+      return `${header('Messages', { right: `<button class="ibtn" data-act="new-dm" aria-label="Nouveau message">${icon('edit', 22)}</button>` })}<main class="scroll">${body}</main>`;
+    }
     const list = Object.keys(state.dms).filter((h) => state.dms[h].length && person(h)).sort((a, b) => state.dms[b].at(-1).at - state.dms[a].at(-1).at);
     const rows = list.map((h) => {
       const last = state.dms[h].at(-1);
@@ -1227,6 +1930,20 @@ const VIEWS = {
 
   chat() {
     const handle = ui.params.user;
+    if (online()) {
+      const conv = chatConv();
+      if (conv && !fedi.contexts.has(conv.last)) once(`context:${conv.last}`, () => loadContext(conv.last));
+      let previous = 0;
+      const bubbles = chatPosts(conv).map((m) => {
+        const stamp = m.at - previous > HOUR ? `<div class="stamp">${fullDate(m.at)}</div>` : '';
+        previous = m.at;
+        return `${stamp}<div class="bubble${isMe(m.author) ? ' me' : ''}">${esc(dmBody(m))}</div>`;
+      });
+      const p = person(handle);
+      return `<header class="bar">${backBtn()}<button class="bar-title" data-act="profile" data-user="${esc(handle)}" style="display:flex;align-items:center;justify-content:center;gap:8px">${avatar(handle, 30)}<span style="text-align:left">${esc(p?.name || handle)}<small>@${esc(handle)}</small></span></button>${spacer}</header>
+        <main class="scroll"><div class="bubbles">${bubbles.join('') || `<div class="empty" style="padding:40px 20px">${avatar(handle, 64)}<b>${esc(p?.name || handle)}</b><span>Message privé : visible seulement par @${esc(handle)} et vous (et par les administrateurs des instances).</span></div>`}</div></main>
+        <div class="composer"><textarea id="dm-text" data-keep rows="1" maxlength="1000" placeholder="Message privé"></textarea><button class="send" data-act="send-dm" aria-label="Envoyer">${icon('send', 18)}</button></div>`;
+    }
     const messages = state.dms[handle] || [];
     let previous = 0;
     const bubbles = messages.map((m) => {
@@ -1247,10 +1964,19 @@ const VIEWS = {
     const words = s.mutedWords.map((w, i) => `<div class="cell"><span class="grow">${esc(w)}</span><button class="link" data-act="unmute-word" data-i="${i}">Retirer</button></div>`).join('');
     const users = s.mutedUsers.map((h) => `<div class="cell">${avatar(h, 30)}<span class="grow">@${h}</span><button class="link" data-act="unmute-user" data-user="${h}">Afficher</button></div>`).join('');
     const used = new TextEncoder().encode(JSON.stringify(state)).length;
+    const chevron = icon('back', 16).replace('<svg', '<svg style="transform:rotate(180deg);color:var(--muted)"');
+    const account = online()
+      ? `<div class="group-title">Compte du fédivers</div>
+        <div class="group"><button class="cell" data-act="edit-profile">${avatar(me(), 30)}<span class="grow">${esc(nameOf(me()))} · @${esc(me())}@${esc(fedi.account.domain)}</span>${chevron}</button><button class="cell danger" data-act="disconnect">Se déconnecter de ${esc(fedi.account.domain)}</button></div>
+        <div class="group-foot">Agora passe par Orion pour joindre ${esc(fedi.account.domain)} (autorisation « Internet »). Votre mot de passe reste chez votre instance.</div>`
+      : `<div class="group-title">Profil</div>
+        <div class="group"><button class="cell" data-act="edit-profile">${avatar(me(), 30)}<span class="grow">${esc(state.profile.name)} · @${me()}</span>${chevron}</button></div>
+        <div class="group-title">Fédivers</div>
+        <div class="group"><button class="cell accent" data-act="go-connect">${icon('userPlus', 18)} Se connecter à Mastodon (ou compatible)</button></div>
+        <div class="group-foot">Retrouvez les vraies personnes du fédivers : Mastodon, Piaille, Framapiaf… La démonstration reste disponible.</div>`;
     return `${header('Réglages')}
       <main class="scroll">
-        <div class="group-title">Profil</div>
-        <div class="group"><button class="cell" data-act="edit-profile">${avatar(me(), 30)}<span class="grow">${esc(state.profile.name)} · @${me()}</span>${icon('back', 16).replace('<svg', '<svg style="transform:rotate(180deg);color:var(--muted)"')}</button></div>
+        ${account}
         <div class="group-title">Notifications</div>
         <div class="group">${sw('notify.like', 'J\'aime', s.notify.like)}${sw('notify.reply', 'Réponses et mentions', s.notify.reply)}${sw('notify.follow', 'Nouveaux abonnés', s.notify.follow)}${sw('notify.repost', 'Partages', s.notify.repost)}${sw('notify.dm', 'Messages', s.notify.dm)}${sw('background', 'Quand Agora est en arrière-plan', s.background)}</div>
         <div class="group-foot">En arrière-plan, Agora vous prévient par une notification d'Orion.</div>
@@ -1258,9 +1984,9 @@ const VIEWS = {
         <div class="group">${words}<button class="cell accent" data-act="mute-word">${icon('plus', 18)} Ajouter un mot</button></div>
         <div class="group-foot">Les publications qui contiennent ces mots n'apparaissent plus.</div>
         ${users ? `<div class="group-title">Comptes masqués</div><div class="group">${users}</div>` : ''}
-        <div class="group-title">Communauté de démonstration</div>
+        ${online() ? '' : `<div class="group-title">Communauté de démonstration</div>
         <div class="group">${sw('simulate', 'Activité de la communauté', s.simulate)}</div>
-        <div class="group-foot">Les applications du Store n'ont pas accès à Internet : les autres membres d'Agora (marqués « démo ») vivent sur cet appareil. Ils publient, répondent à vos publications et à vos messages.</div>
+        <div class="group-foot">Les autres membres de la démonstration (marqués « démo ») vivent sur cet appareil. Ils publient, répondent à vos publications et à vos messages.</div>`}
         <div class="group-title">Données</div>
         <div class="group"><div class="cell"><span class="grow">Espace utilisé</span><span class="muted">${Math.max(1, Math.round(used / 1024))} Ko sur 1 024 Ko</span></div><button class="cell danger" data-act="erase">Effacer toutes les données d'Agora</button></div>
         <div class="group-foot">Vos publications, messages et réglages restent sur cet appareil.</div>
@@ -1269,6 +1995,14 @@ const VIEWS = {
 
   edit() {
     const e = ui.edit;
+    if (online()) {
+      // Fédivers : nom et bio (la photo et la couverture se changent sur l'instance).
+      return `<header class="bar"><button class="link" data-act="back">Annuler</button><div class="bar-title">Modifier le profil</div><button class="pill-btn small" data-act="save-profile">Enregistrer</button></header>
+        <main class="scroll"><div class="preview">${avatar(me(), 88)}</div>
+          <div class="group"><label class="cell"><span>Nom</span><input id="e-name" data-keep maxlength="30" value="${esc(e.name)}"></label><label class="cell stack"><span class="muted" style="font-size:13px">Bio</span><textarea id="e-bio" data-keep maxlength="500">${esc(e.bio || '')}</textarea></label></div>
+          <div class="error" id="e-error" style="margin-top:-14px"></div>
+          <div class="group-foot" style="margin-top:0">La photo et la couverture se changent sur le site de ${esc(fedi.account.domain)}.</div></main>`;
+    }
     return `<header class="bar"><button class="link" data-act="back">Annuler</button><div class="bar-title">Modifier le profil</div><button class="pill-btn small" data-act="save-profile">Enregistrer</button></header>
       <main class="scroll">
         <div class="cover" style="background:${GRADIENTS[e.cover]};height:90px"></div>
@@ -1289,8 +2023,23 @@ const VIEWS = {
       <p>Partagez vos idées, suivez les personnes qui vous inspirent, discutez.</p>
       <div class="group"><label class="cell"><span>Nom</span><input id="w-name" data-keep maxlength="40" placeholder="Camille Martin" autocomplete="name"></label><label class="cell"><span>Identifiant</span><input id="w-handle" data-keep maxlength="20" placeholder="camille" autocapitalize="off" spellcheck="false"></label></div>
       <div class="error" id="w-error"></div>
-      <button class="primary" data-act="welcome-next">Continuer</button>
-      <div class="note">${icon('info', 18)}<span>Agora fonctionne sur cet appareil, sans Internet : vos publications ne le quittent pas. Les autres membres forment une communauté de démonstration, marquée « démo », qui réagit à ce que vous publiez.</span></div>
+      <button class="primary" data-act="welcome-next">Essayer la démonstration</button>
+      <div class="or">ou</div>
+      <button class="secondary" data-act="go-connect">Se connecter à Mastodon</button>
+      <div class="note">${icon('info', 18)}<span>La démonstration fonctionne sur cet appareil, sans Internet : ses autres membres, marqués « démo », réagissent à ce que vous publiez. Avec Mastodon (Piaille, Framapiaf… : le fédivers), vous retrouvez les vraies personnes, avec l'autorisation « Internet ».</span></div>
+    </div></main>`;
+  },
+
+  connect() {
+    return `${header('Fédivers', { left: `<button class="ibtn" data-act="back" aria-label="Retour">${icon('back', 22)}</button>` })}<main class="scroll"><div class="welcome">
+      <div class="welcome-logo" style="background:linear-gradient(150deg,#6364ff,#563acc)">m</div>
+      <h1>Votre instance</h1>
+      <p>Le fédivers rassemble des milliers de serveurs (instances) qui communiquent entre eux. Indiquez celle de votre compte.</p>
+      <div class="group"><label class="cell"><span>Instance</span><input id="c-domain" data-keep autocapitalize="off" spellcheck="false" inputmode="url" placeholder="mastodon.social" value="${esc(ui.domain || '')}"></label></div>
+      <div class="interests" style="margin-top:-8px">${INSTANCES.map((d) => `<button class="chip plain" data-act="pick-instance" data-domain="${d}">${d}</button>`).join('')}</div>
+      <div class="error" id="c-error">${esc(ui.connectError || '')}</div>
+      <button class="primary" data-act="connect" ${ui.connecting ? 'disabled' : ''}>${ui.connecting ? esc(ui.connecting) : 'Se connecter'}</button>
+      <div class="note">${icon('info', 18)}<span>Votre mot de passe se saisit sur la page de l'instance, jamais dans Agora. Agora s'y inscrit comme application et ne reçoit qu'un accès à votre compte, que vous pouvez retirer à tout moment.</span></div>
     </div></main>`;
   },
 
@@ -1312,16 +2061,20 @@ function exploreContent() {
   const results = search(ui.query);
   if (results) {
     const { people, tags, posts } = results;
+    if (results.loading) return '<div class="empty"><span class="spinner"></span></div>';
+    if (results.error) return empty('Recherche impossible', esc(results.error));
     if (!people.length && !tags.length && !posts.length) return empty('Aucun résultat', `Rien ne correspond à « ${esc(ui.query.trim())} ».`);
     return `${people.length ? `<div class="section">Personnes</div>${people.map((h) => personRow(h)).join('')}` : ''}
       ${tags.length ? `<div class="section">Mots-dièse</div>${tags.map((t) => `<button class="trend" data-act="tag" data-tag="${esc(t)}"><b>#${esc(t)}</b></button>`).join('')}` : ''}
       ${posts.length ? `<div class="section">Publications</div>${posts.slice(0, 30).map((p) => postCard(p)).join('')}` : ''}`;
   }
   const trending = trends();
-  const popular = state.posts.filter((p) => !p.repostOf && !p.replyTo && !hidden(p) && Date.now() - p.at < 3 * DAY).sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 5);
-  const others = PEOPLE.filter((p) => !state.follows.includes(p.handle));
-  return `${trending.length ? `<div class="section">Tendances</div>${trending.map(([tag, n], i) => `<button class="trend" data-act="tag" data-tag="${esc(tag)}"><small>${i + 1} · Tendance sur Agora</small><b>#${esc(tag)}</b><small>${plural(n, 'publication', 'publications')}</small></button>`).join('')}` : ''}
-    ${others.length ? `<div class="section">Personnes à suivre</div>${others.slice(0, 4).map((p) => personRow(p.handle)).join('')}` : ''}
+  const popular = online() ? [] : state.posts.filter((p) => !p.repostOf && !p.replyTo && !hidden(p) && Date.now() - p.at < 3 * DAY).sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 5);
+  const others = suggestions();
+  const where = online() ? fedi.account.domain : 'Agora';
+  if (online() && !fedi.trends?.length && !others) return fedi.trends ? empty('', 'Cherchez des personnes (@nom@instance), des mots-dièse ou des publications.') : '<div class="empty"><span class="spinner"></span></div>';
+  return `${trending.length ? `<div class="section">Tendances</div>${trending.map(([tag, n], i) => `<button class="trend" data-act="tag" data-tag="${esc(tag)}"><small>${i + 1} · Tendance sur ${esc(where)}</small><b>#${esc(tag)}</b><small>${online() ? plural(n, 'personne en parle', 'personnes en parlent') : plural(n, 'publication', 'publications')}</small></button>`).join('')}` : ''}
+    ${others ? `<div class="section">Personnes à suivre</div>${others}` : ''}
     ${popular.length ? `<div class="section">Populaires</div>${popular.map((p) => postCard(p)).join('')}` : ''}`;
 }
 
@@ -1335,7 +2088,7 @@ function notifRow(n) {
     <span class="notif-icon ${n.kind}">${icon(NOTIF_ICON[n.kind], 24)}</span>
     <span class="notif-body"><span class="notif-avs">${n.actors.slice(0, 6).map((h) => avatar(h, 30)).join('')}</span>
       <p><b>${esc(text)}</b> <span class="muted">· ${ago(n.at)}</span></p>${excerpt ? `<p class="excerpt">${esc(excerpt)}</p>` : ''}
-      ${n.kind === 'follow' && n.actors.length === 1 && !state.follows.includes(n.actors[0]) ? `<p>${followButton(n.actors[0])}</p>` : ''}</span>
+      ${n.kind === 'follow' && n.actors.length === 1 && !following(n.actors[0]) ? `<p>${followButton(n.actors[0])}</p>` : ''}</span>
   </div>`;
 }
 
@@ -1360,14 +2113,29 @@ function render() {
     observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && showMore(), { root: $app.querySelector('.scroll'), rootMargin: '300px' });
     observer.observe(more);
   }
+  loadImages($app);
   if (ui.view === 'compose') composeReady();
   if (ui.view === 'chat') {
     const scroller = $app.querySelector('.scroll');
     scroller.scrollTop = scroller.scrollHeight;
-    state.dmRead[ui.params.user] = Date.now();
-    save('dmRead');
+    if (online()) {
+      const conv = chatConv();
+      if (conv?.unread && conv.id) {
+        conv.unread = false;
+        remote(`/api/v1/conversations/${conv.id}/read`, {});
+      }
+    } else {
+      state.dmRead[ui.params.user] = Date.now();
+      save('dmRead');
+    }
   }
-  if (ui.view === 'notifs' && state.notifs.some((n) => !n.read)) {
+  const remoteNotifs = online() && ui.view === 'notifs' ? fedi.lists.get('notifs')?.items || [] : [];
+  if (remoteNotifs.some((n) => !n.read)) {
+    remoteNotifs.forEach((n) => (n.read = true));
+    markNotifsRead();
+    updateTabs();
+  }
+  if (!online() && ui.view === 'notifs' && state.notifs.some((n) => !n.read)) {
     state.notifs.forEach((n) => (n.read = true));
     save('notifs');
     updateTabs();
@@ -1412,6 +2180,7 @@ function refreshCards(id) {
     card.insertAdjacentHTML('afterend', html);
     card.remove();
   }
+  loadImages($app);
 }
 
 function autosize(el) {
@@ -1456,6 +2225,15 @@ function back() {
   return true;
 }
 function showMore() {
+  if (online()) {
+    // Défilement : page suivante (pas de nouvel essai automatique après une erreur).
+    const entry = fedi.lists.get(currentKey());
+    if (!entry || entry.loading || !entry.next || entry.error) return;
+    load(currentKey(), { more: true });
+    const button = $app.querySelector('.more-btn');
+    if (button) button.textContent = 'Chargement…';
+    return;
+  }
   ui.shown += PAGE;
   rerender();
 }
@@ -1465,11 +2243,12 @@ function showFresh() {
 }
 const openPost = (id) => find(id) && go('post', { id });
 const openProfile = (handle) => person(handle) && (isMe(handle) && ui.tab === 'me' && !stack.length ? switchTab('me') : go('profile', { user: handle }));
-function openChat(handle) {
-  if (!PERSON.has(handle)) return;
+function openChat(handle, conv = null) {
+  if (!handle || (!online() && !PERSON.has(handle))) return;
   if (ui.view === 'chat') stack.pop(); // depuis la liste de choix : pas d'écran en double
-  go('chat', { user: handle });
+  go('chat', conv ? { user: handle, conv } : { user: handle });
 }
+const chatConv = () => (fedi.convs || []).find((c) => c.id && c.id === ui.params.conv) || convWith(ui.params.user);
 
 // ───────────── Feuille d'actions et message temporaire ─────────────
 
@@ -1485,6 +2264,7 @@ function sheet({ title = '', actions }) {
       <button class="sheet-btn cancel" data-sheet="-1">Annuler</button>
     </div>`;
   $sheet.hidden = false;
+  loadImages($sheet);
   requestAnimationFrame(() => $sheet.classList.add('open'));
   return new Promise((resolve) => (sheetDone = resolve));
 }
@@ -1532,7 +2312,14 @@ function toggleLike(id, { pop = true } = {}) {
   p.liked = !p.liked;
   p.likes = Math.max(0, (p.likes || 0) + (p.liked ? 1 : -1));
   if (p.liked) orion.device.vibrate(8).catch(() => {});
-  save('posts');
+  if (online()) {
+    remote(`/api/v1/statuses/${id}/${p.liked ? 'favourite' : 'unfavourite'}`, {}, () => {
+      p.liked = !p.liked;
+      p.likes = Math.max(0, p.likes + (p.liked ? 1 : -1));
+      refreshCards(id);
+    });
+    fedi.lists.delete('likes');
+  } else save('posts');
   refreshCards(id);
   if (pop && p.liked) $app.querySelectorAll(`[data-card="${id}"] .act.like`).forEach((b) => b.classList.add('pop'));
 }
@@ -1551,6 +2338,19 @@ async function repostMenu(id) {
   const choice = await sheet({ actions: [{ label: p.reposted ? 'Annuler le partage' : 'Partager', value: 'repost' }, { label: 'Citer', value: 'quote' }] });
   if (choice === 'quote') return compose({ quoteOf: id });
   if (choice !== 'repost') return;
+  if (online()) {
+    const undo = () => {
+      p.reposted = !p.reposted;
+      p.reposts = Math.max(0, p.reposts + (p.reposted ? 1 : -1));
+      refreshCards(id);
+    };
+    undo();
+    const shared = await remote(`/api/v1/statuses/${id}/${p.reposted ? 'reblog' : 'unreblog'}`, {}, undo);
+    const home = fedi.lists.get('home');
+    if (shared && p.reposted && home && shared.id !== id) home.ids.unshift(shared.id);
+    if (shared && p.reposted) snack('Publication partagée avec vos abonnés');
+    return ui.view === 'home' ? rerender() : refreshCards(id);
+  }
   if (p.reposted) {
     p.reposted = false;
     p.reposts = Math.max(0, (p.reposts || 1) - 1);
@@ -1570,6 +2370,17 @@ async function repostMenu(id) {
 
 function toggleBookmark(id) {
   const saved = marked(id);
+  if (online()) {
+    const p = find(id);
+    p.bookmarked = !saved;
+    remote(`/api/v1/statuses/${id}/${saved ? 'unbookmark' : 'bookmark'}`, {}, () => {
+      p.bookmarked = saved;
+      refreshCards(id);
+    });
+    fedi.lists.delete('saved');
+    refreshCards(id);
+    return snack(saved ? 'Retirée des enregistrements' : 'Enregistrée : retrouvez-la dans votre profil');
+  }
   state.bookmarks = saved ? state.bookmarks.filter((x) => x !== id) : [...state.bookmarks, id].slice(-200);
   save('bookmarks');
   refreshCards(id);
@@ -1581,8 +2392,16 @@ function vote(id, option) {
   if (!p?.poll || p.poll.mine != null || Date.now() > p.poll.ends) return;
   p.poll.mine = option;
   p.poll.options[option].votes++;
-  save('posts');
   refreshCards(id);
+  if (!online()) return save('posts');
+  api(`/api/v1/polls/${p.poll.id}/votes`, { method: 'POST', body: { choices: [option] } })
+    .then(({ data }) => Object.assign(p.poll, { options: data.options.map((o) => ({ text: o.title, votes: o.votes_count || 0 })), mine: data.own_votes?.[0] ?? option }))
+    .catch((error) => {
+      p.poll.mine = null;
+      p.poll.options[option].votes--;
+      snack(error.message);
+    })
+    .finally(() => refreshCards(id));
 }
 
 async function moreMenu(id) {
@@ -1590,7 +2409,7 @@ async function moreMenu(id) {
   if (!p) return;
   const author = p.author;
   if (isMe(author)) {
-    const pinned = state.profile.pinned === id;
+    const pinned = online() ? p.pinned : state.profile.pinned === id;
     const choice = await sheet({
       actions: [
         !p.replyTo && { label: pinned ? 'Désépingler du profil' : 'Épingler sur votre profil', value: 'pin' },
@@ -1598,7 +2417,11 @@ async function moreMenu(id) {
         { label: 'Supprimer', value: 'delete', danger: true },
       ],
     });
-    if (choice === 'pin') {
+    if (choice === 'pin' && online()) {
+      p.pinned = !pinned;
+      remote(`/api/v1/statuses/${id}/${pinned ? 'unpin' : 'pin'}`, {}, () => (p.pinned = pinned));
+      snack(pinned ? 'Publication désépinglée' : 'Épinglée en haut de votre profil');
+    } else if (choice === 'pin') {
       state.profile.pinned = pinned ? null : id;
       save('profile');
       snack(pinned ? 'Publication désépinglée' : 'Épinglée en haut de votre profil');
@@ -1607,11 +2430,11 @@ async function moreMenu(id) {
     else if (choice === 'delete' && (await sheet({ title: 'Supprimer cette publication ? Ses réponses disparaîtront aussi.', actions: [{ label: 'Supprimer', value: true, danger: true }] }))) removePost(id);
     return;
   }
-  const following = state.follows.includes(author);
+  const followed = following(author);
   const choice = await sheet({
     actions: [
-      { label: following ? `Ne plus suivre @${author}` : `Suivre @${author}`, value: 'follow' },
-      PERSON.has(author) && { label: `Envoyer un message à @${author}`, value: 'dm' },
+      { label: followed ? `Ne plus suivre @${author}` : `Suivre @${author}`, value: 'follow' },
+      (online() || PERSON.has(author)) && { label: `Envoyer un message à @${author}`, value: 'dm' },
       { label: `Masquer @${author}`, value: 'mute' },
       { label: 'Signaler la publication', value: 'report', danger: true },
     ],
@@ -1620,6 +2443,8 @@ async function moreMenu(id) {
   else if (choice === 'dm') openChat(author);
   else if (choice === 'mute') muteUser(author);
   else if (choice === 'report') {
+    // Fédivers : le signalement part aussi à la modération de votre instance.
+    if (online()) remote('/api/v1/reports', { body: { account_id: person(author)?.id, status_ids: [id], comment: 'Signalé depuis Agora (Orion OS)' } });
     state.settings.hiddenPosts.push(id);
     state.settings.hiddenPosts = state.settings.hiddenPosts.slice(-200);
     save('settings');
@@ -1633,6 +2458,17 @@ function afterHide() {
   rerender();
 }
 function removePost(id) {
+  if (online()) {
+    return api(`/api/v1/statuses/${id}`, { method: 'DELETE' })
+      .then(() => {
+        fedi.posts.delete(id);
+        for (const entry of fedi.lists.values()) entry.ids = entry.ids.filter((x) => x !== id && find(x)?.repostOf !== id);
+        snack('Publication supprimée');
+        if (ui.view === 'post' && ui.params.id === id) back();
+        else rerender();
+      })
+      .catch((error) => snack(error.message));
+  }
   const gone = new Set([id]);
   // Ses réponses (et leurs réponses) disparaissent avec elle, ainsi que ses partages.
   for (let grew = true; grew; ) {
@@ -1656,6 +2492,26 @@ function removePost(id) {
 }
 
 function toggleFollow(handle) {
+  if (online()) {
+    const p = person(handle);
+    if (!p?.id) return;
+    const before = { ...relation(handle) };
+    const was = Boolean(before.following || before.requested);
+    fedi.relations.set(handle, { ...before, following: !was && !p.locked, requested: !was && p.locked });
+    rerender();
+    api(`/api/v1/accounts/${p.id}/${was ? 'unfollow' : 'follow'}`, { method: 'POST' })
+      .then(({ data }) => {
+        fedi.relations.set(handle, data);
+        fedi.lists.delete('home');
+        if (was) snack(`Vous ne suivez plus ${nameOf(handle)}`);
+      })
+      .catch((error) => {
+        fedi.relations.set(handle, before);
+        snack(error.message);
+      })
+      .finally(() => rerender());
+    return;
+  }
   if (!PERSON.has(handle)) return;
   if (state.follows.includes(handle)) {
     state.follows = state.follows.filter((h) => h !== handle);
@@ -1668,6 +2524,7 @@ function toggleFollow(handle) {
   rerender();
 }
 function muteUser(handle) {
+  if (online() && person(handle)?.id) remote(`/api/v1/accounts/${person(handle).id}/mute`, {});
   if (!state.settings.mutedUsers.includes(handle)) state.settings.mutedUsers.push(handle);
   save('settings');
   changed();
@@ -1675,6 +2532,7 @@ function muteUser(handle) {
   snack(`@${handle} est masqué`, { label: 'Annuler', run: () => unmuteUser(handle) });
 }
 function unmuteUser(handle) {
+  if (online() && person(handle)?.id) remote(`/api/v1/accounts/${person(handle).id}/unmute`, {});
   state.settings.mutedUsers = state.settings.mutedUsers.filter((h) => h !== handle);
   save('settings');
   changed();
@@ -1688,7 +2546,9 @@ function compose({ replyTo = null, quoteOf = null, edit = null } = {}) {
   const plain = !replyTo && !quoteOf && !edit;
   // Un brouillon de publication est repris ; les réponses et citations partent de zéro.
   if (!(plain && state.draft && !state.draft.replyTo && !state.draft.quoteOf && !state.draft.edit)) {
-    state.draft = { text: editing ? editing.text : '', replyTo, quoteOf, edit: editing ? edit : null, bg: editing?.bg ?? null, poll: null, palette: false };
+    // Fédivers : une réponse mentionne son destinataire (sinon il n'est pas prévenu).
+    const to = online() && replyTo && find(replyTo)?.author;
+    state.draft = { text: editing ? editing.text : to && !isMe(to) ? `@${to} ` : '', replyTo, quoteOf, edit: editing ? edit : null, bg: editing?.bg ?? null, poll: null, palette: false };
   }
   go('compose');
 }
@@ -1703,7 +2563,7 @@ function composeReady() {
 }
 function updateCompose() {
   const d = state.draft;
-  const left = MAX_TEXT - d.text.length;
+  const left = maxText() - d.text.length;
   const counter = document.getElementById('counter');
   counter.textContent = left < 60 ? String(left) : '';
   counter.classList.toggle('over', left < 0);
@@ -1713,16 +2573,18 @@ function updateCompose() {
   if (preview) preview.textContent = d.text || 'Votre texte ici';
   // Mention en cours : propositions de membres.
   const input = document.getElementById('c-text');
-  const typed = /(^|\s)@([a-z0-9_.]*)$/i.exec(d.text.slice(0, input.selectionStart ?? d.text.length));
+  const typed = /(^|\s)@([a-z0-9_.@-]*)$/i.exec(d.text.slice(0, input.selectionStart ?? d.text.length));
   const box = document.getElementById('suggest');
-  const matches = typed ? PEOPLE.filter((p) => fold(`${p.handle} ${p.name}`).includes(fold(typed[2]))).slice(0, 6) : [];
-  box.innerHTML = matches.map((p) => `<button class="chip" data-act="mention-pick" data-user="${p.handle}">${avatar(p.handle, 26)}@${p.handle}</button>`).join('');
+  const pool = online() ? [...fedi.people.values()].filter((p) => !p.partial && !isMe(p.handle)) : PEOPLE;
+  const matches = typed ? pool.filter((p) => fold(`${p.handle} ${p.name}`).includes(fold(typed[2]))).slice(0, 6) : [];
+  box.innerHTML = matches.map((p) => `<button class="chip" data-act="mention-pick" data-user="${esc(p.handle)}">${avatar(p.handle, 26)}@${esc(p.handle)}</button>`).join('');
+  loadImages(box);
 }
 function insertText(snippet, replaceToken = false) {
   const input = document.getElementById('c-text');
   const at = input.selectionStart ?? input.value.length;
   let before = input.value.slice(0, at);
-  if (replaceToken) before = before.replace(/@[a-z0-9_.]*$/i, '');
+  if (replaceToken) before = before.replace(/@[a-z0-9_.@-]*$/i, '');
   else if (before && !/\s$/.test(before)) before += ' ';
   input.value = before + snippet + input.value.slice(at);
   const caret = (before + snippet).length;
@@ -1750,7 +2612,8 @@ async function leaveCompose() {
 function publish() {
   const d = state.draft;
   const text = d.text.trim();
-  if (!text || text.length > MAX_TEXT) return;
+  if (!text || text.length > maxText()) return;
+  if (online()) return publishRemote(d, text);
   if (d.edit) {
     const p = find(d.edit);
     if (p) Object.assign(p, { text, edited: true });
@@ -1781,11 +2644,87 @@ function publish() {
   }
   snack(post.replyTo ? 'Réponse publiée' : 'Publication partagée', { label: 'Voir', run: () => openPost(post.id) });
 }
+/** Visibilité d'une réponse : jamais plus large que la publication d'origine. */
+const replyVisibility = (parent) => (['direct', 'private', 'unlisted'].includes(parent?.visibility) ? parent.visibility : 'public');
+const withMention = (text, handle) => (!handle || isMe(handle) || new RegExp(`(^|\\s)@${handle.replace(/[.]/g, '\\.')}(\\s|$)`, 'i').test(text) ? text : `@${handle} ${text}`);
+
+let publishing = false;
+async function publishRemote(d, text) {
+  if (publishing) return;
+  const options = d.poll ? d.poll.options.map((o) => o.trim()).filter(Boolean) : [];
+  if (d.poll && options.length < 2) return;
+  const parent = find(d.replyTo);
+  const quoted = find(d.quoteOf);
+  const editing = d.edit && find(d.edit);
+  // Pas de citation sur Mastodon : l'adresse de la publication citée est ajoutée au texte.
+  const status = quoted?.url ? `${text}\n\n${quoted.url}` : withMention(text, parent?.author);
+  const body = editing ? { status, spoiler_text: editing.cw || '', sensitive: editing.sensitive } : { status, visibility: replyVisibility(parent), language: 'fr' };
+  if (parent) body.in_reply_to_id = parent.id;
+  if (d.poll && !editing) body.poll = { options, expires_in: POLL_DURATIONS[d.poll.duration].ms / 1000 };
+  publishing = true;
+  const button = document.getElementById('publish');
+  if (button) button.disabled = true;
+  let post;
+  try {
+    post = postFrom((await api(editing ? `/api/v1/statuses/${editing.id}` : '/api/v1/statuses', { method: editing ? 'PUT' : 'POST', body })).data);
+  } catch (error) {
+    snack(error.message);
+    if (ui.view === 'compose') updateCompose();
+    return;
+  } finally {
+    publishing = false;
+  }
+  state.draft = null;
+  save('draft');
+  orion.device.vibrate(12).catch(() => {});
+  if (editing) {
+    back();
+    return snack('Publication modifiée');
+  }
+  if (parent) {
+    parent.replies = (parent.replies || 0) + 1;
+    fedi.contexts.get(parent.id)?.descendants.push(post.id);
+  } else {
+    fedi.lists.get('home')?.ids.unshift(post.id);
+    fedi.lists.get(`posts:${fedi.account.me.id}`)?.ids.unshift(post.id);
+  }
+  back();
+  if (ui.view === 'home' && !parent) {
+    ui.feed = 'following';
+    render();
+  }
+  snack(parent ? 'Réponse publiée' : 'Publication partagée', { label: 'Voir', run: () => openPost(post.id) });
+}
+
 function sendReply() {
   const input = document.getElementById('reply-text');
   const text = input.value.trim();
   if (!text) return;
-  if (text.length > MAX_TEXT) return snack(`${MAX_TEXT} caractères au plus`);
+  if (text.length > maxText()) return snack(`${maxText()} caractères au plus`);
+  if (online()) {
+    const parent = find(ui.params.id);
+    if (!parent || publishing) return;
+    publishing = true;
+    input.disabled = true;
+    api('/api/v1/statuses', { method: 'POST', body: { status: withMention(text, parent.author), in_reply_to_id: parent.id, visibility: replyVisibility(parent), language: 'fr' } })
+      .then(({ data }) => {
+        const post = postFrom(data);
+        parent.replies = (parent.replies || 0) + 1;
+        fedi.contexts.get(parent.id)?.descendants.push(post.id);
+        const field = document.getElementById('reply-text');
+        if (field) field.value = '';
+        rerender();
+        const scroller = $app.querySelector('.scroll');
+        if (ui.view === 'post' && scroller) scroller.scrollTop = scroller.scrollHeight;
+      })
+      .catch((error) => snack(error.message))
+      .finally(() => {
+        publishing = false;
+        const field = document.getElementById('reply-text');
+        if (field) field.disabled = false;
+      });
+    return;
+  }
   const post = { id: newId(), author: me(), text, at: Date.now(), likes: 0, liked: false, reposts: 0, reposted: false, replyTo: ui.params.id };
   state.posts.push(post);
   changed();
@@ -1800,6 +2739,16 @@ function sendReply() {
 // ───────────── Messages ─────────────
 
 async function newDm() {
+  if (online()) {
+    const value = (await orion.ui.prompt({ title: 'Nouveau message', message: 'Adresse de la personne sur le fédivers', placeholder: 'nom@instance.social' }))?.trim().replace(/^@/, '').toLowerCase();
+    if (!value) return;
+    try {
+      openChat((await lookup(value)).handle);
+    } catch (error) {
+      snack(error.message);
+    }
+    return;
+  }
   const choice = await sheet({ title: 'Nouveau message', actions: PEOPLE.map((p) => ({ value: p.handle, html: `${avatar(p.handle, 32)}<span>${esc(p.name)} <span class="muted">@${p.handle}</span></span>` })) });
   if (choice) openChat(choice);
 }
@@ -1808,6 +2757,7 @@ function sendDm() {
   const text = input.value.trim();
   if (!text) return;
   const handle = ui.params.user;
+  if (online()) return sendRemoteDm(input, text);
   (state.dms[handle] ||= []).push({ me: true, text, at: Date.now() });
   state.dms[handle] = state.dms[handle].slice(-KEEP_DM);
   save('dms');
@@ -1816,6 +2766,31 @@ function sendDm() {
   if (!state.sim.queue.some((e) => e.type === 'dm' && e.actor === handle)) plan(between(3, 7) * 1000, { type: 'dm', actor: handle, text: dmText(handle, text) });
   rerender();
   autosize(input);
+}
+
+/** Message privé du fédivers : publication « mentionnées seulement », dans le fil de la conversation. */
+function sendRemoteDm(input, text) {
+  const handle = ui.params.user;
+  const conv = chatConv();
+  const before = chatPosts(conv);
+  const to = conv ? conv.accounts : [handle];
+  input.value = '';
+  autosize(input);
+  api('/api/v1/statuses', { method: 'POST', body: { status: `${to.map((h) => `@${h}`).join(' ')} ${text}`, visibility: 'direct', ...(before.length ? { in_reply_to_id: before.at(-1).id } : {}) } })
+    .then(({ data }) => {
+      const post = postFrom(data);
+      fedi.contexts.set(post.id, { ancestors: before.map((p) => p.id), descendants: [] });
+      if (conv) {
+        conv.last = post.id;
+        fedi.convs = [conv, ...fedi.convs.filter((c) => c !== conv)];
+      } else fedi.convs = [{ id: null, accounts: [handle], last: post.id, unread: false }, ...(fedi.convs || [])];
+      if (ui.view === 'chat') rerender();
+    })
+    .catch((error) => {
+      snack(error.message);
+      const field = document.getElementById('dm-text');
+      if (field && !field.value) field.value = text;
+    });
 }
 
 // ───────────── Activité : affichage et notifications ─────────────
@@ -1867,10 +2842,7 @@ function announce(fresh) {
     const added = fresh.filter((f) => f.kind === 'post' && ids.has(f.post)).map((f) => f.post);
     if (added.length && scrollTop() > 80) {
       ui.fresh += added.length;
-      const pill = $app.querySelector('.new-pill');
-      if (pill) pill.outerHTML = freshPill();
-      else $app.querySelector('.scroll').insertAdjacentHTML('afterbegin', freshPill());
-      updateTabs();
+      updateFreshPill();
     } else rerender({ highlight: added });
   } else if (['notifs', 'post', 'chat', 'messages', 'profile', 'tag'].includes(ui.view)) rerender();
   else updateTabs();
@@ -1927,7 +2899,9 @@ function startAgora() {
 }
 
 async function eraseAll() {
-  if (!(await orion.ui.confirm({ title: 'Effacer Agora ?', message: 'Votre profil, vos publications, vos messages et vos réglages seront supprimés de cet appareil.', confirmLabel: 'Effacer' }))) return;
+  const where = online() ? ` Agora sera aussi déconnecté de ${fedi.account.domain} (votre compte y reste intact).` : '';
+  if (!(await orion.ui.confirm({ title: 'Effacer Agora ?', message: `Votre profil, vos publications, vos messages et vos réglages seront supprimés de cet appareil.${where}`, confirmLabel: 'Effacer' }))) return;
+  if (online()) await disconnect();
   clearTimeout(simTimer);
   dirty.clear();
   await saving;
@@ -1937,6 +2911,47 @@ async function eraseAll() {
   stack.length = 0;
   Object.assign(ui, { tab: 'home', view: 'welcome', params: {}, interests: new Set() });
   render();
+}
+
+// ───────────── Connexion au fédivers ─────────────
+
+async function startConnect() {
+  if (ui.connecting) return;
+  ui.domain = document.getElementById('c-domain')?.value || ui.domain || '';
+  ui.connectError = '';
+  const status = (text) => {
+    ui.connecting = text;
+    if (ui.view === 'connect') rerender();
+  };
+  status('Connexion…');
+  try {
+    await connect(ui.domain, status);
+  } catch (error) {
+    ui.connecting = '';
+    ui.connectError = error.message;
+    if (ui.view === 'connect') rerender();
+    return;
+  }
+  ui.connecting = '';
+  clearTimeout(simTimer);
+  stack.length = 0;
+  Object.assign(ui, { tab: 'home', view: 'home', feed: 'following', params: {}, shown: PAGE, fresh: 0, query: '' });
+  render();
+  goOnline();
+  snack(`Connecté à ${fedi.account.domain}`);
+}
+/** Une fois connecté : notifications, messages, puis relève régulière. */
+function goOnline() {
+  listOf('notifs');
+  loadConvs();
+  schedulePoll();
+}
+async function askDisconnect() {
+  const domain = fedi.account.domain;
+  if (await orion.ui.confirm({ title: `Se déconnecter de ${domain} ?`, message: 'Agora oublie l\'accès à votre compte (votre compte reste intact sur l\'instance) et revient à la démonstration.', confirmLabel: 'Se déconnecter' })) {
+    await disconnect();
+    snack(`Déconnecté de ${domain}`);
+  }
 }
 
 // ───────────── Événements ─────────────
@@ -1997,7 +3012,7 @@ const ACTIONS = {
     else if (choice === 'mute') (muted ? unmuteUser : muteUser)(handle);
   },
   messages: () => go('messages'),
-  chat: (el) => openChat(el.dataset.user),
+  chat: (el) => openChat(el.dataset.user, el.dataset.conv),
   'new-dm': () => newDm(),
   'send-dm': () => sendDm(),
   'send-reply': () => sendReply(),
@@ -2038,7 +3053,8 @@ const ACTIONS = {
   'mention-pick': (el) => insertText(`@${el.dataset.user} `, true),
   settings: () => go('settings'),
   'edit-profile'() {
-    ui.edit = { ...state.profile };
+    const p = online() && person(me());
+    ui.edit = p ? { name: p.name, bio: p.note ?? p.bio } : { ...state.profile };
     go('edit');
   },
   'pick-emoji'(el) {
@@ -2057,6 +3073,22 @@ const ACTIONS = {
     const e = ui.edit;
     const error = document.getElementById('e-error');
     const name = e.name.trim();
+    if (online()) {
+      if (!name) return void (error.textContent = 'Indiquez votre nom.');
+      if (e.saving) return;
+      e.saving = true;
+      return api('/api/v1/accounts/update_credentials', { method: 'PATCH', body: { display_name: name, note: e.bio.trim() } })
+        .then(({ data }) => {
+          personFrom(data);
+          if (ui.view === 'edit') back();
+          snack('Profil enregistré');
+        })
+        .catch((failure) => {
+          const box = document.getElementById('e-error');
+          if (box) box.textContent = failure.message;
+        })
+        .finally(() => (e.saving = false));
+    }
     const handle = e.handle.trim().toLowerCase().replace(/^@/, '');
     if (!name) return void (error.textContent = 'Indiquez votre nom.');
     const problem = handleProblem(handle, me());
@@ -2106,6 +3138,46 @@ const ACTIONS = {
     rerender();
   },
   start: () => startAgora(),
+  'go-connect'() {
+    ui.connectError = '';
+    go('connect');
+  },
+  'pick-instance'(el) {
+    ui.domain = el.dataset.domain;
+    const input = document.getElementById('c-domain');
+    if (input) input.value = ui.domain;
+  },
+  connect: () => startConnect(),
+  disconnect: () => askDisconnect(),
+  retry() {
+    if (ui.view === 'messages') {
+      fedi.convs = null;
+      return render();
+    }
+    const key = currentKey();
+    if (!key) return;
+    load(key);
+    rerender();
+  },
+  'more-remote'() {
+    const key = currentKey();
+    if (!key) return;
+    load(key, { more: true });
+    rerender();
+  },
+  cw(el) {
+    ui.opened.add(el.dataset.id);
+    refreshCards(el.dataset.id);
+  },
+  unveil(el) {
+    ui.opened.add(`${el.dataset.id}:media`);
+    refreshCards(el.dataset.id);
+  },
+  media(el) {
+    const p = find(el.dataset.id);
+    if (p?.sensitive && !ui.opened.has(`${p.id}:media`)) return ACTIONS.unveil(el);
+    viewMedia(el.dataset.id, Number(el.dataset.i));
+  },
 };
 
 $app.addEventListener('click', (event) => {
@@ -2119,7 +3191,7 @@ $app.addEventListener('input', (event) => {
   const t = event.target;
   if (t.id === 'q') {
     ui.query = t.value;
-    document.getElementById('explore').innerHTML = exploreContent();
+    refreshExplore();
   } else if (t.id === 'c-text') {
     state.draft.text = t.value;
     autosize(t);
@@ -2161,10 +3233,12 @@ $app.addEventListener('keydown', (event) => {
   } else if (id === 'c-text' && (event.ctrlKey || event.metaKey) && !document.getElementById('publish').disabled) publish();
   else if (id === 'q') event.target.blur();
   else if (id === 'w-name' || id === 'w-handle') ACTIONS['welcome-next']();
+  else if (id === 'c-domain') startConnect();
 });
 
 orion.onBack(() => {
-  if (sheetDone) closeSheet(null);
+  if (ui.viewer) closeViewer();
+  else if (sheetDone) closeSheet(null);
   else if (ui.view === 'compose') leaveCompose();
   else if (ui.view === 'interests') {
     ui.view = 'welcome';
@@ -2176,9 +3250,11 @@ orion.on('pause', () => {
   paused = true;
   flush();
   arm();
+  schedulePoll();
 });
 orion.on('resume', () => {
   paused = false;
+  if (online()) return void pollInstance();
   if (!state.profile) return;
   catchUp();
   if (ui.view !== 'compose') rerender();
@@ -2198,6 +3274,13 @@ async function start() {
   for (const key of ['posts', 'follows', 'followers', 'notifs', 'bookmarks']) if (!Array.isArray(state[key])) state[key] = [];
   changed();
   ui.interests = new Set();
+  const account = await orion.storage.get('fedi');
+  if (account?.token && account.me) {
+    fedi.account = account;
+    ui.view = 'home';
+    render();
+    return goOnline();
+  }
   if (!state.profile) {
     ui.view = 'welcome';
     return render();
